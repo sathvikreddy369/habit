@@ -41,6 +41,13 @@ class HabitRecordRepositoryImpl(
             habitRecordDao.getRecordsForHabit(habitId)
         }
 
+    override fun observeRecordsForHabitInRange(
+        habitId: String,
+        startDate: String,
+        endDate: String
+    ): Flow<List<HabitRecordEntity>> =
+        habitRecordDao.observeRecordsForHabitInRange(habitId, startDate, endDate).flowOn(ioDispatcher)
+
     override suspend fun getRecordsForHabitInRange(
         habitId: String,
         startDate: String,

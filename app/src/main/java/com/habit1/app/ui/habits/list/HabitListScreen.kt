@@ -56,6 +56,7 @@ fun HabitListScreen(
     onCreateHabit: () -> Unit,
     onEditHabit: (habitId: String) -> Unit,
     onNavigateBack: () -> Unit,
+    onInspectHabit: (habitId: String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -148,6 +149,7 @@ fun HabitListScreen(
                         HabitManagementCard(
                             habit = habit,
                             isArchivedView = uiState.showingArchived,
+                            onInspect = { onInspectHabit(habit.id) },
                             onEdit = { onEditHabit(habit.id) },
                             onTogglePause = {
                                 if (habit.isPaused) {
@@ -216,6 +218,7 @@ fun HabitListScreen(
 private fun HabitManagementCard(
     habit: HabitListItem,
     isArchivedView: Boolean,
+    onInspect: () -> Unit,
     onEdit: () -> Unit,
     onTogglePause: () -> Unit,
     onToggleArchive: () -> Unit,
@@ -326,6 +329,17 @@ private fun HabitManagementCard(
                     }
 
                     Row {
+                        // History
+                        OutlinedButton(
+                            onClick = onInspect,
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                            modifier = Modifier.height(32.dp)
+                        ) {
+                            Text("History", style = MaterialTheme.typography.labelSmall)
+                        }
+
+                        Spacer(modifier = Modifier.width(6.dp))
+
                         // Pause / Resume
                         OutlinedButton(
                             onClick = onTogglePause,
@@ -375,8 +389,18 @@ private fun HabitManagementCard(
                         }
                     }
                 } else {
-                    // Archived actions: Restore & Delete
+                    // Archived actions: History, Restore & Delete
                     Spacer(modifier = Modifier.weight(1f))
+                    OutlinedButton(
+                        onClick = onInspect,
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                        modifier = Modifier.height(32.dp)
+                    ) {
+                        Text("History", style = MaterialTheme.typography.labelSmall)
+                    }
+
+                    Spacer(modifier = Modifier.width(6.dp))
+
                     OutlinedButton(
                         onClick = onToggleArchive,
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),

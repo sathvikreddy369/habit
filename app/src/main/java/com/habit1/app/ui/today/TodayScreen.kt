@@ -49,6 +49,7 @@ import com.habit1.app.ui.components.TodayHeader
 fun TodayScreen(
     viewModel: TodayViewModel,
     onNavigateToHabits: () -> Unit = {},
+    onNavigateToHistory: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -67,6 +68,12 @@ fun TodayScreen(
             androidx.compose.material3.TopAppBar(
                 title = {},
                 actions = {
+                    TextButton(onClick = onNavigateToHistory) {
+                        Text(
+                            text = "History",
+                            style = MaterialTheme.typography.labelLarge
+                        )
+                    }
                     TextButton(onClick = onNavigateToHabits) {
                         Text(
                             text = "Habits",

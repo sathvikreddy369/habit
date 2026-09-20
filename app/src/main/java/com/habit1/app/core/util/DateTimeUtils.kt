@@ -43,4 +43,7 @@ object DateTimeUtils {
     fun toEpochMillis(instant: Instant): Long = instant.toEpochMilli()
 
     fun fromEpochMillis(epochMillis: Long): Instant = Instant.ofEpochMilli(epochMillis)
+
+    fun toLocalDate(instant: Instant, zoneId: ZoneId = ZoneId.systemDefault()): LocalDate =
+        instant.atZone(zoneId).toLocalDate()
 }

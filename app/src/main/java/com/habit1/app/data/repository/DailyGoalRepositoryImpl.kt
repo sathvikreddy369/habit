@@ -17,6 +17,9 @@ class DailyGoalRepositoryImpl(
     override fun observeGoalsForDate(date: String): Flow<List<DailyGoalWithSubtasks>> =
         dailyGoalDao.observeGoalsForDate(date).flowOn(ioDispatcher)
 
+    override fun observeGoalsForDateRange(startDate: String, endDate: String): Flow<List<DailyGoalWithSubtasks>> =
+        dailyGoalDao.observeGoalsForDateRange(startDate, endDate).flowOn(ioDispatcher)
+
     override suspend fun getGoalsForDate(date: String): List<DailyGoalWithSubtasks> =
         withContext(ioDispatcher) {
             dailyGoalDao.getGoalsForDate(date)

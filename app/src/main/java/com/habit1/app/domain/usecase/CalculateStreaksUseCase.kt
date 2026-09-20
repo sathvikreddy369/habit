@@ -50,7 +50,8 @@ class CalculateStreaksUseCase(
         }
 
         val recordMap = records.associateBy { it.date }
-        val scheduledDates = evaluateSchedule.getScheduledDatesInRange(habit, startDate, todayDate, zoneId)
+        val habitForSchedule = if (habit.isArchived) habit.copy(isArchived = false) else habit
+        val scheduledDates = evaluateSchedule.getScheduledDatesInRange(habitForSchedule, startDate, todayDate, zoneId)
 
         if (scheduledDates.isEmpty()) {
             val totalDone = records.count { it.isCompleted }

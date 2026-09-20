@@ -44,6 +44,10 @@ interface DailyGoalDao {
 
     @Transaction
     @Query("SELECT * FROM daily_goals WHERE target_date BETWEEN :startDate AND :endDate ORDER BY target_date ASC, display_order ASC")
+    fun observeGoalsForDateRange(startDate: String, endDate: String): Flow<List<DailyGoalWithSubtasks>>
+
+    @Transaction
+    @Query("SELECT * FROM daily_goals WHERE target_date BETWEEN :startDate AND :endDate ORDER BY target_date ASC, display_order ASC")
     suspend fun getGoalsForDateRange(startDate: String, endDate: String): List<DailyGoalWithSubtasks>
 
     @Update

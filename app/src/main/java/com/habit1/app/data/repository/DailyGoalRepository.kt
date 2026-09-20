@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.Flow
 
 interface DailyGoalRepository {
     fun observeGoalsForDate(date: String): Flow<List<DailyGoalWithSubtasks>>
+    fun observeGoalsForDateRange(startDate: String, endDate: String): Flow<List<DailyGoalWithSubtasks>>
     suspend fun getGoalsForDate(date: String): List<DailyGoalWithSubtasks>
     suspend fun getGoalsForDateRange(startDate: String, endDate: String): List<DailyGoalWithSubtasks>
     suspend fun getGoalById(id: String): DailyGoalWithSubtasks?

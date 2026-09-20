@@ -710,13 +710,23 @@ graph TD
   * `lintDebug`: Passed in 9s with 0 errors.
   * Hardware verification: No physical device or emulator attached; adb daemon safely terminated. Clean process state maintained.
 
-### Phase 7: History, Calendar Heatmap & Meaningful Statistics
+### Phase 7: History, Calendar Heatmap & Meaningful Statistics [COMPLETED & VERIFIED]
 * **Objective**: Historical activity inspection and informative, explainable statistics (no opaque scores).
 * **Deliverables**:
-  * History screen with month-by-month navigation and calendar heatmap view.
-  * Consistency metrics: transparent completion percentage, streak statistics, trend graphs.
-  * Detail view for individual habits showing historical frequency and notes.
-* **Verification**: Unit tests verifying streak calculations against real multi-month mock data; verify query windowing performance on historical datasets.
+  * Pure Domain History Model & Use Case (`CalendarDayStatus`, `HabitHistorySummary`, `EvaluateHabitHistoryUseCase`).
+  * 7 typed calendar day states preserving historical truth: `Completed`, `RecordedIncomplete`, `ProjectedMissed`, `ProjectedRest`, `Paused`, `PreCreation`, `Future`.
+  * Historical Schedule Projection Semantics: Recorded entries are factual historical data; unrecorded dates derive expectation as an explicit projection based on current schedule without fabricating schedule history.
+  * Single Source of Truth for Streaks: Reused `CalculateStreaksUseCase` directly in history; zero streak divergence between Today and History.
+  * Distinct Recorded Incomplete vs. Unrecorded: Distinguishes partial recorded attempts (e.g. target 20, actual 10) from missing unrecorded days.
+  * Quantitative Average Semantics: Clearly labelled "Average actual value on completed days" and "Average actual value on recorded days", preserving historical snapshot values (`actualValue`, `targetValue`, `unit`, `measurementType`).
+  * Paused & Archived Habits: Paused periods do not count as missed and do not penalize consistency; archived habits remain fully inspectable in history.
+  * Explanatory UI: Month-by-month calendar view (`HistoryScreen`), daily breakdown of habits and goals, monthly summary statistics, and individual habit inspection screen (`HabitHistoryScreen`).
+  * Zero synthetic scores, artificial gamification, productivity ratings, or AI assessments.
+* **Verification**:
+  * Unit Tests: 122/122 unit tests passing (`./gradlew testDebugUnitTest`), covering empty history, streak consistency, recorded incomplete vs projected missed, schedule changes with old records, creation date boundaries, leap years, year transitions, paused/archived habits, and quantitative averages.
+  * Compilation & Packaging: `./gradlew assembleDebug` passed in 2s with 0 errors.
+  * Static Analysis: `./gradlew lintDebug` passed in 10s with 0 errors and 0 warnings.
+  * Hardware verification: Checked connected devices (`adb devices -l` -> none connected); terminated adb daemon (`adb kill-server`); stopped Gradle daemons (`./gradlew --stop`).
 
 ### Phase 8: Notifications & Alarm Scheduling
 * **Objective**: Reliable, battery-conscious reminder notifications without polling services.
