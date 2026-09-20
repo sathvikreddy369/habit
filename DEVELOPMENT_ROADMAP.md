@@ -673,13 +673,42 @@ graph TD
   * `lintDebug`: Passed with 0 errors.
   * Hardware verification: No physical device or emulator attached; adb daemon safely terminated. No synthetic performance claims made. Clean process state maintained.
 
-### Phase 6: Daily Goals & Subtasks
-* **Objective**: Goal creation, completion, date reassignment, and subtasks.
+### Phase 6: Daily Goals & Subtasks [COMPLETED & VERIFIED]
+* **Objective**: Establish Daily Goals as a polished, useful second pillar of the Today experience alongside Habits, with pure domain validation, independent completion semantics, hierarchical subtasks, date rescheduling, and atomic reordering.
 * **Deliverables**:
-  * Goal creation dialog/screen with date selection.
-  * Subtask support under goals.
-  * Ability to explicitly move uncompleted goals to another day without altering historical records.
-* **Verification**: Unit and DAO tests for goal queries by date, subtask cascades, and date changes.
+  * Pure domain validator `GoalValidator.kt` with UI-independent typed validation errors (`GoalValidationError`: `TitleBlank`, `TitleTooLong`, `NotesTooLong`, `TargetDateNull`, `SubtaskTitleBlank`, `SubtaskTitleTooLong`).
+  * Explicit, authoritative completion semantics:
+    * Goal completion is an authoritative boolean directly controlled by the user.
+    * Subtask completion is independent, representing granular execution progress (e.g. `2/3`).
+    * Completing all subtasks does not automatically mark the goal complete.
+    * Completing the parent goal does not automatically alter subtask states.
+  * Date reassignment semantics:
+    * Moving a goal to a different civil date resets `isCompleted = false` (as completion belongs to the outcome on its original date).
+    * Moving an incomplete goal preserves `isCompleted = false`.
+    * Goals with subtasks move together; subtask ownership and integrity are preserved.
+  * Content editing vs. date moving:
+    * Editing title/notes preserves completion state, ID, and target date.
+  * Subtask lifecycle & ownership integrity:
+    * Add, edit, toggle, reorder, and delete subtasks under parent goals.
+    * Cascade deletion strictly verified: deleting a goal cascades to its subtasks only, leaving sibling goals and subtasks unaffected.
+  * Atomic reordering:
+    * Batch updates for goals (`updateAllGoals`) and subtasks (`updateAllSubtasks`) in Room, preventing UI flickering and intermediate flow emissions.
+  * Today UX & Material 3 components:
+    * `GoalCard.kt` following the product principle: "Simple at first glance; powerful when interacted with."
+    * Compact top-level card with title, checkbox, subtask progress badge (`2/3`), notes preview, and overflow menu (Edit, Move to Tomorrow, Move Up/Down, Delete).
+    * Expandable subtasks list with individual checkboxes, strikethrough styling, inline Move Up/Down, Edit, and Delete actions.
+    * Inline "+ Add subtask" row for quick subtask capture.
+    * `GoalEditorDialog.kt` for creating/editing goals with inline validation and date selection (Today / Tomorrow).
+    * Irreversible goal deletion confirmation dialog.
+* **Verification & Quality Gate Results**:
+  * 104 total unit tests passing with 100% pass rate:
+    * `GoalValidatorTest` (8 tests): blank/too long titles, notes limits, null dates, subtask blank/length limits.
+    * `DailyGoalLifecycleAndIntegrityTest` (10 tests): goal persistence, editing preserving completion, date moving with completion reset, atomic reordering, cascade deletion, subtask ownership isolation, subtask lifecycle, independent completion semantics, date isolation.
+    * `TodayViewModelTest` (15 tests): full UI event flows for goals and subtasks, add/edit/delete dialogs, Move to Tomorrow, reordering, and negative value coercion.
+    * All 79 prior unit tests intact and passing.
+  * `assembleDebug`: Clean debug APK built in 2s.
+  * `lintDebug`: Passed in 9s with 0 errors.
+  * Hardware verification: No physical device or emulator attached; adb daemon safely terminated. Clean process state maintained.
 
 ### Phase 7: History, Calendar Heatmap & Meaningful Statistics
 * **Objective**: Historical activity inspection and informative, explainable statistics (no opaque scores).

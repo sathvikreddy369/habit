@@ -12,6 +12,7 @@ interface DailyGoalRepository {
     suspend fun getGoalById(id: String): DailyGoalWithSubtasks?
     suspend fun createGoal(goal: DailyGoalEntity)
     suspend fun updateGoal(goal: DailyGoalEntity)
+    suspend fun updateGoalContent(id: String, title: String, notes: String?)
     suspend fun deleteGoal(id: String)
     suspend fun setGoalCompleted(id: String, isCompleted: Boolean)
     suspend fun moveGoalDate(id: String, newDate: String, newOrder: Int)
@@ -20,6 +21,8 @@ interface DailyGoalRepository {
     // Subtasks
     suspend fun addSubtask(subtask: GoalSubtaskEntity)
     suspend fun updateSubtask(subtask: GoalSubtaskEntity)
+    suspend fun updateSubtaskTitle(id: String, title: String)
     suspend fun deleteSubtask(id: String)
     suspend fun setSubtaskCompleted(id: String, isCompleted: Boolean)
+    suspend fun reorderSubtasks(goalId: String, orderedIds: List<String>)
 }

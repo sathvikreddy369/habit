@@ -17,12 +17,15 @@ import com.habit1.app.data.repository.HabitRepositoryImpl
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -315,6 +318,192 @@ class TodayViewModelTest {
             val state = awaitItem()
             assertEquals(1, state.habits.size)
             assertEquals("Meditation", state.habits[0].name)
+        }
+    }
+
+    @Test
+    fun saveNewGoal_createsGoalWithNotes() = runTest(testDispatcher) {
+        viewModel.uiState.test {
+            awaitItem() // loading
+            awaitItem() // empty
+
+            viewModel.onEvent(TodayUiEvent.SaveNewGoal(title = "Review PR", notes = "Security critical"))
+            val state = awaitItem()
+            assertEquals(1, state.goals.size)
+            assertEquals("Review PR", state.goals[0].title)
+            assertEquals("Security critical", state.goals[0].notes)
+        }
+    }
+
+    @Test
+    fun editGoal_updatesTitleAndNotes() = runTest(testDispatcher) {
+        val todayStr = DateTimeUtils.formatDate(DateTimeUtils.today(zoneId))
+        val now = System.currentTimeMillis()
+        val goal = DailyGoalEntity(id = "g_edit_vm", title = "Initial", targetDate = todayStr, isCompleted = true, displayOrder = 0, createdAt = now, updatedAt = now)
+        dailyGoalRepository.createGoal(goal)
+        advanceUntilIdle()
+
+        viewModel.uiState.test {
+            awaitItem() // loading
+            val initial = awaitItem()
+            assertEquals("Initial", initial.goals[0].title)
+
+            viewModel.onEvent(TodayUiEvent.SaveEditedGoal(goalId = "g_edit_vm", title = "Updated Title", notes = "New note"))
+            val edited = awaitItem()
+            assertEquals("Updated Title", edited.goals[0].title)
+            assertEquals("New note", edited.goals[0].notes)
+            assertTrue("Completion must be preserved across edits", edited.goals[0].isCompleted)
+        }
+    }
+
+    @Test
+    fun deleteGoal_withConfirmationRemovesGoal() = runTest(testDispatcher) {
+        val todayStr = DateTimeUtils.formatDate(DateTimeUtils.today(zoneId))
+        val now = System.currentTimeMillis()
+        val goal = DailyGoalEntity(id = "g_del_vm", title = "Delete Me", targetDate = todayStr, isCompleted = false, displayOrder = 0, createdAt = now, updatedAt = now)
+        dailyGoalRepository.createGoal(goal)
+        advanceUntilIdle()
+
+        viewModel.uiState.test {
+            awaitItem() // loading
+            val initial = awaitItem()
+            assertEquals(1, initial.goals.size)
+
+            viewModel.onEvent(TodayUiEvent.RequestDeleteGoal(initial.goals[0]))
+            val requestState = awaitItem()
+            assertNotNull(requestState.goalPendingDeletion)
+
+            viewModel.onEvent(TodayUiEvent.ConfirmDeleteGoal)
+            val deletedState = awaitItem()
+            assertEquals(0, deletedState.goals.size)
+            assertNull(deletedState.goalPendingDeletion)
+        }
+    }
+
+    @Test
+    fun moveGoalDate_removesFromTodayView() = runTest(testDispatcher) {
+        val today = DateTimeUtils.today(zoneId)
+        val todayStr = DateTimeUtils.formatDate(today)
+        val now = System.currentTimeMillis()
+        val goal = DailyGoalEntity(id = "g_move_vm", title = "Move Me", targetDate = todayStr, isCompleted = true, displayOrder = 0, createdAt = now, updatedAt = now)
+        dailyGoalRepository.createGoal(goal)
+        advanceUntilIdle()
+
+        viewModel.uiState.test {
+            awaitItem() // loading
+            val initial = awaitItem()
+            assertEquals(1, initial.goals.size)
+
+            viewModel.onEvent(TodayUiEvent.MoveGoalDate("g_move_vm", today.plusDays(1)))
+            val movedState = awaitItem()
+            assertEquals(0, movedState.goals.size)
+        }
+    }
+
+    @Test
+    fun reorderGoals_moveUpAndDown() = runTest(testDispatcher) {
+        val todayStr = DateTimeUtils.formatDate(DateTimeUtils.today(zoneId))
+        val now = System.currentTimeMillis()
+        val g1 = DailyGoalEntity(id = "g1_order", title = "First", targetDate = todayStr, isCompleted = false, displayOrder = 0, createdAt = now, updatedAt = now)
+        val g2 = DailyGoalEntity(id = "g2_order", title = "Second", targetDate = todayStr, isCompleted = false, displayOrder = 1, createdAt = now, updatedAt = now)
+        dailyGoalRepository.createGoal(g1)
+        dailyGoalRepository.createGoal(g2)
+        advanceUntilIdle()
+
+        viewModel.uiState.test {
+            awaitItem() // loading
+            val initial = awaitItem()
+            assertEquals("First", initial.goals[0].title)
+            assertEquals("Second", initial.goals[1].title)
+
+            viewModel.onEvent(TodayUiEvent.MoveGoalUp("g2_order"))
+            val reordered = awaitItem()
+            assertEquals("Second", reordered.goals[0].title)
+            assertEquals("First", reordered.goals[1].title)
+
+            viewModel.onEvent(TodayUiEvent.MoveGoalDown("g2_order"))
+            val back = awaitItem()
+            assertEquals("First", back.goals[0].title)
+            assertEquals("Second", back.goals[1].title)
+        }
+    }
+
+    @Test
+    fun subtaskManagement_addEditReorderDelete() = runTest(testDispatcher) {
+        val todayStr = DateTimeUtils.formatDate(DateTimeUtils.today(zoneId))
+        val now = System.currentTimeMillis()
+        val goal = DailyGoalEntity(id = "g_sub_vm", title = "Parent Goal", targetDate = todayStr, isCompleted = false, displayOrder = 0, createdAt = now, updatedAt = now)
+        dailyGoalRepository.createGoal(goal)
+        advanceUntilIdle()
+
+        viewModel.uiState.test {
+            awaitItem() // loading
+            awaitItem() // goal loaded with 0 subtasks
+
+            // Add Subtask 1
+            viewModel.onEvent(TodayUiEvent.AddSubtask("g_sub_vm", "Sub 1"))
+            val s1State = awaitItem()
+            assertEquals(1, s1State.goals[0].subtasks.size)
+            assertEquals("Sub 1", s1State.goals[0].subtasks[0].title)
+
+            // Add Subtask 2
+            viewModel.onEvent(TodayUiEvent.AddSubtask("g_sub_vm", "Sub 2"))
+            val s2State = awaitItem()
+            assertEquals(2, s2State.goals[0].subtasks.size)
+            val sub1Id = s2State.goals[0].subtasks[0].id
+            val sub2Id = s2State.goals[0].subtasks[1].id
+
+            // Edit Subtask 1
+            viewModel.onEvent(TodayUiEvent.SaveEditedSubtask("g_sub_vm", sub1Id, "Sub 1 Edited"))
+            val editedState = awaitItem()
+            assertEquals("Sub 1 Edited", editedState.goals[0].subtasks[0].title)
+
+            // Reorder Subtasks: move sub2 up
+            viewModel.onEvent(TodayUiEvent.MoveSubtaskUp("g_sub_vm", sub2Id))
+            val reorderedState = awaitItem()
+            assertEquals(sub2Id, reorderedState.goals[0].subtasks[0].id)
+            assertEquals(sub1Id, reorderedState.goals[0].subtasks[1].id)
+
+            // Delete Subtask 2
+            viewModel.onEvent(TodayUiEvent.DeleteSubtask("g_sub_vm", sub2Id))
+            val deletedSubState = awaitItem()
+            assertEquals(1, deletedSubState.goals[0].subtasks.size)
+            assertEquals(sub1Id, deletedSubState.goals[0].subtasks[0].id)
+        }
+    }
+
+    @Test
+    fun setHabitValue_negativeValueCoercedToZero() = runTest(testDispatcher) {
+        val past = System.currentTimeMillis() - 86400000
+        val habit = HabitEntity(
+            id = "h_neg",
+            name = "Water",
+            measurementType = "QUANTITY",
+            targetValue = 2.0,
+            unit = "L",
+            scheduleType = "DAILY",
+            scheduleConfig = "{}",
+            displayOrder = 0,
+            isArchived = false,
+            createdAt = past,
+            updatedAt = past
+        )
+        habitRepository.createHabit(habit)
+        advanceUntilIdle()
+
+        viewModel.uiState.test {
+            awaitItem() // loading
+            awaitItem() // habit loaded
+
+            // Set to 1.0 first
+            viewModel.onEvent(TodayUiEvent.SetHabitValue("h_neg", 1.0))
+            val state1 = awaitItem()
+            assertEquals(1.0, state1.habits[0].actualValue, 0.001)
+
+            // Set negative value -> coerced to 0.0
+            viewModel.onEvent(TodayUiEvent.SetHabitValue("h_neg", -3.0))
+            val stateCoerced = awaitItem()
+            assertEquals(0.0, stateCoerced.habits[0].actualValue, 0.001)
         }
     }
 }

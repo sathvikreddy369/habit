@@ -27,7 +27,10 @@ data class TodayHabitItem(
 data class TodaySubtaskItem(
     val id: String,
     val title: String,
-    val isCompleted: Boolean
+    val isCompleted: Boolean,
+    val displayOrder: Int = 0,
+    val canMoveUp: Boolean = false,
+    val canMoveDown: Boolean = false
 )
 
 /**
@@ -38,7 +41,11 @@ data class TodayGoalItem(
     val title: String,
     val isCompleted: Boolean,
     val subtasks: List<TodaySubtaskItem> = emptyList(),
-    val notes: String? = null
+    val notes: String? = null,
+    val displayOrder: Int = 0,
+    val canMoveUp: Boolean = false,
+    val canMoveDown: Boolean = false,
+    val isExpanded: Boolean = true
 )
 
 /**
@@ -55,5 +62,9 @@ data class TodayUiState(
     val totalGoalsCount: Int = 0,
     val overallProgress: Float = 0.0f,
     val isLoading: Boolean = false,
-    val userMessage: String? = null
+    val userMessage: String? = null,
+    val isAddGoalDialogOpen: Boolean = false,
+    val goalPendingEdit: TodayGoalItem? = null,
+    val goalPendingDeletion: TodayGoalItem? = null,
+    val subtaskPendingEdit: Pair<String, TodaySubtaskItem>? = null
 )

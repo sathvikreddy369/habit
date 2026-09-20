@@ -42,6 +42,11 @@ class DailyGoalRepositoryImpl(
             dailyGoalDao.updateGoal(goal)
         }
 
+    override suspend fun updateGoalContent(id: String, title: String, notes: String?) =
+        withContext(ioDispatcher) {
+            dailyGoalDao.updateGoalContent(id, title.trim(), notes?.trim(), System.currentTimeMillis())
+        }
+
     override suspend fun deleteGoal(id: String) =
         withContext(ioDispatcher) {
             dailyGoalDao.deleteGoalById(id)
@@ -60,8 +65,12 @@ class DailyGoalRepositoryImpl(
     override suspend fun reorderGoals(date: String, orderedIds: List<String>) =
         withContext(ioDispatcher) {
             val now = System.currentTimeMillis()
-            orderedIds.forEachIndexed { index, id ->
-                dailyGoalDao.updateGoalOrder(id, index, now)
+            val currentGoals = dailyGoalDao.getGoalsForDate(date).associateBy { it.goal.id }
+            val updated = orderedIds.mapIndexedNotNull { index, id ->
+                currentGoals[id]?.goal?.copy(displayOrder = index, updatedAt = now)
+            }
+            if (updated.isNotEmpty()) {
+                dailyGoalDao.updateAllGoals(updated)
             }
         }
 
@@ -75,6 +84,11 @@ class DailyGoalRepositoryImpl(
             dailyGoalDao.updateSubtask(subtask)
         }
 
+    override suspend fun updateSubtaskTitle(id: String, title: String) =
+        withContext(ioDispatcher) {
+            dailyGoalDao.updateSubtaskTitle(id, title.trim())
+        }
+
     override suspend fun deleteSubtask(id: String) =
         withContext(ioDispatcher) {
             dailyGoalDao.deleteSubtaskById(id)
@@ -83,5 +97,16 @@ class DailyGoalRepositoryImpl(
     override suspend fun setSubtaskCompleted(id: String, isCompleted: Boolean) =
         withContext(ioDispatcher) {
             dailyGoalDao.updateSubtaskCompletion(id, isCompleted)
+        }
+
+    override suspend fun reorderSubtasks(goalId: String, orderedIds: List<String>) =
+        withContext(ioDispatcher) {
+            val currentSubtasks = dailyGoalDao.getSubtasksForGoal(goalId).associateBy { it.id }
+            val updated = orderedIds.mapIndexedNotNull { index, id ->
+                currentSubtasks[id]?.copy(displayOrder = index)
+            }
+            if (updated.isNotEmpty()) {
+                dailyGoalDao.updateAllSubtasks(updated)
+            }
         }
 }

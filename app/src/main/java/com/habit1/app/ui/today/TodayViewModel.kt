@@ -5,7 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.habit1.app.core.util.DateTimeUtils
 import com.habit1.app.data.local.db.entity.DailyGoalEntity
-import com.habit1.app.data.local.db.entity.HabitEntity
+import com.habit1.app.data.local.db.entity.GoalSubtaskEntity
 import com.habit1.app.data.local.db.entity.HabitRecordEntity
 import com.habit1.app.data.repository.DailyGoalRepository
 import com.habit1.app.data.repository.HabitRecordRepository
@@ -14,10 +14,12 @@ import com.habit1.app.domain.mapper.EntityMappers.toDomain
 import com.habit1.app.domain.mapper.EntityMappers.toEntity
 import com.habit1.app.domain.model.HabitSchedule
 import com.habit1.app.domain.model.MeasurementType
-import com.habit1.app.domain.model.StreakResult
 import com.habit1.app.domain.usecase.CalculateStreaksUseCase
 import com.habit1.app.domain.usecase.EvaluateMeasurementUseCase
 import com.habit1.app.domain.usecase.EvaluateScheduleUseCase
+import com.habit1.app.domain.validation.GoalValidationError
+import com.habit1.app.domain.validation.GoalValidator
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -43,12 +45,22 @@ class TodayViewModel(
     private val evaluateSchedule: EvaluateScheduleUseCase = EvaluateScheduleUseCase(),
     private val calculateStreaks: CalculateStreaksUseCase = CalculateStreaksUseCase(),
     private val evaluateMeasurement: EvaluateMeasurementUseCase = EvaluateMeasurementUseCase(),
-    private val zoneId: ZoneId = ZoneId.systemDefault()
+    private val zoneId: ZoneId = ZoneId.systemDefault(),
+    coroutineScope: CoroutineScope? = null
 ) : ViewModel() {
+
+    private val scope: CoroutineScope = coroutineScope ?: viewModelScope
 
     private val currentDateFlow = MutableStateFlow(DateTimeUtils.today(zoneId))
     private val userMessageFlow = MutableStateFlow<String?>(null)
     private val dateFormatter = DateTimeFormatter.ofPattern("EEEE, MMMM d", Locale.getDefault())
+
+    // UI state flows for dialogs and expansion
+    private val isAddGoalDialogOpenFlow = MutableStateFlow(false)
+    private val goalPendingEditFlow = MutableStateFlow<TodayGoalItem?>(null)
+    private val goalPendingDeletionFlow = MutableStateFlow<TodayGoalItem?>(null)
+    private val subtaskPendingEditFlow = MutableStateFlow<Pair<String, TodaySubtaskItem>?>(null)
+    private val collapsedGoalIdsFlow = MutableStateFlow<Set<String>>(emptySet())
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val uiState: StateFlow<TodayUiState> = currentDateFlow.flatMapLatest { date ->
@@ -58,8 +70,28 @@ class TodayViewModel(
             habitRepository.observeActiveHabits(),
             habitRecordRepository.observeRecordsForDate(dateString),
             dailyGoalRepository.observeGoalsForDate(dateString),
-            userMessageFlow
-        ) { activeEntities, recordEntities, goalWithSubtasksList, message ->
+            userMessageFlow,
+            isAddGoalDialogOpenFlow,
+            goalPendingEditFlow,
+            goalPendingDeletionFlow,
+            subtaskPendingEditFlow,
+            collapsedGoalIdsFlow
+        ) { args: Array<Any?> ->
+            @Suppress("UNCHECKED_CAST")
+            val activeEntities = args[0] as List<com.habit1.app.data.local.db.entity.HabitEntity>
+            @Suppress("UNCHECKED_CAST")
+            val recordEntities = args[1] as List<HabitRecordEntity>
+            @Suppress("UNCHECKED_CAST")
+            val goalWithSubtasksList = args[2] as List<com.habit1.app.data.local.db.entity.DailyGoalWithSubtasks>
+            val message = args[3] as String?
+            val isAddGoalOpen = args[4] as Boolean
+            val goalPendingEdit = args[5] as TodayGoalItem?
+            val goalPendingDeletion = args[6] as TodayGoalItem?
+            @Suppress("UNCHECKED_CAST")
+            val subtaskPendingEdit = args[7] as Pair<String, TodaySubtaskItem>?
+            @Suppress("UNCHECKED_CAST")
+            val collapsedGoalIds = args[8] as Set<String>
+
             val habits = activeEntities.map { it.toDomain() }
             val recordsMap = recordEntities.associateBy { it.habitId }
 
@@ -91,7 +123,6 @@ class TodayViewModel(
                 val progressRatio = evaluateMeasurement.progressRatio(habit.measurement, actualValue)
                 val formattedProgress = evaluateMeasurement.formatProgress(habit.measurement, actualValue)
 
-                // Retrieve all past records for streak calculation
                 val habitHistory = habitRecordRepository.getRecordsForHabit(habit.id).map { it.toDomain() }
                 val streak = calculateStreaks.execute(habit, habitHistory, date, zoneId)
 
@@ -110,21 +141,30 @@ class TodayViewModel(
                 )
             }
 
-            // 3. Map goals
-            val goalUiItems = goalWithSubtasksList.map { item ->
+            // 3. Map goals & subtasks
+            val goalCount = goalWithSubtasksList.size
+            val goalUiItems = goalWithSubtasksList.mapIndexed { index, item ->
                 val domainGoal = item.toDomain()
+                val subtaskCount = domainGoal.subtasks.size
                 TodayGoalItem(
                     id = domainGoal.id,
                     title = domainGoal.title,
                     isCompleted = domainGoal.isCompleted,
-                    subtasks = domainGoal.subtasks.map { subtask ->
+                    subtasks = domainGoal.subtasks.mapIndexed { sIndex, subtask ->
                         TodaySubtaskItem(
                             id = subtask.id,
                             title = subtask.title,
-                            isCompleted = subtask.isCompleted
+                            isCompleted = subtask.isCompleted,
+                            displayOrder = subtask.displayOrder,
+                            canMoveUp = sIndex > 0,
+                            canMoveDown = sIndex < subtaskCount - 1
                         )
                     },
-                    notes = domainGoal.notes
+                    notes = domainGoal.notes,
+                    displayOrder = domainGoal.displayOrder,
+                    canMoveUp = index > 0,
+                    canMoveDown = index < goalCount - 1,
+                    isExpanded = !collapsedGoalIds.contains(domainGoal.id)
                 )
             }
 
@@ -153,11 +193,15 @@ class TodayViewModel(
                 totalGoalsCount = totalGoalsCount,
                 overallProgress = overallProgress,
                 isLoading = false,
-                userMessage = message
+                userMessage = message,
+                isAddGoalDialogOpen = isAddGoalOpen,
+                goalPendingEdit = goalPendingEdit,
+                goalPendingDeletion = goalPendingDeletion,
+                subtaskPendingEdit = subtaskPendingEdit
             )
         }
     }.stateIn(
-        scope = viewModelScope,
+        scope = scope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = TodayUiState(
             currentDate = DateTimeUtils.today(zoneId),
@@ -167,7 +211,7 @@ class TodayViewModel(
     )
 
     fun onEvent(event: TodayUiEvent) {
-        viewModelScope.launch {
+        scope.launch {
             when (event) {
                 is TodayUiEvent.ToggleHabit -> handleToggleHabit(event.habitId)
                 is TodayUiEvent.IncrementHabit -> handleAdjustHabit(event.habitId, increment = true)
@@ -178,10 +222,41 @@ class TodayViewModel(
                     !isGoalCompleted(event.goalId)
                 )
                 is TodayUiEvent.ToggleSubtask -> handleToggleSubtask(event.goalId, event.subtaskId)
-                is TodayUiEvent.AddGoal -> handleAddGoal(event.title)
+                is TodayUiEvent.AddGoal -> handleAddGoal(event.title, notes = null, targetDate = null)
                 is TodayUiEvent.AddHabitQuick -> handleAddHabitQuick(event.name, event.measurementType)
                 is TodayUiEvent.RefreshDate -> currentDateFlow.value = DateTimeUtils.today(zoneId)
                 is TodayUiEvent.DismissMessage -> userMessageFlow.value = null
+
+                // Goal dialogs and actions
+                is TodayUiEvent.OpenAddGoalDialog -> isAddGoalDialogOpenFlow.value = true
+                is TodayUiEvent.DismissGoalDialog -> {
+                    isAddGoalDialogOpenFlow.value = false
+                    goalPendingEditFlow.value = null
+                }
+                is TodayUiEvent.SaveNewGoal -> handleAddGoal(event.title, event.notes, event.targetDate)
+                is TodayUiEvent.RequestEditGoal -> goalPendingEditFlow.value = event.goal
+                is TodayUiEvent.SaveEditedGoal -> handleEditGoal(event.goalId, event.title, event.notes)
+                is TodayUiEvent.RequestDeleteGoal -> goalPendingDeletionFlow.value = event.goal
+                is TodayUiEvent.ConfirmDeleteGoal -> {
+                    goalPendingDeletionFlow.value?.let { goal ->
+                        dailyGoalRepository.deleteGoal(goal.id)
+                        goalPendingDeletionFlow.value = null
+                    }
+                }
+                is TodayUiEvent.CancelDeleteGoal -> goalPendingDeletionFlow.value = null
+                is TodayUiEvent.MoveGoalDate -> handleMoveGoalDate(event.goalId, event.newDate)
+                is TodayUiEvent.MoveGoalUp -> handleReorderGoal(event.goalId, moveUp = true)
+                is TodayUiEvent.MoveGoalDown -> handleReorderGoal(event.goalId, moveUp = false)
+                is TodayUiEvent.ToggleGoalExpanded -> handleToggleGoalExpanded(event.goalId)
+
+                // Subtask actions
+                is TodayUiEvent.AddSubtask -> handleAddSubtask(event.goalId, event.title)
+                is TodayUiEvent.RequestEditSubtask -> subtaskPendingEditFlow.value = Pair(event.goalId, event.subtask)
+                is TodayUiEvent.SaveEditedSubtask -> handleEditSubtask(event.subtaskId, event.title)
+                is TodayUiEvent.DismissSubtaskEditDialog -> subtaskPendingEditFlow.value = null
+                is TodayUiEvent.DeleteSubtask -> dailyGoalRepository.deleteSubtask(event.subtaskId)
+                is TodayUiEvent.MoveSubtaskUp -> handleReorderSubtask(event.goalId, event.subtaskId, moveUp = true)
+                is TodayUiEvent.MoveSubtaskDown -> handleReorderSubtask(event.goalId, event.subtaskId, moveUp = false)
             }
         }
     }
@@ -270,6 +345,7 @@ class TodayViewModel(
     }
 
     private suspend fun handleSetHabitValue(habitId: String, value: Double) {
+        val safeValue = value.coerceAtLeast(0.0)
         val habitEntity = habitRepository.getHabitById(habitId) ?: return
         val habit = habitEntity.toDomain()
         val dateString = DateTimeUtils.formatDate(currentDateFlow.value)
@@ -281,14 +357,15 @@ class TodayViewModel(
             is MeasurementType.Duration -> m.targetMinutes.toDouble()
             is MeasurementType.Quantity -> m.target
         }
-        val isCompleted = evaluateMeasurement.isCompleted(habit.measurement, value)
+
+        val isCompleted = evaluateMeasurement.isCompleted(habit.measurement, safeValue)
         val now = System.currentTimeMillis()
 
         val recordToSave = HabitRecordEntity(
             id = existingRecord?.id ?: UUID.randomUUID().toString(),
             habitId = habitId,
             date = dateString,
-            actualValue = value.coerceAtLeast(0.0),
+            actualValue = safeValue,
             targetValue = targetVal,
             measurementType = habit.measurement.typeName,
             unit = habitEntity.unit,
@@ -308,11 +385,17 @@ class TodayViewModel(
         dailyGoalRepository.setSubtaskCompleted(subtaskId, !subtask.isCompleted)
     }
 
-    private suspend fun handleAddGoal(title: String) {
-        if (title.isBlank()) return
-        val dateString = DateTimeUtils.formatDate(currentDateFlow.value)
+    private suspend fun handleAddGoal(title: String, notes: String?, targetDate: LocalDate?) {
+        val dateToUse = targetDate ?: currentDateFlow.value
+        val validationErrors = GoalValidator.validateGoal(title, notes, dateToUse)
+        if (validationErrors.isNotEmpty()) {
+            userMessageFlow.value = mapValidationError(validationErrors.first())
+            return
+        }
+
+        val dateString = DateTimeUtils.formatDate(dateToUse)
         val now = System.currentTimeMillis()
-        val currentGoalsCount = uiState.value.goals.size
+        val currentGoalsCount = dailyGoalRepository.getGoalsForDate(dateString).size
 
         val newGoal = DailyGoalEntity(
             id = UUID.randomUUID().toString(),
@@ -320,10 +403,111 @@ class TodayViewModel(
             targetDate = dateString,
             isCompleted = false,
             displayOrder = currentGoalsCount,
+            notes = notes?.trim()?.ifEmpty { null },
             createdAt = now,
             updatedAt = now
         )
         dailyGoalRepository.createGoal(newGoal)
+        isAddGoalDialogOpenFlow.value = false
+    }
+
+    private suspend fun handleEditGoal(goalId: String, title: String, notes: String?) {
+        val validationErrors = GoalValidator.validateGoal(title, notes, currentDateFlow.value)
+        if (validationErrors.isNotEmpty()) {
+            userMessageFlow.value = mapValidationError(validationErrors.first())
+            return
+        }
+
+        dailyGoalRepository.updateGoalContent(goalId, title.trim(), notes?.trim()?.ifEmpty { null })
+        goalPendingEditFlow.value = null
+    }
+
+    private suspend fun handleMoveGoalDate(goalId: String, newDate: LocalDate) {
+        val newDateString = DateTimeUtils.formatDate(newDate)
+        val nextDisplayOrder = dailyGoalRepository.getGoalsForDate(newDateString).size
+        dailyGoalRepository.moveGoalDate(goalId, newDateString, nextDisplayOrder)
+    }
+
+    private suspend fun handleReorderGoal(goalId: String, moveUp: Boolean) {
+        val currentDateStr = DateTimeUtils.formatDate(currentDateFlow.value)
+        val currentGoals = uiState.value.goals.map { it.id }.toMutableList()
+        val index = currentGoals.indexOf(goalId)
+        if (index == -1) return
+
+        val targetIndex = if (moveUp) index - 1 else index + 1
+        if (targetIndex in currentGoals.indices) {
+            val item = currentGoals.removeAt(index)
+            currentGoals.add(targetIndex, item)
+            dailyGoalRepository.reorderGoals(currentDateStr, currentGoals)
+        }
+    }
+
+    private fun handleToggleGoalExpanded(goalId: String) {
+        val current = collapsedGoalIdsFlow.value.toMutableSet()
+        if (current.contains(goalId)) {
+            current.remove(goalId)
+        } else {
+            current.add(goalId)
+        }
+        collapsedGoalIdsFlow.value = current
+    }
+
+    private suspend fun handleAddSubtask(goalId: String, title: String) {
+        val validationErrors = GoalValidator.validateSubtask(title)
+        if (validationErrors.isNotEmpty()) {
+            userMessageFlow.value = mapValidationError(validationErrors.first())
+            return
+        }
+
+        val goal = uiState.value.goals.find { it.id == goalId }
+        val displayOrder = goal?.subtasks?.size ?: 0
+        val now = System.currentTimeMillis()
+
+        val subtask = GoalSubtaskEntity(
+            id = UUID.randomUUID().toString(),
+            goalId = goalId,
+            title = title.trim(),
+            isCompleted = false,
+            displayOrder = displayOrder,
+            createdAt = now
+        )
+        dailyGoalRepository.addSubtask(subtask)
+    }
+
+    private suspend fun handleEditSubtask(subtaskId: String, title: String) {
+        val validationErrors = GoalValidator.validateSubtask(title)
+        if (validationErrors.isNotEmpty()) {
+            userMessageFlow.value = mapValidationError(validationErrors.first())
+            return
+        }
+
+        dailyGoalRepository.updateSubtaskTitle(subtaskId, title.trim())
+        subtaskPendingEditFlow.value = null
+    }
+
+    private suspend fun handleReorderSubtask(goalId: String, subtaskId: String, moveUp: Boolean) {
+        val goal = uiState.value.goals.find { it.id == goalId } ?: return
+        val currentSubtasks = goal.subtasks.map { it.id }.toMutableList()
+        val index = currentSubtasks.indexOf(subtaskId)
+        if (index == -1) return
+
+        val targetIndex = if (moveUp) index - 1 else index + 1
+        if (targetIndex in currentSubtasks.indices) {
+            val item = currentSubtasks.removeAt(index)
+            currentSubtasks.add(targetIndex, item)
+            dailyGoalRepository.reorderSubtasks(goalId, currentSubtasks)
+        }
+    }
+
+    private fun mapValidationError(error: GoalValidationError): String {
+        return when (error) {
+            GoalValidationError.TitleBlank -> "Goal title cannot be blank"
+            is GoalValidationError.TitleTooLong -> "Goal title cannot exceed ${error.maxLength} characters"
+            is GoalValidationError.NotesTooLong -> "Notes cannot exceed ${error.maxLength} characters"
+            GoalValidationError.TargetDateNull -> "Target date must be specified"
+            GoalValidationError.SubtaskTitleBlank -> "Subtask title cannot be blank"
+            is GoalValidationError.SubtaskTitleTooLong -> "Subtask title cannot exceed ${error.maxLength} characters"
+        }
     }
 
     private suspend fun handleAddHabitQuick(name: String, measurementType: MeasurementType) {

@@ -150,7 +150,7 @@ object EntityMappers {
             targetDate = LocalDate.parse(goal.targetDate),
             isCompleted = goal.isCompleted,
             displayOrder = goal.displayOrder,
-            subtasks = subtasks.map { it.toDomain() },
+            subtasks = subtasks.sortedWith(compareBy({ it.displayOrder }, { it.createdAt })).map { it.toDomain() },
             notes = goal.notes,
             createdAt = Instant.ofEpochMilli(goal.createdAt),
             updatedAt = Instant.ofEpochMilli(goal.updatedAt)

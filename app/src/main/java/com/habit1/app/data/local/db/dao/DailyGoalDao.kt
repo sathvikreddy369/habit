@@ -46,8 +46,14 @@ interface DailyGoalDao {
     @Query("SELECT * FROM daily_goals WHERE target_date BETWEEN :startDate AND :endDate ORDER BY target_date ASC, display_order ASC")
     suspend fun getGoalsForDateRange(startDate: String, endDate: String): List<DailyGoalWithSubtasks>
 
-    @Query("UPDATE daily_goals SET target_date = :newDate, display_order = :newOrder, updated_at = :updatedAt WHERE id = :id")
+    @Update
+    suspend fun updateAllGoals(goals: List<DailyGoalEntity>)
+
+    @Query("UPDATE daily_goals SET target_date = :newDate, display_order = :newOrder, is_completed = 0, updated_at = :updatedAt WHERE id = :id")
     suspend fun moveGoalDate(id: String, newDate: String, newOrder: Int, updatedAt: Long)
+
+    @Query("UPDATE daily_goals SET title = :title, notes = :notes, updated_at = :updatedAt WHERE id = :id")
+    suspend fun updateGoalContent(id: String, title: String, notes: String?, updatedAt: Long)
 
     @Query("UPDATE daily_goals SET is_completed = :isCompleted, updated_at = :updatedAt WHERE id = :id")
     suspend fun updateGoalCompletion(id: String, isCompleted: Boolean, updatedAt: Long)
@@ -62,14 +68,23 @@ interface DailyGoalDao {
     @Update
     suspend fun updateSubtask(subtask: GoalSubtaskEntity)
 
+    @Update
+    suspend fun updateAllSubtasks(subtasks: List<GoalSubtaskEntity>)
+
     @Delete
     suspend fun deleteSubtask(subtask: GoalSubtaskEntity)
 
     @Query("DELETE FROM goal_subtasks WHERE id = :id")
     suspend fun deleteSubtaskById(id: String)
 
+    @Query("UPDATE goal_subtasks SET title = :title WHERE id = :id")
+    suspend fun updateSubtaskTitle(id: String, title: String)
+
     @Query("UPDATE goal_subtasks SET is_completed = :isCompleted WHERE id = :id")
     suspend fun updateSubtaskCompletion(id: String, isCompleted: Boolean)
+
+    @Query("SELECT * FROM goal_subtasks WHERE goal_id = :goalId ORDER BY display_order ASC, created_at ASC")
+    suspend fun getSubtasksForGoal(goalId: String): List<GoalSubtaskEntity>
 
     @Query("DELETE FROM goal_subtasks WHERE goal_id = :goalId")
     suspend fun deleteSubtasksForGoal(goalId: String)
