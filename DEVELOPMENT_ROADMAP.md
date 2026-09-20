@@ -3,7 +3,7 @@
 **Project**: Offline Habit & Daily Goal Android Application  
 **Author**: Primary Implementation Agent  
 **Date**: September 2026  
-**Status**: Phase 2 Complete (Database Layer & Persistence) — Verified  
+**Status**: Phase 3 Complete (Domain Engine & Business Logic) — Verified  
 
 
 ---
@@ -591,12 +591,32 @@ graph TD
   * `assembleDebug`: Debug APK generated cleanly in 8s.
 
 ### Phase 3: Domain Engine & Business Logic
-* **Objective**: Implement pure domain models, scheduling logic, and streak calculation algorithms.
+* **Status**: **Completed & Verified**
+* **Objective**: Implement pure domain models, scheduling logic, measurement evaluation, and streak calculation algorithms.
 * **Deliverables**:
-  * Domain models decoupled from Room.
-  * `EvaluateScheduleUseCase`: Handles every day, specific days of week, and periodic schedules across leap years and month boundaries.
-  * `CalculateStreaksUseCase`: Computes current streak, longest streak, completion rate, and missed days accurately without historical falsification.
-* **Verification**: Comprehensive JUnit 5 unit tests with extensive date edge cases (leap years, month transitions, year transitions).
+  * Pure Domain Models decoupled from Room and Android framework:
+    * `Habit`: Domain representation of tracked habits.
+    * `HabitRecord`: Domain record preserving civil calendar date, instant timestamp, and historical measurement snapshots.
+    * `DailyGoal` & `GoalSubtask`: Domain representation of daily outcomes and subtasks.
+    * `DailyReview`: Domain representation of daily reflection notes.
+    * `MeasurementType`: Sealed hierarchy (`BooleanChoice`, `Count`, `Duration`, `Quantity`).
+    * `HabitSchedule`: Sealed hierarchy (`Daily`, `SpecificDays`, `Interval`).
+    * `StreakResult`: Transparent, explainable streak and consistency metrics.
+  * Mappers & Serializers:
+    * `ScheduleConfigSerializer`: Pure serialization for schedule configs.
+    * `EntityMappers`: Bidirectional mapping between Room entities and domain models.
+  * Domain Use Cases:
+    * `EvaluateScheduleUseCase`: Pure schedule evaluation across leap years, month boundaries, and specific weekdays.
+    * `CalculateStreaksUseCase`: Deterministic streak and completion rate calculations. Correctly handles non-scheduled days without breaking streaks, preserves ongoing streaks when today is pending, and avoids synthetic scores.
+    * `EvaluateMeasurementUseCase`: Completion determination, step sizing, progress ratio, and progress formatting.
+* **Verification & Results**:
+  * `EvaluateScheduleUseCaseTest`: 6 unit tests covering daily, specific days, interval, leap year transitions (Feb 28-29-Mar 1), paused/archived habits, and pre-creation dates.
+  * `CalculateStreaksUseCaseTest`: 8 unit tests covering consecutive streaks, missed days, non-scheduled days, today pending vs completed, longest streak, and empty histories.
+  * `EvaluateMeasurementUseCaseTest`: 7 unit tests covering completion evaluation, progress ratios, default steps, and historical snapshot evaluation.
+  * `EntityMappersTest`: 6 unit tests covering full roundtrip entity/domain mappings.
+  * Total unit tests: 48 tests with 100% pass rate.
+  * `lintDebug`: Passed with 0 errors.
+  * `assembleDebug`: Debug APK generated cleanly in 8s.
 
 ### Phase 4: Design System & Today Screen Core
 * **Objective**: Establish Material 3 calm design theme and build the primary user interaction hub (Today Screen).
