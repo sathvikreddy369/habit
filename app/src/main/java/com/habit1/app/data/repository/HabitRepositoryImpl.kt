@@ -15,6 +15,9 @@ class HabitRepositoryImpl(
     override fun observeActiveHabits(): Flow<List<HabitEntity>> =
         habitDao.observeActiveHabits().flowOn(ioDispatcher)
 
+    override fun observeArchivedHabits(): Flow<List<HabitEntity>> =
+        habitDao.observeArchivedHabits().flowOn(ioDispatcher)
+
     override fun observeAllHabits(): Flow<List<HabitEntity>> =
         habitDao.observeAllHabits().flowOn(ioDispatcher)
 
@@ -59,8 +62,12 @@ class HabitRepositoryImpl(
     override suspend fun reorderHabits(orderedIds: List<String>) =
         withContext(ioDispatcher) {
             val now = System.currentTimeMillis()
-            orderedIds.forEachIndexed { index, id ->
-                habitDao.updateDisplayOrder(id, index, now)
+            val allHabits = habitDao.getActiveHabitsList().associateBy { it.id }
+            val updated = orderedIds.mapIndexedNotNull { index, id ->
+                allHabits[id]?.copy(displayOrder = index, updatedAt = now)
+            }
+            if (updated.isNotEmpty()) {
+                habitDao.updateAll(updated)
             }
         }
 }

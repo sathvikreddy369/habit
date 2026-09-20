@@ -58,11 +58,16 @@ abstract class AppDatabase : RoomDatabase() {
         }
 
         fun buildInMemoryDatabase(context: Context): AppDatabase {
+            val executor = kotlinx.coroutines.Dispatchers.Unconfined.let {
+                java.util.concurrent.Executor { command -> command.run() }
+            }
             return Room.inMemoryDatabaseBuilder(
                 context,
                 AppDatabase::class.java
             )
                 .allowMainThreadQueries()
+                .setQueryExecutor(executor)
+                .setTransactionExecutor(executor)
                 .addCallback(object : Callback() {
                     override fun onOpen(db: SupportSQLiteDatabase) {
                         super.onOpen(db)

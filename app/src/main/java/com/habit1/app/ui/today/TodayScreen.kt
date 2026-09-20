@@ -42,9 +42,11 @@ import com.habit1.app.ui.components.TodayHeader
 /**
  * Primary Today screen composable that renders habits, goals, and daily progress.
  */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun TodayScreen(
     viewModel: TodayViewModel,
+    onNavigateToHabits: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -60,6 +62,19 @@ fun TodayScreen(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        topBar = {
+            androidx.compose.material3.TopAppBar(
+                title = {},
+                actions = {
+                    TextButton(onClick = onNavigateToHabits) {
+                        Text(
+                            text = "Habits",
+                            style = MaterialTheme.typography.labelLarge
+                        )
+                    }
+                }
+            )
+        },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
             FloatingActionButton(
@@ -162,6 +177,12 @@ fun TodayScreen(
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            androidx.compose.material3.OutlinedButton(
+                                onClick = onNavigateToHabits
+                            ) {
+                                Text("Manage Habits")
+                            }
                         }
                     }
                 }

@@ -643,17 +643,35 @@ graph TD
   * `lintDebug`: Passed with 0 errors.
   * Empirical profiling baseline recorded: APK size ~10.4MB unstripped debug build, cold startup overhead minimal with zero background tasks or reflection. Daemon and ADB processes safely managed.
 
-### Phase 5: Habit Management & Measurement Support
-* **Objective**: Full habit lifecycle management (create, edit, pause, archive, reorder) and measurement types.
+### Phase 5: Habit Management & Measurement Support [COMPLETED & VERIFIED]
+* **Objective**: Full habit lifecycle management (create, edit, pause, archive, unarchive, delete with confirmation, reorder) and measurement types with historical snapshot integrity and pure domain validation.
 * **Deliverables**:
-  * Habit creation/edit screen supporting:
+  * Pure domain validator `HabitValidator.kt` with UI-independent typed validation errors (`HabitValidationError`: `NameBlank`, `NameTooLong`, `TargetMustBePositive`, `UnitRequired`, `SpecificDaysEmpty`, `IntervalTooSmall`, `InvalidConfiguration`).
+  * Typed UI state models (`ScheduleKind`, `MeasurementKind`) avoiding stringly-typed internal state.
+  * Habit creation & edit form `HabitFormScreen.kt` + `HabitFormViewModel.kt` supporting:
     * Boolean (Done / Not Done)
-    * Count (e.g. 50 pushups with + / - steppers)
-    * Duration (e.g. 30 mins with time picker/stepper)
-    * Quantity (e.g. 2.5 L water)
-  * Frequency/schedule selector (Daily, Selected Days, Custom Interval).
-  * Reordering and archiving logic.
-* **Verification**: Unit tests for habit repository; validation tests for measurement bounds.
+    * Count (with customizable unit, e.g. "reps")
+    * Duration (in minutes)
+    * Quantity (with unit, e.g. "L", "km")
+    * Schedule configurations: Daily, SpecificDays (Monday-Sunday selection chips), and Interval (every N days).
+  * Habit list screen `HabitListScreen.kt` + `HabitListViewModel.kt` supporting:
+    * Active / Archived tabs with status badges (Paused, Frequency, Measurement type).
+    * Pause / Resume and Archive / Unarchive with orthogonal semantics (unarchiving leaves paused habits paused).
+    * Reordering via Move Up / Move Down modifying `display_order` atomically in Room.
+    * Explicit destructive deletion with irreversible warning confirmation dialog.
+  * Lightweight deterministic navigation (`Today` ↔ `HabitList` ↔ `HabitForm`) with back navigation support.
+  * Canonical historical integrity: "Editing a habit changes its future definition; it never rewrites its past." Existing records in `habit_records` remain untouched when habits are edited.
+  * Creation date scheduling rules: Habits cannot be scheduled before civil creation date; editing does not alter `createdAt`.
+* **Verification & Quality Gate Results**:
+  * 79 total unit tests passing with 100% pass rate:
+    * `HabitValidatorTest` (10 tests): valid/invalid names, all measurement types, invalid targets, negative values, required units, all schedule types, empty specific days, invalid intervals.
+    * `HabitFormViewModelTest` (4 tests): habit creation with typed models, interval schedule creation, validation error mapping, edit mode preserving historical snapshots and `createdAt`.
+    * `HabitListViewModelTest` (4 tests): pause/resume orthogonal to archival, archive/unarchive restoring paused state, atomic Move Up/Move Down reordering, confirmation dialog deletion.
+    * `HabitLifecycleAndHistoricalIntegrityTest` (5 tests): past records untouched across edits, creation date bounds, non-fabrication of pre-creation misses, Today integration (paused/archived disappearance), quantitative non-negativity coercion.
+    * All previous 56 tests intact and passing.
+  * `assembleDebug`: Clean debug APK built in 2s.
+  * `lintDebug`: Passed with 0 errors.
+  * Hardware verification: No physical device or emulator attached; adb daemon safely terminated. No synthetic performance claims made. Clean process state maintained.
 
 ### Phase 6: Daily Goals & Subtasks
 * **Objective**: Goal creation, completion, date reassignment, and subtasks.

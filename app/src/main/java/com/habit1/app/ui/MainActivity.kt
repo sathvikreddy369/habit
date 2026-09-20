@@ -2,14 +2,23 @@ package com.habit1.app.ui
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.habit1.app.HabitApplication
+import com.habit1.app.ui.habits.form.HabitFormScreen
+import com.habit1.app.ui.habits.form.HabitFormViewModel
+import com.habit1.app.ui.habits.list.HabitListScreen
+import com.habit1.app.ui.habits.list.HabitListViewModel
+import com.habit1.app.ui.navigation.Screen
 import com.habit1.app.ui.theme.HabitTheme
 import com.habit1.app.ui.today.TodayScreen
 import com.habit1.app.ui.today.TodayViewModel
@@ -34,10 +43,64 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    TodayScreen(viewModel = todayViewModel)
+                    val app = application as HabitApplication
+                    val backstack = remember { mutableStateListOf<Screen>(Screen.Today) }
+                    val currentScreen = backstack.lastOrNull() ?: Screen.Today
+
+                    BackHandler(enabled = backstack.size > 1) {
+                        backstack.removeAt(backstack.size - 1)
+                    }
+
+                    when (currentScreen) {
+                        is Screen.Today -> {
+                            TodayScreen(
+                                viewModel = todayViewModel,
+                                onNavigateToHabits = {
+                                    backstack.add(Screen.HabitList)
+                                }
+                            )
+                        }
+
+                        is Screen.HabitList -> {
+                            val habitListViewModel: HabitListViewModel = viewModel(
+                                factory = HabitListViewModel.Factory(app.container.habitRepository)
+                            )
+                            HabitListScreen(
+                                viewModel = habitListViewModel,
+                                onCreateHabit = {
+                                    backstack.add(Screen.HabitForm(null))
+                                },
+                                onEditHabit = { habitId ->
+                                    backstack.add(Screen.HabitForm(habitId))
+                                },
+                                onNavigateBack = {
+                                    if (backstack.size > 1) {
+                                        backstack.removeAt(backstack.size - 1)
+                                    }
+                                }
+                            )
+                        }
+
+                        is Screen.HabitForm -> {
+                            val habitFormViewModel: HabitFormViewModel = viewModel(
+                                key = currentScreen.habitId ?: "new_habit",
+                                factory = HabitFormViewModel.Factory(
+                                    habitRepository = app.container.habitRepository,
+                                    habitId = currentScreen.habitId
+                                )
+                            )
+                            HabitFormScreen(
+                                viewModel = habitFormViewModel,
+                                onNavigateBack = {
+                                    if (backstack.size > 1) {
+                                        backstack.removeAt(backstack.size - 1)
+                                    }
+                                }
+                            )
+                        }
+                    }
                 }
             }
         }
     }
 }
-

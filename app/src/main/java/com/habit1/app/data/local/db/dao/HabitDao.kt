@@ -5,6 +5,7 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
 import com.habit1.app.data.local.db.entity.HabitEntity
 import kotlinx.coroutines.flow.Flow
@@ -17,6 +18,9 @@ interface HabitDao {
 
     @Update
     suspend fun update(habit: HabitEntity)
+
+    @Update
+    suspend fun updateAll(habits: List<HabitEntity>)
 
     @Delete
     suspend fun delete(habit: HabitEntity)
@@ -35,6 +39,9 @@ interface HabitDao {
 
     @Query("SELECT * FROM habits WHERE is_archived = 0 ORDER BY display_order ASC, created_at ASC")
     suspend fun getActiveHabitsList(): List<HabitEntity>
+
+    @Query("SELECT * FROM habits WHERE is_archived = 1 ORDER BY display_order ASC, created_at ASC")
+    fun observeArchivedHabits(): Flow<List<HabitEntity>>
 
     @Query("SELECT * FROM habits ORDER BY is_archived ASC, display_order ASC, created_at ASC")
     fun observeAllHabits(): Flow<List<HabitEntity>>
