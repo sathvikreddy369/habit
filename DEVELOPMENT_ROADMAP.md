@@ -3,7 +3,7 @@
 **Project**: Offline Habit & Daily Goal Android Application  
 **Author**: Primary Implementation Agent  
 **Date**: September 2026  
-**Status**: Phase 1 Complete (Project Initialization & Core Infrastructure) — Verified  
+**Status**: Phase 2 Complete (Database Layer & Persistence) — Verified  
 
 
 ---
@@ -561,14 +561,34 @@ graph TD
   * `lintDebug`: Passed with 0 errors.
 
 ### Phase 2: Database Layer & Persistence
-* **Objective**: Implement Room database, entities, DAOs, type converters, and unit tests.
+* **Status**: **Completed & Verified**
+* **Objective**: Implement Room database, entities, DAOs, type converters, repositories, and unit/integration tests.
 * **Deliverables**:
-  * Entities: `HabitEntity`, `HabitRecordEntity`, `DailyGoalEntity`, `GoalSubtaskEntity`, `DailyReviewEntity`.
-  * DAOs with reactive Flow queries and atomic transactions.
-  * Room database builder with WAL enabled.
-  * DataStore Preferences for user settings.
-  * Enforce explicit data-retention rule: no automatic deletion of historical records.
-* **Verification**: In-memory Room database unit tests covering all DAOs, CRUD operations, foreign key constraints, and unique indexes.
+  * Normalized Room Entities:
+    * `HabitEntity`: Core habit definition, measurement configuration, frequency schedule, reminder time, archive/pause flags.
+    * `HabitRecordEntity`: Daily habit records with historical measurement snapshotting (`measurement_type`, `target_value`, `unit`) to preserve historical truth across habit definition edits. Indexed on `UNIQUE(habit_id, date)` and `(date)`.
+    * `DailyGoalEntity`: Target date-based goals with display order. Indexed on `(target_date, display_order)`.
+    * `GoalSubtaskEntity`: Subtasks related to goals with `ON DELETE CASCADE`.
+    * `DailyGoalWithSubtasks`: Composite relationship POJO for atomic queries.
+    * `DailyReviewEntity`: Optional reflection notes keyed by calendar date.
+  * DAOs with reactive Flow queries and atomic transactions:
+    * `HabitDao`: Lifecycle management, reordering, archiving, pausing.
+    * `HabitRecordDao`: Date-windowed queries, upsert operations, completion counts.
+    * `DailyGoalDao`: Goal and subtask CRUD, reordering, date reassignment.
+    * `DailyReviewDao`: Daily reflection notes.
+  * Database Engine:
+    * `AppDatabase`: Room database v1 with WAL (Write-Ahead Logging) enabled and `PRAGMA foreign_keys = ON;`. Schema export enabled to `app/schemas/`.
+  * User Preferences:
+    * `UserPreferencesDataStore`: Asynchronous DataStore Preferences for theme, notification flags, first-run state.
+  * Repository Layer:
+    * `HabitRepository`, `HabitRecordRepository`, `DailyGoalRepository`, `DailyReviewRepository` implemented and wired lazily into `AppContainer`.
+  * Enforced explicit data-retention rule: no automatic pruning or destruction of historical data.
+* **Verification & Results**:
+  * `RoomDatabaseTest`: 8 integration tests covering empty database, habit lifecycle, measurement snapshotting, unique constraints, foreign-key cascades, date windowing, daily goals with subtasks, and reviews.
+  * `LongTermUsageDatabaseTest`: Multi-year historical scale simulation (>10,950 records across 3 years of daily history) verifying sub-millisecond date-windowed query performance.
+  * `RepositoryTest`: Verified all repository methods and reactive Flow emissions.
+  * `lintDebug`: Passed with 0 errors.
+  * `assembleDebug`: Debug APK generated cleanly in 8s.
 
 ### Phase 3: Domain Engine & Business Logic
 * **Objective**: Implement pure domain models, scheduling logic, and streak calculation algorithms.
