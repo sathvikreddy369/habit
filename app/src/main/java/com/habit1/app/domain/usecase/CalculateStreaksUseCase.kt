@@ -9,12 +9,16 @@ import java.time.ZoneId
 /**
  * Pure domain logic to calculate streak and consistency metrics for a habit.
  *
- * Product Rules (Engineering Rules #3 & ADR-08):
+ * Canonical Streak Rules (Product Principles #7, #8 & ADR-08):
  * 1. Only scheduled days count towards streaks.
  * 2. Non-scheduled days neither increment nor break a streak.
- * 3. Today (if scheduled but not yet completed) does not penalize or break an ongoing streak.
+ * 3. Today's Pending Scheduled Day:
+ *    - Mon ✅, Tue ✅, Wed ⏳ (today pending): The current streak remains 2 until Wednesday is completed.
+ *    - When Wednesday is completed (✅), the current streak becomes 3.
+ *    - If Wednesday ends without completion, then on Thursday morning, Wednesday was missed, and the current streak resets to 0.
+ *    - In short: Today does NOT prematurely break an active streak from yesterday.
  * 4. Missing records remain unrecorded; historical records are never fabricated.
- * 5. All statistics are explainable and mathematically transparent.
+ * 5. All statistics are explainable and mathematically transparent without synthetic scores.
  */
 class CalculateStreaksUseCase(
     private val evaluateSchedule: EvaluateScheduleUseCase = EvaluateScheduleUseCase()

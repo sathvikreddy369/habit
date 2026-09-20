@@ -4,46 +4,40 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.Box
+import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
-import com.habit1.app.R
+import com.habit1.app.HabitApplication
 import com.habit1.app.ui.theme.HabitTheme
+import com.habit1.app.ui.today.TodayScreen
+import com.habit1.app.ui.today.TodayViewModel
 
 class MainActivity : ComponentActivity() {
+
+    private val todayViewModel: TodayViewModel by viewModels {
+        val app = application as HabitApplication
+        TodayViewModel.Factory(
+            habitRepository = app.container.habitRepository,
+            habitRecordRepository = app.container.habitRecordRepository,
+            dailyGoalRepository = app.container.dailyGoalRepository
+        )
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
             HabitTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(innerPadding),
-                        color = MaterialTheme.colorScheme.background
-                    ) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = stringResource(R.string.app_name),
-                                style = MaterialTheme.typography.headlineLarge,
-                                color = MaterialTheme.colorScheme.onBackground
-                            )
-                        }
-                    }
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    TodayScreen(viewModel = todayViewModel)
                 }
             }
         }
     }
 }
+

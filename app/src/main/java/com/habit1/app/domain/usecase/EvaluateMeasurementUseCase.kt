@@ -4,11 +4,21 @@ import com.habit1.app.domain.model.MeasurementType
 
 /**
  * Domain rules evaluating completion status and progress for different measurement types.
+ *
+ * Authoritative Rule (Canonical Semantics):
+ * - For BOOLEAN habits: The user's explicit action directly determines completion. When marked done,
+ *   isCompleted = true and actualValue = 1.0; when marked undone, isCompleted = false and actualValue = 0.0.
+ * - For QUANTITATIVE habits (Count, Duration, Quantity): Completion is derived mathematically from
+ *   actualValue >= target.
+ * - Single Source of Truth: In all persistent storage, queries, and streak calculations, HabitRecord.isCompleted
+ *   is the sole authoritative verdict.
  */
 class EvaluateMeasurementUseCase {
 
     /**
-     * Determines whether [actualValue] meets or exceeds the target specified by [measurement].
+     * Authoritative evaluation:
+     * For BooleanChoice: actualValue >= 1.0 (set directly by user toggle).
+     * For Quantitative types: actualValue >= target.
      */
     fun isCompleted(measurement: MeasurementType, actualValue: Double): Boolean {
         return when (measurement) {
