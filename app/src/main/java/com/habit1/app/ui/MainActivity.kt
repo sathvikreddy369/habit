@@ -12,7 +12,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.launch
 import com.habit1.app.HabitApplication
 import com.habit1.app.ui.habits.form.HabitFormScreen
 import com.habit1.app.ui.habits.form.HabitFormViewModel
@@ -32,6 +34,14 @@ class MainActivity : ComponentActivity() {
             habitRecordRepository = app.container.habitRecordRepository,
             dailyGoalRepository = app.container.dailyGoalRepository
         )
+    }
+
+    override fun onResume() {
+        super.onResume()
+        val app = application as? HabitApplication ?: return
+        lifecycleScope.launch {
+            app.container.reminderCoordinator.reconcileAllReminders()
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -66,7 +76,10 @@ class MainActivity : ComponentActivity() {
 
                         is Screen.HabitList -> {
                             val habitListViewModel: HabitListViewModel = viewModel(
-                                factory = HabitListViewModel.Factory(app.container.habitRepository)
+                                factory = HabitListViewModel.Factory(
+                                    habitRepository = app.container.habitRepository,
+                                    reminderCoordinator = app.container.reminderCoordinator
+                                )
                             )
                             HabitListScreen(
                                 viewModel = habitListViewModel,
@@ -92,6 +105,7 @@ class MainActivity : ComponentActivity() {
                                 key = currentScreen.habitId ?: "new_habit",
                                 factory = HabitFormViewModel.Factory(
                                     habitRepository = app.container.habitRepository,
+                                    reminderCoordinator = app.container.reminderCoordinator,
                                     habitId = currentScreen.habitId
                                 )
                             )

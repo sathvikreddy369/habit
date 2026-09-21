@@ -23,6 +23,7 @@ import java.util.Locale
  */
 class HabitListViewModel(
     private val habitRepository: HabitRepository,
+    private val reminderCoordinator: com.habit1.app.domain.reminder.HabitReminderCoordinator? = null,
     coroutineScope: CoroutineScope? = null
 ) : ViewModel() {
 
@@ -61,15 +62,19 @@ class HabitListViewModel(
                 }
                 is HabitListUiEvent.PauseHabit -> {
                     habitRepository.pauseHabit(event.habitId, isPaused = true)
+                    reminderCoordinator?.onHabitPaused(event.habitId)
                 }
                 is HabitListUiEvent.ResumeHabit -> {
                     habitRepository.pauseHabit(event.habitId, isPaused = false)
+                    reminderCoordinator?.onHabitResumed(event.habitId)
                 }
                 is HabitListUiEvent.ArchiveHabit -> {
                     habitRepository.archiveHabit(event.habitId, isArchived = true)
+                    reminderCoordinator?.onHabitArchived(event.habitId)
                 }
                 is HabitListUiEvent.UnarchiveHabit -> {
                     habitRepository.archiveHabit(event.habitId, isArchived = false)
+                    reminderCoordinator?.onHabitUnarchived(event.habitId)
                 }
                 is HabitListUiEvent.MoveUp -> {
                     handleReorder(event.habitId, moveUp = true)
@@ -83,6 +88,7 @@ class HabitListViewModel(
                 is HabitListUiEvent.ConfirmDeleteHabit -> {
                     pendingDeletionFlow.value?.let { habit ->
                         habitRepository.deleteHabit(habit.id)
+                        reminderCoordinator?.onHabitDeleted(habit.id)
                         pendingDeletionFlow.value = null
                     }
                 }
@@ -140,12 +146,13 @@ class HabitListViewModel(
     }
 
     class Factory(
-        private val habitRepository: HabitRepository
+        private val habitRepository: HabitRepository,
+        private val reminderCoordinator: com.habit1.app.domain.reminder.HabitReminderCoordinator? = null
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(HabitListViewModel::class.java)) {
-                return HabitListViewModel(habitRepository) as T
+                return HabitListViewModel(habitRepository, reminderCoordinator) as T
             }
             throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
         }

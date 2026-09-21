@@ -16,5 +16,6 @@ class HabitApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         container = DefaultAppContainer(this)
+        container.notificationHelper.createNotificationChannel()
     }
 }

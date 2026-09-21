@@ -31,6 +31,10 @@ interface AppContainer {
     val habitRecordRepository: HabitRecordRepository
     val dailyGoalRepository: DailyGoalRepository
     val dailyReviewRepository: DailyReviewRepository
+
+    val notificationHelper: com.habit1.app.platform.notification.NotificationHelper
+    val reminderScheduler: com.habit1.app.platform.reminder.HabitReminderScheduler
+    val reminderCoordinator: com.habit1.app.domain.reminder.HabitReminderCoordinator
 }
 
 /**
@@ -66,5 +70,21 @@ class DefaultAppContainer(
 
     override val dailyReviewRepository: DailyReviewRepository by lazy {
         DailyReviewRepositoryImpl(database.dailyReviewDao(), ioDispatcher)
+    }
+
+    override val notificationHelper: com.habit1.app.platform.notification.NotificationHelper by lazy {
+        com.habit1.app.platform.notification.NotificationHelper(context)
+    }
+
+    override val reminderScheduler: com.habit1.app.platform.reminder.HabitReminderScheduler by lazy {
+        com.habit1.app.platform.reminder.AlarmManagerHabitReminderScheduler(context)
+    }
+
+    override val reminderCoordinator: com.habit1.app.domain.reminder.HabitReminderCoordinator by lazy {
+        com.habit1.app.domain.reminder.HabitReminderCoordinator(
+            habitRepository = habitRepository,
+            scheduler = reminderScheduler,
+            notificationHelper = notificationHelper
+        )
     }
 }

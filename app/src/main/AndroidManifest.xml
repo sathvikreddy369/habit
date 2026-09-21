@@ -2,7 +2,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!-- Explicitly NO android.permission.INTERNET -->
-    <!-- Notification & Alarm permissions will be added in Phase 8 when notifications are implemented -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <application
         android:name=".HabitApplication"
@@ -24,6 +26,23 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- AlarmReceiver: strictly internal, invoked only by AlarmManager explicit pending intents -->
+        <receiver
+            android:name=".platform.receiver.AlarmReceiver"
+            android:exported="false" />
+
+        <!-- BootReceiver: system broadcast receiver for reboot and clock/timezone adjustments -->
+        <receiver
+            android:name=".platform.receiver.BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.TIME_SET" />
+            </intent-filter>
+        </receiver>
 
     </application>
 

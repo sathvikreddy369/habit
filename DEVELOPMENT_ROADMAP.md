@@ -3,7 +3,7 @@
 **Project**: Offline Habit & Daily Goal Android Application  
 **Author**: Primary Implementation Agent  
 **Date**: September 2026  
-**Status**: Phase 3 Complete (Domain Engine & Business Logic) — Verified  
+**Status**: Phase 8 Complete (Notifications & Alarm Scheduling) — Verified  
 
 
 ---
@@ -728,15 +728,18 @@ graph TD
   * Static Analysis: `./gradlew lintDebug` passed in 10s with 0 errors and 0 warnings.
   * Hardware verification: Checked connected devices (`adb devices -l` -> none connected); terminated adb daemon (`adb kill-server`); stopped Gradle daemons (`./gradlew --stop`).
 
-### Phase 8: Notifications & Alarm Scheduling
-* **Objective**: Reliable, battery-conscious reminder notifications without polling services.
+### Phase 8: Notifications & Alarm Scheduling — [COMPLETED & VERIFIED]
+* **Objective**: Reliable, battery-conscious reminder notifications without polling services or background daemons.
+* **Core Principle**: *"Notifications are reminders, not records."* Firing, dismissing, or opening a notification never touches `habit_records`, streaks, or stats.
 * **Deliverables**:
-  * `AlarmScheduler` leveraging `AlarmManager.setExactAndAllowWhileIdle` (with inexact fallback).
-  * `AlarmReceiver` building native notifications with quick-action completion buttons.
-  * `BootReceiver` handling device reboot, timezone shifts (`ACTION_TIMEZONE_CHANGED`), manual time changes (`ACTION_TIME_SET`), and package updates (`ACTION_MY_PACKAGE_REPLACED`).
-  * Notification permission handling (Android 13+ `POST_NOTIFICATIONS` & Android 12+ `SCHEDULE_EXACT_ALARM`).
-  * Duplicate alarm prevention via unique request codes.
-* **Verification**: Alarm trigger verification, receiver execution tests, reboot rescheduling verification, time zone change test.
+  * `HabitReminderCalculator`: Pure domain next-trigger calculation using `EvaluateScheduleUseCase` across Daily, SpecificDays, and Interval schedules, leap years, year boundaries, and timezones.
+  * `AlarmManagerHabitReminderScheduler`: Uses habit UUID in Intent data URI (`habit1://reminder/{habitId}`) for PendingIntent identity, checks `canScheduleExactAlarms()` on API 31+, calls `setExactAndAllowWhileIdle()` with graceful `setAndAllowWhileIdle()` fallback.
+  * `NotificationHelper`: Notification channel management, status-bar notification display with privacy-preserving content, and cancellation.
+  * `HabitReminderCoordinator`: Post-persistence lifecycle coordination ensuring alarms are scheduled only after database mutations succeed.
+  * `AlarmReceiver` (`exported="false"`): Re-evaluates habit existence, active state, and whether today is scheduled under the current schedule before showing notifications; calculates and schedules next reminder without touching habit history.
+  * `BootReceiver` (`exported="true"`): Handles `BOOT_COMPLETED`, `MY_PACKAGE_REPLACED`, `TIMEZONE_CHANGED`, and `TIME_SET` broadcasts to reconcile all eligible alarms.
+  * Permission flow: Habit reminder saving is completely independent of `POST_NOTIFICATIONS`; lightweight reconciliation recovers reminders when permission is granted.
+* **Verification**: 147 automated unit tests (all passing), 0 lint errors, clean debug build, zero network leaks.
 
 ### Phase 9: Backup, Export & Restore (Local, Private, User-Controlled)
 * **Objective**: Reliable, user-controlled data export and restore via Android SAF (no background or automatic backups).

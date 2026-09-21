@@ -328,14 +328,51 @@ fun HabitFormScreen(
                 color = MaterialTheme.colorScheme.onBackground
             )
             Spacer(modifier = Modifier.height(4.dp))
+
+            val context = androidx.compose.ui.platform.LocalContext.current
+            val isNotificationPermissionGranted = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                androidx.core.content.ContextCompat.checkSelfPermission(
+                    context,
+                    android.Manifest.permission.POST_NOTIFICATIONS
+                ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            } else {
+                androidx.core.app.NotificationManagerCompat.from(context).areNotificationsEnabled()
+            }
+
+            val permissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+                contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+            ) { /* Permission result handled */ }
+
             OutlinedTextField(
                 value = uiState.reminderTimeInput,
                 onValueChange = { viewModel.onEvent(HabitFormUiEvent.UpdateReminderTime(it)) },
-                label = { Text("Reminder time (e.g. 08:00)") },
+                label = { Text("Reminder time (HH:mm)") },
+                placeholder = { Text("08:00") },
                 singleLine = true,
-                supportingText = { Text("Configures planned notification time (notifications inactive in current phase)") },
+                supportingText = {
+                    if (uiState.reminderTimeInput.isNotBlank() && !isNotificationPermissionGranted) {
+                        Text(
+                            text = "Notifications are currently disabled. Reminders will be scheduled once permission is granted.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        Text("24-hour format (e.g. 07:30, 20:00). Leave blank for no reminder.")
+                    }
+                },
                 modifier = Modifier.fillMaxWidth()
             )
+
+            if (uiState.reminderTimeInput.isNotBlank() && !isNotificationPermissionGranted && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                Spacer(modifier = Modifier.height(6.dp))
+                androidx.compose.material3.OutlinedButton(
+                    onClick = {
+                        permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Grant Notification Permission")
+                }
+            }
 
             Spacer(modifier = Modifier.height(36.dp))
         }

@@ -29,6 +29,7 @@ import java.util.UUID
  */
 class HabitFormViewModel(
     private val habitRepository: HabitRepository,
+    private val reminderCoordinator: com.habit1.app.domain.reminder.HabitReminderCoordinator? = null,
     private val initialHabitId: String? = null,
     coroutineScope: CoroutineScope? = null
 ) : ViewModel() {
@@ -275,6 +276,7 @@ class HabitFormViewModel(
                         updatedAt = now
                     )
                     habitRepository.createHabit(newEntity)
+                    reminderCoordinator?.onHabitCreated(newEntity.toDomain())
                 } else {
                     // Edit - preserving createdAt, isPaused, isArchived, displayOrder
                     val updatedEntity = HabitEntity(
@@ -294,6 +296,7 @@ class HabitFormViewModel(
                         updatedAt = now
                     )
                     habitRepository.updateHabit(updatedEntity)
+                    reminderCoordinator?.onHabitUpdated(updatedEntity.toDomain())
                 }
 
                 _uiState.update { it.copy(isSaving = false, isSaved = true) }
@@ -305,12 +308,13 @@ class HabitFormViewModel(
 
     class Factory(
         private val habitRepository: HabitRepository,
+        private val reminderCoordinator: com.habit1.app.domain.reminder.HabitReminderCoordinator? = null,
         private val habitId: String? = null
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(HabitFormViewModel::class.java)) {
-                return HabitFormViewModel(habitRepository, habitId) as T
+                return HabitFormViewModel(habitRepository, reminderCoordinator, habitId) as T
             }
             throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
         }
