@@ -33,6 +33,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.habit1.app.domain.model.MeasurementType
+import com.habit1.app.ui.components.HabitHeatmap
+import com.habit1.app.ui.components.HeatmapDayDetailDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,6 +46,7 @@ fun HabitHistoryScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val habit = uiState.habit
     val summary = uiState.summary
+    val analyticsSummary = uiState.analyticsSummary
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -61,7 +64,7 @@ fun HabitHistoryScreen(
             )
         }
     ) { innerPadding ->
-        if (habit == null || summary == null) {
+        if (habit == null || (summary == null && analyticsSummary == null)) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -83,8 +86,29 @@ fun HabitHistoryScreen(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // 1. Streak Cards Row
+                // 1. Calendar Heatmap
+                if (analyticsSummary != null) {
+                    item(key = "heatmap") {
+                        HabitHeatmap(
+                            summary = analyticsSummary,
+                            selectedPreset = uiState.selectedPreset,
+                            formattedRange = uiState.formattedRange,
+                            canNavigateNext = uiState.canNavigateNext,
+                            isCurrentRange = uiState.isCurrentRange,
+                            onSelectPreset = { viewModel.onEvent(HabitHistoryUiEvent.SelectPreset(it)) },
+                            onPreviousRange = { viewModel.onEvent(HabitHistoryUiEvent.PreviousRange) },
+                            onNextRange = { viewModel.onEvent(HabitHistoryUiEvent.NextRange) },
+                            onResetToToday = { viewModel.onEvent(HabitHistoryUiEvent.ResetToToday) },
+                            onDayClick = { viewModel.onEvent(HabitHistoryUiEvent.SelectDay(it)) }
+                        )
+                    }
+                }
+
+                // 2. Streak Cards Row
                 item(key = "streaks") {
+                    val currentStreak = analyticsSummary?.currentStreak ?: summary?.streakResult?.currentStreak ?: 0
+                    val longestStreak = analyticsSummary?.longestStreak ?: summary?.streakResult?.longestStreak ?: 0
+
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -102,7 +126,7 @@ fun HabitHistoryScreen(
                                 )
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = "${summary.streakResult.currentStreak} days",
+                                    text = "$currentStreak days",
                                     style = MaterialTheme.typography.headlineMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -123,7 +147,7 @@ fun HabitHistoryScreen(
                                 )
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = "${summary.streakResult.longestStreak} days",
+                                    text = "$longestStreak days",
                                     style = MaterialTheme.typography.headlineMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSecondaryContainer
@@ -133,7 +157,7 @@ fun HabitHistoryScreen(
                     }
                 }
 
-                // 2. Consistency Summary Card
+                // 3. Consistency Summary Card
                 item(key = "consistency_summary") {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -143,23 +167,32 @@ fun HabitHistoryScreen(
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text(
-                                text = "Consistency Breakdown",
+                                text = "Consistency Breakdown (${uiState.selectedPreset.label})",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
                             Spacer(modifier = Modifier.height(12.dp))
 
-                            StatRow(label = "Completion Rate", value = "${summary.streakResult.completionRate.toInt()}%")
-                            StatRow(label = "Completed Days", value = "${summary.completedDaysCount}")
-                            StatRow(label = "Scheduled Days", value = "${summary.streakResult.totalScheduledDays}")
-                            StatRow(label = "Recorded Incomplete", value = "${summary.recordedIncompleteDaysCount}")
-                            StatRow(label = "Projected Missed", value = "${summary.projectedMissedDaysCount}")
-                            StatRow(label = "Projected Rest", value = "${summary.projectedRestDaysCount}")
+                            if (analyticsSummary != null) {
+                                StatRow(label = "Completion Rate", value = "${analyticsSummary.completionRate.toInt()}%")
+                                StatRow(label = "Completed Days", value = "${analyticsSummary.completedDays}")
+                                StatRow(label = "Scheduled Days", value = "${analyticsSummary.scheduledDays}")
+                                StatRow(label = "Recorded Incomplete", value = "${analyticsSummary.recordedIncompleteDays}")
+                                StatRow(label = "Projected Missed", value = "${analyticsSummary.missedDays}")
+                                StatRow(label = "Projected Rest", value = "${analyticsSummary.restDays}")
+                            } else if (summary != null) {
+                                StatRow(label = "Completion Rate", value = "${summary.streakResult.completionRate.toInt()}%")
+                                StatRow(label = "Completed Days", value = "${summary.completedDaysCount}")
+                                StatRow(label = "Scheduled Days", value = "${summary.streakResult.totalScheduledDays}")
+                                StatRow(label = "Recorded Incomplete", value = "${summary.recordedIncompleteDaysCount}")
+                                StatRow(label = "Projected Missed", value = "${summary.projectedMissedDaysCount}")
+                                StatRow(label = "Projected Rest", value = "${summary.projectedRestDaysCount}")
+                            }
                         }
                     }
                 }
 
-                // 3. Quantitative Progression Card (if applicable)
+                // 4. Quantitative Progression Card (if applicable)
                 if (habit.measurement !is MeasurementType.BooleanChoice) {
                     item(key = "quantitative_stats") {
                         Card(
@@ -170,44 +203,70 @@ fun HabitHistoryScreen(
                         ) {
                             Column(modifier = Modifier.padding(16.dp)) {
                                 Text(
-                                    text = "Quantitative Performance",
+                                    text = "Quantitative Performance (${uiState.selectedPreset.label})",
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold
                                 )
                                 Spacer(modifier = Modifier.height(12.dp))
 
-                                StatRow(
-                                    label = "Total Recorded Volume",
-                                    value = "${summary.totalRecordedVolume}"
-                                )
-                                summary.averageOnCompletedDays?.let { avgComp ->
+                                if (analyticsSummary?.quantitativeStats != null) {
+                                    val qStats = analyticsSummary.quantitativeStats
                                     StatRow(
-                                        label = "Average actual value on completed days",
-                                        value = "%.1f".format(avgComp)
+                                        label = "Total Recorded Volume",
+                                        value = formatStatValue(qStats.totalActualValue)
                                     )
-                                }
-                                summary.averageOnRecordedDays?.let { avgRec ->
+                                    qStats.averageOnCompletedDays?.let { avgComp ->
+                                        StatRow(
+                                            label = "Average on completed days",
+                                            value = "%.1f".format(avgComp)
+                                        )
+                                    }
+                                    qStats.averageOnRecordedDays?.let { avgRec ->
+                                        StatRow(
+                                            label = "Average on recorded days",
+                                            value = "%.1f".format(avgRec)
+                                        )
+                                    }
+                                    qStats.successRateOnRecordedDays?.let { succRate ->
+                                        StatRow(
+                                            label = "Target success on recorded days",
+                                            value = "${succRate.toInt()}%"
+                                        )
+                                    }
+                                } else if (summary != null) {
                                     StatRow(
-                                        label = "Average actual value on recorded days",
-                                        value = "%.1f".format(avgRec)
+                                        label = "Total Recorded Volume",
+                                        value = formatStatValue(summary.totalRecordedVolume)
                                     )
+                                    summary.averageOnCompletedDays?.let { avgComp ->
+                                        StatRow(
+                                            label = "Average on completed days",
+                                            value = "%.1f".format(avgComp)
+                                        )
+                                    }
+                                    summary.averageOnRecordedDays?.let { avgRec ->
+                                        StatRow(
+                                            label = "Average on recorded days",
+                                            value = "%.1f".format(avgRec)
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
                 }
 
-                // 4. Chronological Recorded History Header
+                // 5. Chronological Recorded History Header
                 item(key = "records_header") {
                     Text(
-                        text = "Historical Activity Log (${uiState.records.size} recorded)",
+                        text = "Historical Activity Log (${uiState.records.size} in range)",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onBackground
                     )
                 }
 
-                // 5. Historical Record Items
+                // 6. Historical Record Items
                 if (uiState.records.isEmpty()) {
                     item(key = "empty_records") {
                         Card(
@@ -216,7 +275,7 @@ fun HabitHistoryScreen(
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                         ) {
                             Text(
-                                text = "No records logged yet for this habit.",
+                                text = "No records logged in this date range.",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(16.dp)
@@ -246,7 +305,7 @@ fun HabitHistoryScreen(
                                     )
                                     Spacer(modifier = Modifier.height(2.dp))
                                     Text(
-                                        text = "Recorded: ${record.actualValue} / Target: ${record.targetValue} ${record.unit ?: ""}".trim(),
+                                        text = "Recorded: ${formatStatValue(record.actualValue)} / Target: ${formatStatValue(record.targetValue)} ${record.unit ?: ""}".trim(),
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -276,7 +335,7 @@ fun HabitHistoryScreen(
                     }
                 }
 
-                // 6. Explanatory Note (Addressing Historical Schedule Limitation)
+                // 7. Explanatory Note
                 item(key = "schedule_limitation_note") {
                     Text(
                         text = "Note: Schedule expectations for unrecorded past dates are projected based on the habit's current schedule. Recorded historical completions and snapshots are immutable truth.",
@@ -287,6 +346,15 @@ fun HabitHistoryScreen(
                 }
             }
         }
+    }
+
+    // Day Detail Dialog
+    uiState.selectedDayDetail?.let { day ->
+        HeatmapDayDetailDialog(
+            day = day,
+            habitName = habit?.name ?: "Habit",
+            onDismiss = { viewModel.onEvent(HabitHistoryUiEvent.DismissDayDetail) }
+        )
     }
 }
 
@@ -305,5 +373,13 @@ private fun StatRow(
     ) {
         Text(text = label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(text = value, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+private fun formatStatValue(value: Double): String {
+    return if (value % 1.0 == 0.0) {
+        value.toInt().toString()
+    } else {
+        "%.1f".format(value)
     }
 }

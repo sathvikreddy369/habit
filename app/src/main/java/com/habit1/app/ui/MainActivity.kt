@@ -163,7 +163,8 @@ class MainActivity : ComponentActivity() {
                                 factory = com.habit1.app.ui.history.HabitHistoryViewModel.Factory(
                                     habitId = currentScreen.habitId,
                                     habitRepository = app.container.habitRepository,
-                                    habitRecordRepository = app.container.habitRecordRepository
+                                    habitRecordRepository = app.container.habitRecordRepository,
+                                    computeHabitAnalytics = app.container.computeHabitAnalyticsUseCase
                                 )
                             )
                             com.habit1.app.ui.history.HabitHistoryScreen(

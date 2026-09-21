@@ -170,4 +170,74 @@ class HabitHistoryViewModelTest {
             cancelAndIgnoreRemainingEvents()
         }
     }
+
+    @Test
+    fun testHeatmapRangeNavigation_andDaySelection() = runTest(testDispatcher) {
+        val habit = HabitEntity(
+            id = "habit_heatmap",
+            name = "Heatmap Test",
+            measurementType = "BOOLEAN",
+            targetValue = 1.0,
+            unit = null,
+            scheduleType = "DAILY",
+            scheduleConfig = "{}",
+            displayOrder = 0,
+            isArchived = false,
+            createdAt = pastMillis,
+            updatedAt = pastMillis
+        )
+        database.habitDao().insert(habit)
+
+        val viewModel = HabitHistoryViewModel(
+            habitId = "habit_heatmap",
+            habitRepository = habitRepository,
+            habitRecordRepository = habitRecordRepository,
+            zoneId = fixedZone,
+            coroutineScope = CoroutineScope(testDispatcher)
+        )
+
+        viewModel.uiState.test {
+            var state = awaitItem()
+            if (state.isLoading) {
+                state = awaitItem()
+            }
+
+            assertEquals(HeatmapRangePreset.THIRTY_DAYS, state.selectedPreset)
+            assertEquals(true, state.isCurrentRange)
+            assertEquals(false, state.canNavigateNext)
+            assertNotNull(state.analyticsSummary)
+            assertTrue(state.analyticsSummary!!.dailyBreakdown.isNotEmpty())
+
+            // Switch to 7D preset
+            viewModel.onEvent(HabitHistoryUiEvent.SelectPreset(HeatmapRangePreset.SEVEN_DAYS))
+            state = awaitItem()
+            assertEquals(HeatmapRangePreset.SEVEN_DAYS, state.selectedPreset)
+            assertEquals(7, state.currentRange.dayCount)
+
+            // Navigate previous range
+            viewModel.onEvent(HabitHistoryUiEvent.PreviousRange)
+            state = awaitItem()
+            assertEquals(true, state.canNavigateNext)
+            assertEquals(false, state.isCurrentRange)
+
+            // Navigate next range
+            viewModel.onEvent(HabitHistoryUiEvent.NextRange)
+            state = awaitItem()
+            assertEquals(false, state.canNavigateNext)
+            assertEquals(true, state.isCurrentRange)
+
+            // Select a day for inspection
+            val sampleDay = state.analyticsSummary!!.dailyBreakdown.first()
+            viewModel.onEvent(HabitHistoryUiEvent.SelectDay(sampleDay))
+            state = awaitItem()
+            assertEquals(sampleDay.date, state.selectedDayDetail?.date)
+
+            // Dismiss day detail
+            viewModel.onEvent(HabitHistoryUiEvent.DismissDayDetail)
+            state = awaitItem()
+            assertEquals(null, state.selectedDayDetail)
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
 }
