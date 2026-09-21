@@ -60,4 +60,10 @@ interface HabitDao {
 
     @Query("SELECT COUNT(*) FROM habits WHERE is_archived = 0")
     suspend fun countActive(): Int
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertAll(habits: List<HabitEntity>)
+
+    @Query("DELETE FROM habits")
+    suspend fun deleteAllHabits()
 }

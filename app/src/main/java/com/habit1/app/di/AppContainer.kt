@@ -35,6 +35,7 @@ interface AppContainer {
     val notificationHelper: com.habit1.app.platform.notification.NotificationHelper
     val reminderScheduler: com.habit1.app.platform.reminder.HabitReminderScheduler
     val reminderCoordinator: com.habit1.app.domain.reminder.HabitReminderCoordinator
+    val backupRepository: com.habit1.app.data.repository.BackupRepository
 }
 
 /**
@@ -85,6 +86,23 @@ class DefaultAppContainer(
             habitRepository = habitRepository,
             scheduler = reminderScheduler,
             notificationHelper = notificationHelper
+        )
+    }
+
+    override val backupRepository: com.habit1.app.data.repository.BackupRepository by lazy {
+        val exporter = com.habit1.app.data.backup.BackupExporter(database)
+        val importer = com.habit1.app.data.backup.BackupImporter(
+            database = database,
+            reminderCoordinator = reminderCoordinator,
+            reminderScheduler = reminderScheduler,
+            notificationHelper = notificationHelper
+        )
+        com.habit1.app.data.repository.BackupRepositoryImpl(
+            context = context,
+            database = database,
+            exporter = exporter,
+            importer = importer,
+            ioDispatcher = ioDispatcher
         )
     }
 }

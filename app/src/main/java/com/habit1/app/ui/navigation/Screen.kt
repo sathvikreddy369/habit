@@ -9,4 +9,5 @@ sealed interface Screen {
     data class HabitForm(val habitId: String? = null) : Screen
     data object History : Screen
     data class HabitHistory(val habitId: String) : Screen
+    data object Settings : Screen
 }

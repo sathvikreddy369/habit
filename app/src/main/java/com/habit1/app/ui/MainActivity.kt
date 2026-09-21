@@ -70,6 +70,9 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onNavigateToHistory = {
                                     backstack.add(Screen.History)
+                                },
+                                onNavigateToSettings = {
+                                    backstack.add(Screen.Settings)
                                 }
                             )
                         }
@@ -151,6 +154,22 @@ class MainActivity : ComponentActivity() {
                             )
                             com.habit1.app.ui.history.HabitHistoryScreen(
                                 viewModel = habitHistoryViewModel,
+                                onNavigateBack = {
+                                    if (backstack.size > 1) {
+                                        backstack.removeAt(backstack.size - 1)
+                                    }
+                                }
+                            )
+                        }
+
+                        is Screen.Settings -> {
+                            val settingsViewModel: com.habit1.app.ui.settings.SettingsViewModel = viewModel(
+                                factory = com.habit1.app.ui.settings.SettingsViewModel.Factory(
+                                    backupRepository = app.container.backupRepository
+                                )
+                            )
+                            com.habit1.app.ui.settings.SettingsScreen(
+                                viewModel = settingsViewModel,
                                 onNavigateBack = {
                                     if (backstack.size > 1) {
                                         backstack.removeAt(backstack.size - 1)

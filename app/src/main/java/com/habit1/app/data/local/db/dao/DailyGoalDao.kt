@@ -102,4 +102,22 @@ interface DailyGoalDao {
     @Transaction
     @Query("SELECT * FROM daily_goals ORDER BY target_date ASC, display_order ASC")
     suspend fun getAllGoalsWithSubtasks(): List<DailyGoalWithSubtasks>
+
+    @Query("SELECT * FROM daily_goals ORDER BY target_date ASC, display_order ASC")
+    suspend fun getAllGoalsList(): List<DailyGoalEntity>
+
+    @Query("SELECT * FROM goal_subtasks ORDER BY goal_id ASC, display_order ASC")
+    suspend fun getAllSubtasksList(): List<GoalSubtaskEntity>
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertAllGoals(goals: List<DailyGoalEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertAllSubtasks(subtasks: List<GoalSubtaskEntity>)
+
+    @Query("DELETE FROM goal_subtasks")
+    suspend fun deleteAllSubtasks()
+
+    @Query("DELETE FROM daily_goals")
+    suspend fun deleteAllGoals()
 }

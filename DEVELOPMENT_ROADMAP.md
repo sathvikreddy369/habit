@@ -3,7 +3,7 @@
 **Project**: Offline Habit & Daily Goal Android Application  
 **Author**: Primary Implementation Agent  
 **Date**: September 2026  
-**Status**: Phase 8 Complete (Notifications & Alarm Scheduling) — Verified  
+**Status**: Phase 9 Complete (Backup, Export & Restore) — Verified  
 
 
 ---
@@ -741,14 +741,18 @@ graph TD
   * Permission flow: Habit reminder saving is completely independent of `POST_NOTIFICATIONS`; lightweight reconciliation recovers reminders when permission is granted.
 * **Verification**: 147 automated unit tests (all passing), 0 lint errors, clean debug build, zero network leaks.
 
-### Phase 9: Backup, Export & Restore (Local, Private, User-Controlled)
-* **Objective**: Reliable, user-controlled data export and restore via Android SAF (no background or automatic backups).
+### Phase 9: Backup, Export & Restore (Local, Private, User-Controlled) — [COMPLETED & VERIFIED]
+* **Objective**: Reliable, user-controlled data export and restore via Android SAF (no cloud backend, no background or automatic backups).
+* **Core Principles**: Privacy-first, transparent JSON envelope format, deterministic canonical SHA-256 integrity validation, complete pre-mutation validation, and transactional atomicity.
 * **Deliverables**:
-  * Versioned JSON serialization and deserialization engine.
-  * SHA-256 checksum generator and validator.
-  * SAF file picker integration (`CreateDocument` and `OpenDocument`).
-  * Atomic database restore inside Room transaction with schema validation and rollback on error.
-* **Verification**: Unit tests for corrupted backup rejection, version mismatch handling, and successful roundtrip export/restore data integrity tests.
+  * `BackupModels`: Serializable DTOs (`BackupEnvelopeDto`, `BackupPayloadDto`, `HabitBackupDto`, `HabitRecordBackupDto`, `DailyGoalBackupDto`, `GoalSubtaskBackupDto`, `DailyReviewBackupDto`) with bi-directional Room entity mappers.
+  * `BackupChecksumCalculator`: Deterministic list sorting, canonical JSON serialization, and SHA-256 hex digest computation.
+  * `BackupValidator`: Comprehensive pre-mutation validation verifying resource limits (20 MB / entity caps), string limits, collection uniqueness, foreign-key relationships, and domain invariants.
+  * `BackupExporter`: Consistent Room database read snapshot executed within a short transaction; streams pretty-printed JSON to user-selected SAF URI.
+  * `BackupImporter`: Atomic Room transaction supporting **Replace All** (with pre-wipe alarm cancellation, child-to-parent deletion, parent-to-child insertion, post-commit alarm synchronization, and transaction failure rollback alarm recovery) and **Merge** (with explicit timestamp conflict policies and strict preservation of conflicting historical records).
+  * `BackupRepository` / `BackupRepositoryImpl`: Safe ContentResolver SAF file streaming and preview inspection.
+  * `SettingsViewModel` & `SettingsScreen`: Material 3 settings interface providing Data & Privacy disclosures, SAF CreateDocument/OpenDocument launchers, preview dialog with entity and conflict counts, and explicit secondary confirmation for destructive Replace All.
+* **Verification**: 167 automated unit and integration tests (100% passing), clean debug APK build (`assembleDebug`), and 0 lint errors (`lintDebug`).
 
 ### Phase 10: Optional Daily Review, Hardening & Physical Device Verification
 * **Objective**: Polish UI, add optional daily reflection, run static analysis, verify on physical hardware against empirical baselines.

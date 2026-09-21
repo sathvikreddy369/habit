@@ -27,4 +27,10 @@ interface DailyReviewDao {
 
     @Query("SELECT * FROM daily_reviews ORDER BY date ASC")
     suspend fun getAllReviews(): List<DailyReviewEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAll(reviews: List<DailyReviewEntity>)
+
+    @Query("DELETE FROM daily_reviews")
+    suspend fun deleteAllReviews()
 }

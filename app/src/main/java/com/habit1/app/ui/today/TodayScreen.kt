@@ -50,6 +50,7 @@ fun TodayScreen(
     viewModel: TodayViewModel,
     onNavigateToHabits: () -> Unit = {},
     onNavigateToHistory: () -> Unit = {},
+    onNavigateToSettings: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -77,6 +78,12 @@ fun TodayScreen(
                     TextButton(onClick = onNavigateToHabits) {
                         Text(
                             text = "Habits",
+                            style = MaterialTheme.typography.labelLarge
+                        )
+                    }
+                    TextButton(onClick = onNavigateToSettings) {
+                        Text(
+                            text = "Settings",
                             style = MaterialTheme.typography.labelLarge
                         )
                     }

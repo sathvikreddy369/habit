@@ -57,4 +57,10 @@ interface HabitRecordDao {
 
     @Query("SELECT * FROM habit_records ORDER BY date ASC")
     suspend fun getAllRecordsList(): List<HabitRecordEntity>
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertAll(records: List<HabitRecordEntity>)
+
+    @Query("DELETE FROM habit_records")
+    suspend fun deleteAllRecords()
 }
