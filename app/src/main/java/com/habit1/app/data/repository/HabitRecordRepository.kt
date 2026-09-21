@@ -14,6 +14,13 @@ interface HabitRecordRepository {
     suspend fun getRecordsForHabits(habitIds: List<String>): List<HabitRecordEntity>
     fun observeRecordsForHabitInRange(habitId: String, startDate: String, endDate: String): Flow<List<HabitRecordEntity>>
     suspend fun getRecordsForHabitInRange(habitId: String, startDate: String, endDate: String): List<HabitRecordEntity>
+
+    fun observeRecordsForHabitInRange(habitId: String, range: com.habit1.app.domain.model.AnalyticsRange): Flow<List<HabitRecordEntity>> =
+        observeRecordsForHabitInRange(habitId, range.startDate.toString(), range.endDate.toString())
+
+    suspend fun getRecordsForHabitInRange(habitId: String, range: com.habit1.app.domain.model.AnalyticsRange): List<HabitRecordEntity> =
+        getRecordsForHabitInRange(habitId, range.startDate.toString(), range.endDate.toString())
+
     suspend fun recordProgress(record: HabitRecordEntity)
     suspend fun deleteRecord(habitId: String, date: String)
     suspend fun countCompletedForHabit(habitId: String): Int

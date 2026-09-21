@@ -31,14 +31,18 @@ class CalculateStreaksUseCase(
         habit: Habit,
         records: List<HabitRecord>,
         todayDate: LocalDate,
-        zoneId: ZoneId = ZoneId.systemDefault()
+        zoneId: ZoneId = ZoneId.systemDefault(),
+        startDate: LocalDate? = null,
+        endDate: LocalDate? = null
     ): StreakResult {
         val creationCivilDate = habit.createdAt.atZone(zoneId).toLocalDate()
         val earliestRecordDate = records.minOfOrNull { it.date } ?: creationCivilDate
-        val startDate = if (earliestRecordDate.isBefore(creationCivilDate)) earliestRecordDate else creationCivilDate
+        val defaultStartDate = if (earliestRecordDate.isBefore(creationCivilDate)) earliestRecordDate else creationCivilDate
+        val effectiveStartDate = startDate ?: defaultStartDate
+        val effectiveEndDate = endDate ?: todayDate
 
         // If habit is in the future or no valid dates exist
-        if (startDate.isAfter(todayDate)) {
+        if (effectiveStartDate.isAfter(effectiveEndDate)) {
             val totalDone = records.count { it.isCompleted }
             return StreakResult(
                 currentStreak = 0,
@@ -51,7 +55,7 @@ class CalculateStreaksUseCase(
 
         val recordMap = records.associateBy { it.date }
         val habitForSchedule = if (habit.isArchived) habit.copy(isArchived = false) else habit
-        val scheduledDates = evaluateSchedule.getScheduledDatesInRange(habitForSchedule, startDate, todayDate, zoneId)
+        val scheduledDates = evaluateSchedule.getScheduledDatesInRange(habitForSchedule, effectiveStartDate, effectiveEndDate, zoneId)
 
         if (scheduledDates.isEmpty()) {
             val totalDone = records.count { it.isCompleted }
