@@ -50,6 +50,8 @@ class TodayViewModel(
     private val evaluateSchedule: EvaluateScheduleUseCase = EvaluateScheduleUseCase(),
     private val calculateStreaks: CalculateStreaksUseCase = CalculateStreaksUseCase(),
     private val evaluateMeasurement: EvaluateMeasurementUseCase = EvaluateMeasurementUseCase(),
+    private val recordHabitProgress: com.habit1.app.domain.usecase.RecordHabitProgressUseCase =
+        com.habit1.app.domain.usecase.RecordHabitProgressUseCase(habitRepository, habitRecordRepository, evaluateMeasurement, evaluateSchedule),
     private val zoneId: ZoneId = ZoneId.systemDefault(),
     coroutineScope: CoroutineScope? = null
 ) : ViewModel() {
@@ -290,117 +292,15 @@ class TodayViewModel(
 
 
     private suspend fun handleToggleHabit(habitId: String) {
-        val habitEntity = habitRepository.getHabitById(habitId) ?: return
-        val habit = habitEntity.toDomain()
-        val dateString = DateTimeUtils.formatDate(currentDateFlow.value)
-        val existingRecord = habitRecordRepository.getRecord(habitId, dateString)
-
-        val isCurrentlyCompleted = existingRecord?.isCompleted ?: false
-        val now = System.currentTimeMillis()
-
-        val (newActualValue, newIsCompleted) = when (val m = habit.measurement) {
-            is MeasurementType.BooleanChoice -> {
-                if (isCurrentlyCompleted) Pair(0.0, false) else Pair(1.0, true)
-            }
-            is MeasurementType.Count -> {
-                if (isCurrentlyCompleted) Pair(0.0, false) else Pair(m.target.toDouble(), true)
-            }
-            is MeasurementType.Duration -> {
-                if (isCurrentlyCompleted) Pair(0.0, false) else Pair(m.targetMinutes.toDouble(), true)
-            }
-            is MeasurementType.Quantity -> {
-                if (isCurrentlyCompleted) Pair(0.0, false) else Pair(m.target, true)
-            }
-        }
-
-        val targetVal = when (val m = habit.measurement) {
-            is MeasurementType.BooleanChoice -> 1.0
-            is MeasurementType.Count -> m.target.toDouble()
-            is MeasurementType.Duration -> m.targetMinutes.toDouble()
-            is MeasurementType.Quantity -> m.target
-        }
-
-        val recordToSave = HabitRecordEntity(
-            id = existingRecord?.id ?: UUID.randomUUID().toString(),
-            habitId = habitId,
-            date = dateString,
-            actualValue = newActualValue,
-            targetValue = targetVal,
-            measurementType = habit.measurement.typeName,
-            unit = habitEntity.unit,
-            isCompleted = newIsCompleted,
-            recordedAt = now
-        )
-        habitRecordRepository.recordProgress(recordToSave)
+        recordHabitProgress.toggleHabit(habitId, currentDateFlow.value, zoneId)
     }
 
     private suspend fun handleAdjustHabit(habitId: String, increment: Boolean) {
-        val habitEntity = habitRepository.getHabitById(habitId) ?: return
-        val habit = habitEntity.toDomain()
-        val dateString = DateTimeUtils.formatDate(currentDateFlow.value)
-        val existingRecord = habitRecordRepository.getRecord(habitId, dateString)
-
-        val currentVal = existingRecord?.actualValue ?: 0.0
-        val step = evaluateMeasurement.defaultStep(habit.measurement)
-        val targetVal = when (val m = habit.measurement) {
-            is MeasurementType.BooleanChoice -> 1.0
-            is MeasurementType.Count -> m.target.toDouble()
-            is MeasurementType.Duration -> m.targetMinutes.toDouble()
-            is MeasurementType.Quantity -> m.target
-        }
-
-        val newVal = if (increment) {
-            currentVal + step
-        } else {
-            (currentVal - step).coerceAtLeast(0.0)
-        }
-
-        val isCompleted = evaluateMeasurement.isCompleted(habit.measurement, newVal)
-        val now = System.currentTimeMillis()
-
-        val recordToSave = HabitRecordEntity(
-            id = existingRecord?.id ?: UUID.randomUUID().toString(),
-            habitId = habitId,
-            date = dateString,
-            actualValue = newVal,
-            targetValue = targetVal,
-            measurementType = habit.measurement.typeName,
-            unit = habitEntity.unit,
-            isCompleted = isCompleted,
-            recordedAt = now
-        )
-        habitRecordRepository.recordProgress(recordToSave)
+        recordHabitProgress.adjustHabit(habitId, currentDateFlow.value, increment, zoneId)
     }
 
     private suspend fun handleSetHabitValue(habitId: String, value: Double) {
-        val safeValue = value.coerceAtLeast(0.0)
-        val habitEntity = habitRepository.getHabitById(habitId) ?: return
-        val habit = habitEntity.toDomain()
-        val dateString = DateTimeUtils.formatDate(currentDateFlow.value)
-        val existingRecord = habitRecordRepository.getRecord(habitId, dateString)
-
-        val targetVal = when (val m = habit.measurement) {
-            is MeasurementType.BooleanChoice -> 1.0
-            is MeasurementType.Count -> m.target.toDouble()
-            is MeasurementType.Duration -> m.targetMinutes.toDouble()
-            is MeasurementType.Quantity -> m.target
-        }
-
-        val isCompleted = evaluateMeasurement.isCompleted(habit.measurement, safeValue)
-        val now = System.currentTimeMillis()
-
-        val recordToSave = HabitRecordEntity(
-            id = existingRecord?.id ?: UUID.randomUUID().toString(),
-            habitId = habitId,
-            date = dateString,
-            actualValue = safeValue,
-            targetValue = targetVal,
-            measurementType = habit.measurement.typeName,
-            unit = habitEntity.unit,
-            isCompleted = isCompleted,
-            recordedAt = now
-        )
-        habitRecordRepository.recordProgress(recordToSave)
+        recordHabitProgress.setActualValue(habitId, currentDateFlow.value, value, zoneId)
     }
 
     private fun isGoalCompleted(goalId: String): Boolean {

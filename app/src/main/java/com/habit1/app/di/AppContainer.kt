@@ -36,6 +36,7 @@ interface AppContainer {
     val reminderScheduler: com.habit1.app.platform.reminder.HabitReminderScheduler
     val reminderCoordinator: com.habit1.app.domain.reminder.HabitReminderCoordinator
     val backupRepository: com.habit1.app.data.repository.BackupRepository
+    val recordHabitProgressUseCase: com.habit1.app.domain.usecase.RecordHabitProgressUseCase
 }
 
 /**
@@ -103,6 +104,13 @@ class DefaultAppContainer(
             exporter = exporter,
             importer = importer,
             ioDispatcher = ioDispatcher
+        )
+    }
+
+    override val recordHabitProgressUseCase: com.habit1.app.domain.usecase.RecordHabitProgressUseCase by lazy {
+        com.habit1.app.domain.usecase.RecordHabitProgressUseCase(
+            habitRepository = habitRepository,
+            habitRecordRepository = habitRecordRepository
         )
     }
 }

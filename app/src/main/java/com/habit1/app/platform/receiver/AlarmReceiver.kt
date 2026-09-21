@@ -70,7 +70,8 @@ class AlarmReceiver : BroadcastReceiver() {
                 val isScheduledToday = isEligible && evaluateSchedule.isScheduledOn(habit, today, zoneId)
 
                 if (isScheduledToday) {
-                    notificationHelper.showReminderNotification(habit)
+                    val targetDateStr = DateTimeUtils.formatDate(today)
+                    notificationHelper.showReminderNotification(habit, targetDateStr)
                 }
 
                 // Schedule next upcoming reminder starting from tomorrow
