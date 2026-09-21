@@ -36,7 +36,7 @@ class BackupChecksumCalculatorTest {
                 HabitBackupDto(
                     id = "h2",
                     name = "Pushups",
-                    measurementType = "NUMERIC",
+                    measurementType = "COUNT",
                     targetValue = 50.0,
                     unit = "reps",
                     scheduleType = "DAILY",

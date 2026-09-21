@@ -201,7 +201,7 @@ class BackupImporterMergeTest {
         val habit = HabitEntity(
             id = "h1",
             name = "Pushups",
-            measurementType = "NUMERIC",
+            measurementType = "COUNT",
             targetValue = 50.0,
             unit = "reps",
             scheduleType = "DAILY",
@@ -224,7 +224,7 @@ class BackupImporterMergeTest {
             actualValue = 50.0,
             targetValue = 50.0,
             unit = "reps",
-            measurementType = "NUMERIC",
+            measurementType = "COUNT",
             notes = "Local factual record",
             recordedAt = 1000L
         )
@@ -242,7 +242,7 @@ class BackupImporterMergeTest {
                     actualValue = 20.0,
                     targetValue = 50.0,
                     unit = "reps",
-                    measurementType = "NUMERIC",
+                    measurementType = "COUNT",
                     notes = "Backup conflicting record",
                     recordedAt = 2000L
                 ),
@@ -254,7 +254,7 @@ class BackupImporterMergeTest {
                     actualValue = 50.0,
                     targetValue = 50.0,
                     unit = "reps",
-                    measurementType = "NUMERIC",
+                    measurementType = "COUNT",
                     notes = "New record",
                     recordedAt = 2000L
                 )

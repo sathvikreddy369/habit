@@ -40,6 +40,7 @@ data class BackupPayloadDto(
 data class HabitBackupDto(
     val id: String,
     val name: String,
+    val description: String? = null,
     val measurementType: String,
     val targetValue: Double,
     val unit: String? = null,
@@ -103,6 +104,7 @@ data class DailyReviewBackupDto(
 fun HabitEntity.toBackupDto(): HabitBackupDto = HabitBackupDto(
     id = id,
     name = name,
+    description = description,
     measurementType = measurementType,
     targetValue = targetValue,
     unit = unit,
@@ -119,6 +121,7 @@ fun HabitEntity.toBackupDto(): HabitBackupDto = HabitBackupDto(
 fun HabitBackupDto.toEntity(): HabitEntity = HabitEntity(
     id = id,
     name = name,
+    description = description,
     measurementType = measurementType,
     targetValue = targetValue,
     unit = unit,

@@ -72,7 +72,7 @@ class BackupRoundtripIntegrationTest {
             HabitEntity(
                 id = "h_daily",
                 name = "Daily Hydration",
-                measurementType = "NUMERIC",
+                measurementType = "QUANTITY",
                 targetValue = 2500.0,
                 unit = "ml",
                 scheduleType = "DAILY",
@@ -156,7 +156,7 @@ class BackupRoundtripIntegrationTest {
                 actualValue = 2500.0,
                 targetValue = 2500.0,
                 unit = "ml",
-                measurementType = "NUMERIC",
+                measurementType = "QUANTITY",
                 notes = "Drank all bottles",
                 recordedAt = 2000L
             ),
@@ -168,7 +168,7 @@ class BackupRoundtripIntegrationTest {
                 actualValue = 1500.0,
                 targetValue = 2500.0,
                 unit = "ml",
-                measurementType = "NUMERIC",
+                measurementType = "QUANTITY",
                 notes = "Busy day",
                 recordedAt = 2100L
             ),

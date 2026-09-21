@@ -73,8 +73,13 @@ object BackupValidator {
     const val MAX_NAME_LENGTH = 100
     const val MAX_NOTES_LENGTH = 5_000
 
-    private val VALID_MEASUREMENT_TYPES = setOf("BOOLEAN", "NUMERIC")
-    private val VALID_SCHEDULE_TYPES = setOf("DAILY", "SPECIFIC_DAYS", "INTERVAL")
+    val VALID_MEASUREMENT_TYPES = setOf(
+        com.habit1.app.domain.model.MeasurementType.BooleanChoice.TYPE_NAME, // "BOOLEAN"
+        com.habit1.app.domain.model.MeasurementType.Count.TYPE_NAME,         // "COUNT"
+        com.habit1.app.domain.model.MeasurementType.Duration.TYPE_NAME,      // "DURATION"
+        com.habit1.app.domain.model.MeasurementType.Quantity.TYPE_NAME       // "QUANTITY"
+    )
+    val VALID_SCHEDULE_TYPES = setOf("DAILY", "SPECIFIC_DAYS", "INTERVAL")
 
     /**
      * Comprehensive validation of envelope, checksum, constraints, and relationships.
@@ -172,15 +177,45 @@ object BackupValidator {
                     BackupValidationError.StringLengthExceeded("habit.name", habit.name.length, MAX_NAME_LENGTH)
                 )
             }
-            if (habit.measurementType !in VALID_MEASUREMENT_TYPES) {
-                return BackupValidationResult.Invalid(
-                    BackupValidationError.InvalidDomainInvariant("Habit", habit.id, "Unknown measurementType '${habit.measurementType}'.")
-                )
-            }
-            if (habit.targetValue <= 0.0) {
-                return BackupValidationResult.Invalid(
-                    BackupValidationError.InvalidDomainInvariant("Habit", habit.id, "Target value must be positive, got ${habit.targetValue}.")
-                )
+            when (habit.measurementType) {
+                com.habit1.app.domain.model.MeasurementType.BooleanChoice.TYPE_NAME -> {
+                    if (habit.targetValue != 1.0) {
+                        return BackupValidationResult.Invalid(
+                            BackupValidationError.InvalidDomainInvariant("Habit", habit.id, "Boolean habit targetValue must be 1.0, got ${habit.targetValue}.")
+                        )
+                    }
+                }
+                com.habit1.app.domain.model.MeasurementType.Count.TYPE_NAME -> {
+                    if (habit.targetValue < 1.0 || habit.targetValue % 1.0 != 0.0) {
+                        return BackupValidationResult.Invalid(
+                            BackupValidationError.InvalidDomainInvariant("Habit", habit.id, "Count habit targetValue must be a positive integer, got ${habit.targetValue}.")
+                        )
+                    }
+                }
+                com.habit1.app.domain.model.MeasurementType.Duration.TYPE_NAME -> {
+                    if (habit.targetValue < 1.0 || habit.targetValue % 1.0 != 0.0) {
+                        return BackupValidationResult.Invalid(
+                            BackupValidationError.InvalidDomainInvariant("Habit", habit.id, "Duration habit targetValue must be positive minutes, got ${habit.targetValue}.")
+                        )
+                    }
+                }
+                com.habit1.app.domain.model.MeasurementType.Quantity.TYPE_NAME -> {
+                    if (habit.targetValue <= 0.0) {
+                        return BackupValidationResult.Invalid(
+                            BackupValidationError.InvalidDomainInvariant("Habit", habit.id, "Quantity habit targetValue must be positive, got ${habit.targetValue}.")
+                        )
+                    }
+                    if (habit.unit.isNullOrBlank()) {
+                        return BackupValidationResult.Invalid(
+                            BackupValidationError.InvalidDomainInvariant("Habit", habit.id, "Quantity habit requires a non-blank unit.")
+                        )
+                    }
+                }
+                else -> {
+                    return BackupValidationResult.Invalid(
+                        BackupValidationError.InvalidDomainInvariant("Habit", habit.id, "Unknown measurementType '${habit.measurementType}'.")
+                    )
+                }
             }
             if (habit.scheduleType !in VALID_SCHEDULE_TYPES) {
                 return BackupValidationResult.Invalid(
@@ -246,6 +281,11 @@ object BackupValidator {
             if (record.targetValue <= 0.0) {
                 return BackupValidationResult.Invalid(
                     BackupValidationError.InvalidDomainInvariant("Record", record.id, "Target value must be positive, got ${record.targetValue}.")
+                )
+            }
+            if (record.measurementType !in VALID_MEASUREMENT_TYPES) {
+                return BackupValidationResult.Invalid(
+                    BackupValidationError.InvalidDomainInvariant("Record", record.id, "Unknown measurementType '${record.measurementType}'.")
                 )
             }
             if (record.notes != null && record.notes.length > MAX_NOTES_LENGTH) {
