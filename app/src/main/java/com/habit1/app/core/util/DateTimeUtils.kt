@@ -29,6 +29,24 @@ object DateTimeUtils {
 
     fun parseTime(timeString: String): LocalTime = LocalTime.parse(timeString, TIME_ISO_FORMATTER)
 
+    /**
+     * Formats [time] for user presentation respecting 12-hour (e.g. "8:30 AM") or 24-hour (e.g. "08:30") display.
+     */
+    fun formatLocalizedTime(time: LocalTime, is24Hour: Boolean = false): String {
+        return if (is24Hour) {
+            time.format(TIME_ISO_FORMATTER)
+        } else {
+            val hour = when (time.hour) {
+                0 -> 12
+                in 1..12 -> time.hour
+                else -> time.hour - 12
+            }
+            val minute = String.format(java.util.Locale.US, "%02d", time.minute)
+            val amPm = if (time.hour < 12) "AM" else "PM"
+            "$hour:$minute $amPm"
+        }
+    }
+
     fun daysBetween(start: LocalDate, end: LocalDate): Long = ChronoUnit.DAYS.between(start, end)
 
     fun isToday(date: LocalDate, zoneId: ZoneId = ZoneId.systemDefault()): Boolean =

@@ -94,11 +94,10 @@ fun GoalCard(
             ) {
                 Checkbox(
                     checked = goalItem.isCompleted,
-                    onCheckedChange = { onToggle() },
-                    modifier = Modifier.size(24.dp)
+                    onCheckedChange = { onToggle() }
                 )
 
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(8.dp))
 
                 Column(
                     modifier = Modifier
@@ -330,15 +329,16 @@ private fun SubtaskRow(
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Row(
-            modifier = Modifier.weight(1f),
+            modifier = Modifier
+                .weight(1f)
+                .clickable { onToggle() },
             verticalAlignment = Alignment.CenterVertically
         ) {
             Checkbox(
                 checked = subtask.isCompleted,
-                onCheckedChange = { onToggle() },
-                modifier = Modifier.size(20.dp)
+                onCheckedChange = { onToggle() }
             )
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(4.dp))
             Text(
                 text = subtask.title,
                 style = MaterialTheme.typography.bodyMedium,
@@ -354,14 +354,13 @@ private fun SubtaskRow(
         }
 
         IconButton(
-            onClick = { menuExpanded = true },
-            modifier = Modifier.size(24.dp)
+            onClick = { menuExpanded = true }
         ) {
             Icon(
                 imageVector = Icons.Default.MoreVert,
                 contentDescription = "Subtask options",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(16.dp)
+                modifier = Modifier.size(20.dp)
             )
         }
 

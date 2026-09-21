@@ -6,12 +6,15 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.launch
@@ -50,12 +53,19 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            HabitTheme {
+            val app = application as HabitApplication
+            val userPrefs by app.container.userPreferences.userPreferencesFlow.collectAsStateWithLifecycle(initialValue = null)
+            val isDarkTheme = when (userPrefs?.themeMode) {
+                "LIGHT" -> false
+                "DARK" -> true
+                else -> isSystemInDarkTheme()
+            }
+
+            HabitTheme(darkTheme = isDarkTheme) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    val app = application as HabitApplication
                     val backstack = remember { mutableStateListOf<Screen>(Screen.Today) }
                     val currentScreen = backstack.lastOrNull() ?: Screen.Today
 
@@ -169,7 +179,8 @@ class MainActivity : ComponentActivity() {
                         is Screen.Settings -> {
                             val settingsViewModel: com.habit1.app.ui.settings.SettingsViewModel = viewModel(
                                 factory = com.habit1.app.ui.settings.SettingsViewModel.Factory(
-                                    backupRepository = app.container.backupRepository
+                                    backupRepository = app.container.backupRepository,
+                                    userPreferences = app.container.userPreferences
                                 )
                             )
                             com.habit1.app.ui.settings.SettingsScreen(

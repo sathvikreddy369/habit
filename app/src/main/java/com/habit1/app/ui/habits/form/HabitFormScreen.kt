@@ -14,14 +14,21 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -29,16 +36,24 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.habit1.app.core.util.DateTimeUtils
 import com.habit1.app.domain.validation.HabitValidationError
 import com.habit1.app.domain.validation.MeasurementKind
 import com.habit1.app.domain.validation.ScheduleKind
+import com.habit1.app.ui.components.ReminderTimePickerDialog
 import java.time.DayOfWeek
 import java.time.format.TextStyle
 import java.util.Locale
@@ -51,6 +66,14 @@ fun HabitFormScreen(
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val nameFocusRequester = remember { FocusRequester() }
+    var showTimePickerDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        if (!uiState.isEditMode) {
+            nameFocusRequester.requestFocus()
+        }
+    }
 
     LaunchedEffect(uiState.isSaved) {
         if (uiState.isSaved) {
@@ -117,7 +140,9 @@ fun HabitFormScreen(
                         else -> null
                     }
                 },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(nameFocusRequester)
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -351,9 +376,10 @@ fun HabitFormScreen(
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onBackground
             )
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-            val context = androidx.compose.ui.platform.LocalContext.current
+            val context = LocalContext.current
+            val is24Hour = android.text.format.DateFormat.is24HourFormat(context)
             val isNotificationPermissionGranted = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
                 androidx.core.content.ContextCompat.checkSelfPermission(
                     context,
@@ -367,39 +393,124 @@ fun HabitFormScreen(
                 contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
             ) { /* Permission result handled */ }
 
-            OutlinedTextField(
-                value = uiState.reminderTimeInput,
-                onValueChange = { viewModel.onEvent(HabitFormUiEvent.UpdateReminderTime(it)) },
-                label = { Text("Reminder time (HH:mm)") },
-                placeholder = { Text("08:00") },
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Text,
-                    imeAction = ImeAction.Done
-                ),
-                singleLine = true,
-                supportingText = {
-                    if (uiState.reminderTimeInput.isNotBlank() && !isNotificationPermissionGranted) {
-                        Text(
-                            text = "Notifications are currently disabled. Reminders will be scheduled once permission is granted.",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    } else {
-                        Text("24-hour format (e.g. 07:30, 20:00). Leave blank for no reminder.")
+            val currentLocalTime = remember(uiState.reminderTimeInput) {
+                if (uiState.reminderTimeInput.isNotBlank()) {
+                    try {
+                        DateTimeUtils.parseTime(uiState.reminderTimeInput)
+                    } catch (e: Exception) {
+                        null
                     }
-                },
-                modifier = Modifier.fillMaxWidth()
-            )
+                } else null
+            }
 
-            if (uiState.reminderTimeInput.isNotBlank() && !isNotificationPermissionGranted && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-                Spacer(modifier = Modifier.height(6.dp))
-                androidx.compose.material3.OutlinedButton(
-                    onClick = {
-                        permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
-                    },
-                    modifier = Modifier.fillMaxWidth()
+            if (currentLocalTime == null) {
+                OutlinedCard(
+                    onClick = { showTimePickerDialog = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
                 ) {
-                    Text("Grant Notification Permission")
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = "Add reminder",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
+            } else {
+                Card(
+                    onClick = { showTimePickerDialog = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(text = "🔔", style = MaterialTheme.typography.titleMedium)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    text = DateTimeUtils.formatLocalizedTime(currentLocalTime, is24Hour),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = "Daily reminder",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.outline
+                                )
+                            }
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(onClick = { showTimePickerDialog = true }) {
+                                Icon(
+                                    imageVector = Icons.Default.Edit,
+                                    contentDescription = "Edit reminder time"
+                                )
+                            }
+                            IconButton(onClick = { viewModel.onEvent(HabitFormUiEvent.UpdateReminderTime("")) }) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Clear reminder"
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (uiState.reminderTimeInput.isNotBlank() && !isNotificationPermissionGranted) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "Notifications are currently disabled on this device. Reminders will be scheduled once permission is granted.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    androidx.compose.material3.OutlinedButton(
+                        onClick = {
+                            permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Grant Notification Permission")
+                    }
+                }
+            }
+
+            if (showTimePickerDialog) {
+                ReminderTimePickerDialog(
+                    initialTime = currentLocalTime,
+                    onConfirm = { time ->
+                        viewModel.onEvent(HabitFormUiEvent.UpdateReminderTime(DateTimeUtils.formatTime(time)))
+                        showTimePickerDialog = false
+                    },
+                    onClear = {
+                        viewModel.onEvent(HabitFormUiEvent.UpdateReminderTime(""))
+                        showTimePickerDialog = false
+                    },
+                    onDismiss = { showTimePickerDialog = false }
+                )
             }
 
             Spacer(modifier = Modifier.height(36.dp))

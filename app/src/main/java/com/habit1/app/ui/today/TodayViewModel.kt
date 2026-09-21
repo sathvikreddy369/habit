@@ -111,7 +111,15 @@ class TodayViewModel(
                 evaluateSchedule.isScheduledOn(habit, date, zoneId)
             }
 
-            // 2. Map to UI items
+            // 2. Map to UI items (batch-fetching history to avoid N+1 SQLite queries)
+            val scheduledHabitIds = scheduledHabits.map { it.id }
+            val batchRecordsByHabit = if (scheduledHabitIds.isNotEmpty()) {
+                habitRecordRepository.getRecordsForHabits(scheduledHabitIds)
+                    .groupBy { it.habitId }
+            } else {
+                emptyMap()
+            }
+
             val habitUiItems = scheduledHabits.map { habit ->
                 val recordEntity = recordsMap[habit.id]
                 val record = recordEntity?.toDomain()
@@ -134,7 +142,7 @@ class TodayViewModel(
                 val progressRatio = evaluateMeasurement.progressRatio(habit.measurement, actualValue)
                 val formattedProgress = evaluateMeasurement.formatProgress(habit.measurement, actualValue)
 
-                val habitHistory = habitRecordRepository.getRecordsForHabit(habit.id).map { it.toDomain() }
+                val habitHistory = (batchRecordsByHabit[habit.id] ?: emptyList()).map { it.toDomain() }
                 val streak = calculateStreaks.execute(habit, habitHistory, date, zoneId)
 
                 TodayHabitItem(

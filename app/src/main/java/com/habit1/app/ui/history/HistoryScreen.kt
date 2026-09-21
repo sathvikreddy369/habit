@@ -137,7 +137,7 @@ fun HistoryScreen(
                                     text = dayLabel,
                                     style = MaterialTheme.typography.labelMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.width(36.dp),
+                                    modifier = Modifier.width(40.dp),
                                     textAlign = TextAlign.Center
                                 )
                             }
@@ -168,7 +168,7 @@ fun HistoryScreen(
                                             onClick = { viewModel.onEvent(HistoryUiEvent.SelectDate(dayItem.date)) }
                                         )
                                     } else {
-                                        Spacer(modifier = Modifier.size(36.dp))
+                                        Spacer(modifier = Modifier.size(40.dp))
                                     }
                                 }
                             }
@@ -422,7 +422,7 @@ private fun CalendarDayCell(
 
     Column(
         modifier = modifier
-            .size(36.dp)
+            .size(40.dp)
             .clip(CircleShape)
             .background(
                 when {

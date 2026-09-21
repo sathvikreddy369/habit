@@ -153,4 +153,37 @@ class RepositoryTest {
         reviewRepo.deleteReview("2026-09-20")
         assertNull(reviewRepo.getReview("2026-09-20"))
     }
+
+    @Test
+    fun testGetRecordsForHabitsBatchRetrieval() = runBlocking {
+        val now = System.currentTimeMillis()
+        val h1 = HabitEntity(id = "h1", name = "H1", measurementType = "COUNT", targetValue = 1.0, scheduleType = "DAILY", scheduleConfig = "{}", displayOrder = 0, createdAt = now, updatedAt = now)
+        val h2 = HabitEntity(id = "h2", name = "H2", measurementType = "COUNT", targetValue = 1.0, scheduleType = "DAILY", scheduleConfig = "{}", displayOrder = 1, createdAt = now, updatedAt = now)
+        val h3 = HabitEntity(id = "h3", name = "H3", measurementType = "COUNT", targetValue = 1.0, scheduleType = "DAILY", scheduleConfig = "{}", displayOrder = 2, createdAt = now, updatedAt = now)
+        habitRepo.createHabit(h1)
+        habitRepo.createHabit(h2)
+        habitRepo.createHabit(h3)
+
+        val r1 = HabitRecordEntity("r1", "h1", "2026-09-20", 1.0, 1.0, "COUNT", null, true, null, now)
+        val r2 = HabitRecordEntity("r2", "h1", "2026-09-21", 1.0, 1.0, "COUNT", null, true, null, now)
+        val r3 = HabitRecordEntity("r3", "h2", "2026-09-21", 1.0, 1.0, "COUNT", null, false, null, now)
+        val r4 = HabitRecordEntity("r4", "h3", "2026-09-21", 1.0, 1.0, "COUNT", null, true, null, now)
+
+        recordRepo.recordProgress(r1)
+        recordRepo.recordProgress(r2)
+        recordRepo.recordProgress(r3)
+        recordRepo.recordProgress(r4)
+
+        // Batch query for h1 and h2
+        val batch = recordRepo.getRecordsForHabits(listOf("h1", "h2"))
+        assertEquals(3, batch.size)
+        assertTrue(batch.any { it.id == "r1" })
+        assertTrue(batch.any { it.id == "r2" })
+        assertTrue(batch.any { it.id == "r3" })
+        assertTrue(batch.none { it.id == "r4" })
+
+        // Empty list handling
+        val emptyBatch = recordRepo.getRecordsForHabits(emptyList())
+        assertTrue(emptyBatch.isEmpty())
+    }
 }

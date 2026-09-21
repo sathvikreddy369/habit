@@ -13,7 +13,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+import com.habit1.app.data.local.preferences.UserPreferencesDataStore
+
 data class SettingsUiState(
+    val themeMode: String = "SYSTEM",
     val isExporting: Boolean = false,
     val isInspecting: Boolean = false,
     val isRestoring: Boolean = false,
@@ -25,11 +28,27 @@ data class SettingsUiState(
 )
 
 class SettingsViewModel(
-    private val backupRepository: BackupRepository
+    private val backupRepository: BackupRepository,
+    private val userPreferences: UserPreferencesDataStore
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            userPreferences.userPreferencesFlow.collect { prefs ->
+                _uiState.update { it.copy(themeMode = prefs.themeMode) }
+            }
+        }
+    }
+
+    fun selectThemeMode(mode: String) {
+        _uiState.update { it.copy(themeMode = mode) }
+        viewModelScope.launch {
+            userPreferences.updateThemeMode(mode)
+        }
+    }
 
     fun exportBackup(uri: Uri) {
         viewModelScope.launch {
@@ -135,11 +154,12 @@ class SettingsViewModel(
     }
 
     class Factory(
-        private val backupRepository: BackupRepository
+        private val backupRepository: BackupRepository,
+        private val userPreferences: UserPreferencesDataStore
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            return SettingsViewModel(backupRepository) as T
+            return SettingsViewModel(backupRepository, userPreferences) as T
         }
     }
 }

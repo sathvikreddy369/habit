@@ -41,6 +41,12 @@ class HabitRecordRepositoryImpl(
             habitRecordDao.getRecordsForHabit(habitId)
         }
 
+    override suspend fun getRecordsForHabits(habitIds: List<String>): List<HabitRecordEntity> =
+        withContext(ioDispatcher) {
+            if (habitIds.isEmpty()) emptyList()
+            else habitRecordDao.getRecordsForHabits(habitIds)
+        }
+
     override fun observeRecordsForHabitInRange(
         habitId: String,
         startDate: String,
