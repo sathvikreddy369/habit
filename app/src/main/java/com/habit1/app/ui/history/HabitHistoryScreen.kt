@@ -33,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.habit1.app.domain.model.MeasurementType
+import com.habit1.app.ui.components.CompletionTrendGraph
 import com.habit1.app.ui.components.HabitHeatmap
 import com.habit1.app.ui.components.HeatmapDayDetailDialog
 
@@ -102,9 +103,18 @@ fun HabitHistoryScreen(
                             onDayClick = { viewModel.onEvent(HabitHistoryUiEvent.SelectDay(it)) }
                         )
                     }
+
+                    // 2. Completion Trend Graph
+                    item(key = "completion_trend") {
+                        CompletionTrendGraph(
+                            summary = analyticsSummary,
+                            selectedPreset = uiState.selectedPreset,
+                            onDayClick = { viewModel.onEvent(HabitHistoryUiEvent.SelectDay(it)) }
+                        )
+                    }
                 }
 
-                // 2. Streak Cards Row
+                // 3. Streak Cards Row
                 item(key = "streaks") {
                     val currentStreak = analyticsSummary?.currentStreak ?: summary?.streakResult?.currentStreak ?: 0
                     val longestStreak = analyticsSummary?.longestStreak ?: summary?.streakResult?.longestStreak ?: 0
