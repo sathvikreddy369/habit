@@ -308,6 +308,55 @@ class TodayViewModelTest {
     }
 
     @Test
+    fun setHabitValue_countAndDurationCompletionAndSteppers() = runTest(testDispatcher) {
+        viewModel.uiState.test {
+            awaitItem() // loading
+            awaitItem() // empty
+
+            val past = System.currentTimeMillis() - 86400000
+            val countHabit = HabitEntity(
+                id = "h_pushups",
+                name = "Pushups",
+                measurementType = "COUNT",
+                targetValue = 50.0,
+                unit = "reps",
+                scheduleType = "DAILY",
+                scheduleConfig = "{}",
+                displayOrder = 0,
+                isArchived = false,
+                createdAt = past,
+                updatedAt = past
+            )
+            habitRepository.createHabit(countHabit)
+            awaitItem()
+
+            // Type 20 directly -> under target, not completed
+            viewModel.onEvent(TodayUiEvent.SetHabitValue("h_pushups", 20.0))
+            val state1 = awaitItem()
+            assertEquals(20.0, state1.habits[0].actualValue, 0.001)
+            assertFalse(state1.habits[0].isCompleted)
+
+            // Increment stepper from 20 -> 21
+            viewModel.onEvent(TodayUiEvent.IncrementHabit("h_pushups"))
+            val state2 = awaitItem()
+            assertEquals(21.0, state2.habits[0].actualValue, 0.001)
+            assertFalse(state2.habits[0].isCompleted)
+
+            // Type 50 directly -> reaches target, completed!
+            viewModel.onEvent(TodayUiEvent.SetHabitValue("h_pushups", 50.0))
+            val state3 = awaitItem()
+            assertEquals(50.0, state3.habits[0].actualValue, 0.001)
+            assertTrue(state3.habits[0].isCompleted)
+
+            // Decrement stepper from 50 -> 49, no longer completed
+            viewModel.onEvent(TodayUiEvent.DecrementHabit("h_pushups"))
+            val state4 = awaitItem()
+            assertEquals(49.0, state4.habits[0].actualValue, 0.001)
+            assertFalse(state4.habits[0].isCompleted)
+        }
+    }
+
+    @Test
     fun addHabitQuick_createsNewActiveDailyHabit() = runTest(testDispatcher) {
         viewModel.uiState.test {
             awaitItem() // loading

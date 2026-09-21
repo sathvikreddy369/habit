@@ -2,6 +2,7 @@ package com.habit1.app.ui.components
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -22,11 +23,16 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedIconButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.habit1.app.domain.model.MeasurementType
@@ -34,7 +40,7 @@ import com.habit1.app.ui.today.TodayHabitItem
 
 /**
  * Reusable habit card for the Today screen.
- * Supports Boolean check toggling and quantitative steppers right on the card.
+ * Supports Boolean check toggling, quantitative steppers, and direct numeric value entry.
  */
 @Composable
 fun HabitCard(
@@ -42,8 +48,11 @@ fun HabitCard(
     onToggle: () -> Unit,
     onIncrement: () -> Unit,
     onDecrement: () -> Unit,
+    onSetValue: ((Double) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    var showValueDialog by remember { mutableStateOf(false) }
+
     val checkColor by animateColorAsState(
         targetValue = if (habitItem.isCompleted) {
             MaterialTheme.colorScheme.primary
@@ -61,6 +70,21 @@ fun HabitCard(
         },
         label = "icon_tint"
     )
+
+    val formattedActualValue = remember(habitItem.actualValue, habitItem.measurementType) {
+        when (habitItem.measurementType) {
+            is MeasurementType.Count,
+            is MeasurementType.Duration -> habitItem.actualValue.toInt().toString()
+            is MeasurementType.Quantity -> {
+                if (habitItem.actualValue % 1.0 == 0.0) {
+                    habitItem.actualValue.toInt().toString()
+                } else {
+                    habitItem.actualValue.toString()
+                }
+            }
+            is MeasurementType.BooleanChoice -> ""
+        }
+    }
 
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -118,6 +142,11 @@ fun HabitCard(
                         MaterialTheme.colorScheme.primary
                     } else {
                         MaterialTheme.colorScheme.outline
+                    },
+                    modifier = if (onSetValue != null && habitItem.measurementType !is MeasurementType.BooleanChoice) {
+                        Modifier.clickable { showValueDialog = true }
+                    } else {
+                        Modifier
                     }
                 )
             }
@@ -158,7 +187,28 @@ fun HabitCard(
                             )
                         }
 
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+
+                        // Tappable actual value for direct numeric entry
+                        Surface(
+                            onClick = {
+                                if (onSetValue != null) {
+                                    showValueDialog = true
+                                }
+                            },
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                            modifier = Modifier.padding(horizontal = 2.dp)
+                        ) {
+                            Text(
+                                text = formattedActualValue,
+                                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(4.dp))
 
                         OutlinedIconButton(
                             onClick = onIncrement,
@@ -193,5 +243,20 @@ fun HabitCard(
                 }
             }
         }
+    }
+
+    if (showValueDialog && onSetValue != null) {
+        NumericEntryDialog(
+            habitName = habitItem.name,
+            measurementType = habitItem.measurementType,
+            currentValue = habitItem.actualValue,
+            targetValue = habitItem.targetValue,
+            unit = habitItem.unit,
+            onDismiss = { showValueDialog = false },
+            onConfirm = { value ->
+                onSetValue(value)
+                showValueDialog = false
+            }
+        )
     }
 }

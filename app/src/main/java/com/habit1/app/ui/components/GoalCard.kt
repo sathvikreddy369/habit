@@ -245,6 +245,19 @@ fun GoalCard(
                                 onValueChange = { newSubtaskTitle = it },
                                 placeholder = { Text("Subtask title...") },
                                 singleLine = true,
+                                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                    capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Sentences,
+                                    imeAction = androidx.compose.ui.text.input.ImeAction.Done
+                                ),
+                                keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                                    onDone = {
+                                        if (newSubtaskTitle.isNotBlank()) {
+                                            onAddSubtask(newSubtaskTitle.trim())
+                                            newSubtaskTitle = ""
+                                            isAddingSubtask = false
+                                        }
+                                    }
+                                ),
                                 modifier = Modifier.weight(1f)
                             )
                             Spacer(modifier = Modifier.width(8.dp))

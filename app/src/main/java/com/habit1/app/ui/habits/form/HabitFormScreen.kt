@@ -31,6 +31,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -102,6 +104,10 @@ fun HabitFormScreen(
                 value = uiState.name,
                 onValueChange = { viewModel.onEvent(HabitFormUiEvent.UpdateName(it)) },
                 label = { Text("Habit name") },
+                keyboardOptions = KeyboardOptions(
+                    capitalization = KeyboardCapitalization.Sentences,
+                    imeAction = ImeAction.Next
+                ),
                 singleLine = true,
                 isError = nameError != null,
                 supportingText = {
@@ -121,6 +127,10 @@ fun HabitFormScreen(
                 value = uiState.description,
                 onValueChange = { viewModel.onEvent(HabitFormUiEvent.UpdateDescription(it)) },
                 label = { Text("Description (optional)") },
+                keyboardOptions = KeyboardOptions(
+                    capitalization = KeyboardCapitalization.Sentences,
+                    imeAction = ImeAction.Next
+                ),
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -172,7 +182,10 @@ fun HabitFormScreen(
                             value = uiState.targetInput,
                             onValueChange = { viewModel.onEvent(HabitFormUiEvent.UpdateTarget(it)) },
                             label = { Text("Daily target count") },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Number,
+                                imeAction = ImeAction.Next
+                            ),
                             singleLine = true,
                             isError = targetError,
                             supportingText = if (targetError) { { Text("Must be a positive number") } } else null,
@@ -183,6 +196,7 @@ fun HabitFormScreen(
                             value = uiState.unitInput,
                             onValueChange = { viewModel.onEvent(HabitFormUiEvent.UpdateUnit(it)) },
                             label = { Text("Unit (e.g. reps, pages)") },
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                             singleLine = true,
                             modifier = Modifier.weight(1f)
                         )
@@ -194,7 +208,10 @@ fun HabitFormScreen(
                         value = uiState.targetInput,
                         onValueChange = { viewModel.onEvent(HabitFormUiEvent.UpdateTarget(it)) },
                         label = { Text("Target duration (minutes)") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Number,
+                            imeAction = ImeAction.Next
+                        ),
                         singleLine = true,
                         isError = targetError,
                         supportingText = if (targetError) { { Text("Must be greater than 0 minutes") } } else null,
@@ -209,7 +226,10 @@ fun HabitFormScreen(
                             value = uiState.targetInput,
                             onValueChange = { viewModel.onEvent(HabitFormUiEvent.UpdateTarget(it)) },
                             label = { Text("Target quantity") },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Decimal,
+                                imeAction = ImeAction.Next
+                            ),
                             singleLine = true,
                             isError = targetError,
                             supportingText = if (targetError) { { Text("Must be greater than 0") } } else null,
@@ -220,6 +240,7 @@ fun HabitFormScreen(
                             value = uiState.unitInput,
                             onValueChange = { viewModel.onEvent(HabitFormUiEvent.UpdateUnit(it)) },
                             label = { Text("Unit (e.g. L, km)") },
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                             singleLine = true,
                             isError = unitError,
                             supportingText = if (unitError) { { Text("Unit required") } } else null,
@@ -304,7 +325,10 @@ fun HabitFormScreen(
                         value = uiState.intervalDaysInput,
                         onValueChange = { viewModel.onEvent(HabitFormUiEvent.UpdateIntervalDays(it)) },
                         label = { Text("Every N days") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Number,
+                            imeAction = ImeAction.Next
+                        ),
                         singleLine = true,
                         isError = intervalError,
                         supportingText = {
@@ -348,6 +372,10 @@ fun HabitFormScreen(
                 onValueChange = { viewModel.onEvent(HabitFormUiEvent.UpdateReminderTime(it)) },
                 label = { Text("Reminder time (HH:mm)") },
                 placeholder = { Text("08:00") },
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Text,
+                    imeAction = ImeAction.Done
+                ),
                 singleLine = true,
                 supportingText = {
                     if (uiState.reminderTimeInput.isNotBlank() && !isNotificationPermissionGranted) {

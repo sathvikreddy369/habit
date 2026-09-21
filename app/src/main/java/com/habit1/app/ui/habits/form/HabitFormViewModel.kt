@@ -140,13 +140,34 @@ class HabitFormViewModel(
             }
             is HabitFormUiEvent.SelectMeasurementKind -> {
                 _uiState.update {
+                    val isFromBoolean = it.measurementKind == MeasurementKind.BOOLEAN
                     val defaultTarget = when (event.kind) {
                         MeasurementKind.BOOLEAN -> "1"
-                        MeasurementKind.COUNT -> if (it.targetInput.isBlank() || it.targetInput == "0") "10" else it.targetInput
-                        MeasurementKind.DURATION -> if (it.targetInput.isBlank() || it.targetInput == "0") "30" else it.targetInput
-                        MeasurementKind.QUANTITY -> if (it.targetInput.isBlank() || it.targetInput == "0") "2.0" else it.targetInput
+                        MeasurementKind.COUNT -> {
+                            val current = it.targetInput.trim().toIntOrNull()
+                            if (isFromBoolean || current == null || current <= 0) "10" else current.toString()
+                        }
+                        MeasurementKind.DURATION -> {
+                            val current = it.targetInput.trim().toIntOrNull()
+                            if (isFromBoolean || current == null || current <= 0) "30" else current.toString()
+                        }
+                        MeasurementKind.QUANTITY -> {
+                            val current = it.targetInput.trim().toDoubleOrNull()
+                            if (isFromBoolean || current == null || current <= 0.0) "2.0" else it.targetInput.trim()
+                        }
                     }
-                    it.copy(measurementKind = event.kind, targetInput = defaultTarget)
+                    val updatedUnit = when (event.kind) {
+                        MeasurementKind.BOOLEAN -> ""
+                        MeasurementKind.DURATION -> "mins"
+                        MeasurementKind.COUNT -> if (isFromBoolean || it.unitInput == "L" || it.unitInput == "km") "reps" else it.unitInput
+                        MeasurementKind.QUANTITY -> if (it.unitInput == "reps" || it.unitInput == "mins" || it.unitInput == "pages") "" else it.unitInput
+                    }
+                    it.copy(
+                        measurementKind = event.kind,
+                        targetInput = defaultTarget,
+                        unitInput = updatedUnit,
+                        errors = it.errors - HabitValidationError.TargetMustBePositive - HabitValidationError.UnitRequired
+                    )
                 }
             }
             is HabitFormUiEvent.UpdateTarget -> {

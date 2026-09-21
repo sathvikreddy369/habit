@@ -142,6 +142,7 @@ fun TodayScreen(
                         onToggle = { viewModel.onEvent(TodayUiEvent.ToggleHabit(habitItem.id)) },
                         onIncrement = { viewModel.onEvent(TodayUiEvent.IncrementHabit(habitItem.id)) },
                         onDecrement = { viewModel.onEvent(TodayUiEvent.DecrementHabit(habitItem.id)) },
+                        onSetValue = { value -> viewModel.onEvent(TodayUiEvent.SetHabitValue(habitItem.id, value)) },
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
                     )
                 }
@@ -398,13 +399,13 @@ private fun SectionHeader(
         if (onAddAction != null) {
             IconButton(
                 onClick = onAddAction,
-                modifier = Modifier.size(28.dp)
+                modifier = Modifier.size(44.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.Add,
                     contentDescription = "Add $title",
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(24.dp)
                 )
             }
         }

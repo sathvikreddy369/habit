@@ -186,4 +186,35 @@ class HabitFormViewModelTest {
         assertEquals("pages", preservedRecord.unit)
         assertTrue(preservedRecord.isCompleted)
     }
+
+    @Test
+    fun switchMeasurementKind_updatesTargetAndCleansUnitWithoutBleed() = runTest(testDispatcher) {
+        val viewModel = HabitFormViewModel(habitRepository, coroutineScope = this)
+
+        // Initial state is BOOLEAN
+        assertEquals(MeasurementKind.BOOLEAN, viewModel.uiState.value.measurementKind)
+
+        // Select COUNT: sets target to 10 and user sets unit "reps"
+        viewModel.onEvent(HabitFormUiEvent.SelectMeasurementKind(MeasurementKind.COUNT))
+        viewModel.onEvent(HabitFormUiEvent.UpdateUnit("reps"))
+        assertEquals(MeasurementKind.COUNT, viewModel.uiState.value.measurementKind)
+        assertEquals("10", viewModel.uiState.value.targetInput)
+        assertEquals("reps", viewModel.uiState.value.unitInput)
+
+        // Switch to QUANTITY: target defaults to positive (or existing valid number), unit "reps" is cleared
+        viewModel.onEvent(HabitFormUiEvent.SelectMeasurementKind(MeasurementKind.QUANTITY))
+        assertEquals(MeasurementKind.QUANTITY, viewModel.uiState.value.measurementKind)
+        assertEquals("10", viewModel.uiState.value.targetInput) // 10 is valid for quantity
+        assertEquals("", viewModel.uiState.value.unitInput) // "reps" cleared so user can enter "L"
+
+        // Type "L" for unit and "3.25" for target
+        viewModel.onEvent(HabitFormUiEvent.UpdateTarget("3.25"))
+        viewModel.onEvent(HabitFormUiEvent.UpdateUnit("L"))
+
+        // Switch to DURATION: target converted to integer minutes default, unit set to mins
+        viewModel.onEvent(HabitFormUiEvent.SelectMeasurementKind(MeasurementKind.DURATION))
+        assertEquals(MeasurementKind.DURATION, viewModel.uiState.value.measurementKind)
+        assertEquals("30", viewModel.uiState.value.targetInput)
+        assertEquals("mins", viewModel.uiState.value.unitInput)
+    }
 }

@@ -53,6 +53,10 @@ fun GoalEditorDialog(
                     isError = titleError != null,
                     supportingText = titleError?.let { { Text(it) } },
                     singleLine = true,
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Sentences,
+                        imeAction = androidx.compose.ui.text.input.ImeAction.Next
+                    ),
                     modifier = Modifier.fillMaxWidth()
                 )
 
