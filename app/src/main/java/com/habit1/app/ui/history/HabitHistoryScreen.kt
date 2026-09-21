@@ -36,6 +36,7 @@ import com.habit1.app.domain.model.MeasurementType
 import com.habit1.app.ui.components.CompletionTrendGraph
 import com.habit1.app.ui.components.HabitHeatmap
 import com.habit1.app.ui.components.HeatmapDayDetailDialog
+import com.habit1.app.ui.components.QuantitativePerformanceCard
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -202,67 +203,14 @@ fun HabitHistoryScreen(
                     }
                 }
 
-                // 4. Quantitative Progression Card (if applicable)
-                if (habit.measurement !is MeasurementType.BooleanChoice) {
-                    item(key = "quantitative_stats") {
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
-                        ) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Text(
-                                    text = "Quantitative Performance (${uiState.selectedPreset.label})",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Spacer(modifier = Modifier.height(12.dp))
-
-                                if (analyticsSummary?.quantitativeStats != null) {
-                                    val qStats = analyticsSummary.quantitativeStats
-                                    StatRow(
-                                        label = "Total Recorded Volume",
-                                        value = formatStatValue(qStats.totalActualValue)
-                                    )
-                                    qStats.averageOnCompletedDays?.let { avgComp ->
-                                        StatRow(
-                                            label = "Average on completed days",
-                                            value = "%.1f".format(avgComp)
-                                        )
-                                    }
-                                    qStats.averageOnRecordedDays?.let { avgRec ->
-                                        StatRow(
-                                            label = "Average on recorded days",
-                                            value = "%.1f".format(avgRec)
-                                        )
-                                    }
-                                    qStats.successRateOnRecordedDays?.let { succRate ->
-                                        StatRow(
-                                            label = "Target success on recorded days",
-                                            value = "${succRate.toInt()}%"
-                                        )
-                                    }
-                                } else if (summary != null) {
-                                    StatRow(
-                                        label = "Total Recorded Volume",
-                                        value = formatStatValue(summary.totalRecordedVolume)
-                                    )
-                                    summary.averageOnCompletedDays?.let { avgComp ->
-                                        StatRow(
-                                            label = "Average on completed days",
-                                            value = "%.1f".format(avgComp)
-                                        )
-                                    }
-                                    summary.averageOnRecordedDays?.let { avgRec ->
-                                        StatRow(
-                                            label = "Average on recorded days",
-                                            value = "%.1f".format(avgRec)
-                                        )
-                                    }
-                                }
-                            }
-                        }
+                // 4. Quantitative Performance Section (if applicable)
+                if (habit.measurement !is MeasurementType.BooleanChoice && analyticsSummary != null) {
+                    item(key = "quantitative_performance") {
+                        QuantitativePerformanceCard(
+                            habit = habit,
+                            summary = analyticsSummary,
+                            selectedPreset = uiState.selectedPreset
+                        )
                     }
                 }
 
