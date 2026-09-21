@@ -32,9 +32,11 @@ class MainActivity : ComponentActivity() {
         TodayViewModel.Factory(
             habitRepository = app.container.habitRepository,
             habitRecordRepository = app.container.habitRecordRepository,
-            dailyGoalRepository = app.container.dailyGoalRepository
+            dailyGoalRepository = app.container.dailyGoalRepository,
+            dailyReviewRepository = app.container.dailyReviewRepository
         )
     }
+
 
     override fun onResume() {
         super.onResume()
@@ -127,9 +129,11 @@ class MainActivity : ComponentActivity() {
                                 factory = com.habit1.app.ui.history.HistoryViewModel.Factory(
                                     habitRepository = app.container.habitRepository,
                                     habitRecordRepository = app.container.habitRecordRepository,
-                                    dailyGoalRepository = app.container.dailyGoalRepository
+                                    dailyGoalRepository = app.container.dailyGoalRepository,
+                                    dailyReviewRepository = app.container.dailyReviewRepository
                                 )
                             )
+
                             com.habit1.app.ui.history.HistoryScreen(
                                 viewModel = historyViewModel,
                                 onNavigateBack = {

@@ -62,9 +62,10 @@ import java.time.LocalDate
 fun HistoryScreen(
     viewModel: HistoryViewModel,
     onNavigateBack: () -> Unit,
-    onInspectHabit: (habitId: String) -> Unit = {},
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onInspectHabit: (habitId: String) -> Unit = {}
 ) {
+
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     Scaffold(
@@ -340,10 +341,75 @@ fun HistoryScreen(
                         }
                     }
                 }
+
+                // Daily Reflection for selected date (if recorded)
+                breakdown.dailyReview?.let { review ->
+                    item(key = "breakdown_reflection_header") {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Daily Reflection",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.tertiary
+                        )
+                    }
+
+                    item(key = "breakdown_reflection_card") {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                if (!review.mood.isNullOrBlank()) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Text(
+                                            text = "Mood:",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Surface(
+                                            shape = RoundedCornerShape(6.dp),
+                                            color = MaterialTheme.colorScheme.secondaryContainer
+                                        ) {
+                                            Text(
+                                                text = review.mood,
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                                fontWeight = FontWeight.Medium,
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                }
+
+                                if (!review.notes.isNullOrBlank()) {
+                                    Text(
+                                        text = review.notes,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                }
+
+                                Text(
+                                    text = "This is a user-written reflection, not a calculated productivity result.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
     }
 }
+
 
 @Composable
 private fun CalendarDayCell(

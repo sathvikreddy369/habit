@@ -44,6 +44,7 @@ class HistoryViewModelTest {
     private lateinit var habitRepository: HabitRepository
     private lateinit var habitRecordRepository: HabitRecordRepository
     private lateinit var dailyGoalRepository: DailyGoalRepository
+    private lateinit var dailyReviewRepository: com.habit1.app.data.repository.DailyReviewRepository
     private lateinit var viewModel: HistoryViewModel
 
     private val fixedZone = ZoneId.of("UTC")
@@ -58,15 +59,18 @@ class HistoryViewModelTest {
         habitRepository = HabitRepositoryImpl(database.habitDao(), testDispatcher)
         habitRecordRepository = HabitRecordRepositoryImpl(database.habitRecordDao(), testDispatcher)
         dailyGoalRepository = DailyGoalRepositoryImpl(database.dailyGoalDao(), testDispatcher)
+        dailyReviewRepository = com.habit1.app.data.repository.DailyReviewRepositoryImpl(database.dailyReviewDao(), testDispatcher)
 
         viewModel = HistoryViewModel(
             habitRepository = habitRepository,
             habitRecordRepository = habitRecordRepository,
             dailyGoalRepository = dailyGoalRepository,
+            dailyReviewRepository = dailyReviewRepository,
             zoneId = fixedZone,
             coroutineScope = CoroutineScope(testDispatcher)
         )
     }
+
 
     @After
     fun tearDown() {
@@ -235,4 +239,38 @@ class HistoryViewModelTest {
             cancelAndIgnoreRemainingEvents()
         }
     }
+
+    @Test
+    fun testSelectedDateBreakdown_includesDailyReviewWhenPresent() = runTest(testDispatcher) {
+        val dateStr = "2026-09-01"
+        database.dailyReviewDao().upsert(
+            com.habit1.app.data.local.db.entity.DailyReviewEntity(
+                date = dateStr,
+                notes = "Reflective evening walk.",
+                mood = "Calm",
+                createdAt = pastMillis,
+                updatedAt = pastMillis
+            )
+        )
+
+        viewModel.uiState.test {
+            awaitItem() // loading
+            var state = awaitItem()
+            // Select the date with review
+            viewModel.onEvent(HistoryUiEvent.SelectDate(java.time.LocalDate.of(2026, 9, 1)))
+            state = awaitItem()
+
+            while (state.selectedDateBreakdown?.dailyReview == null) {
+                state = awaitItem()
+            }
+
+            val breakdown = state.selectedDateBreakdown
+            assertNotNull(breakdown)
+            assertNotNull(breakdown!!.dailyReview)
+            assertEquals("Reflective evening walk.", breakdown.dailyReview!!.notes)
+            assertEquals("Calm", breakdown.dailyReview!!.mood)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
 }
+

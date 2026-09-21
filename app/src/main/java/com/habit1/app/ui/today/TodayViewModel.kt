@@ -5,9 +5,11 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.habit1.app.core.util.DateTimeUtils
 import com.habit1.app.data.local.db.entity.DailyGoalEntity
+import com.habit1.app.data.local.db.entity.DailyReviewEntity
 import com.habit1.app.data.local.db.entity.GoalSubtaskEntity
 import com.habit1.app.data.local.db.entity.HabitRecordEntity
 import com.habit1.app.data.repository.DailyGoalRepository
+import com.habit1.app.data.repository.DailyReviewRepository
 import com.habit1.app.data.repository.HabitRecordRepository
 import com.habit1.app.data.repository.HabitRepository
 import com.habit1.app.domain.mapper.EntityMappers.toDomain
@@ -26,7 +28,9 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
+
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.ZoneId
@@ -42,6 +46,7 @@ class TodayViewModel(
     private val habitRepository: HabitRepository,
     private val habitRecordRepository: HabitRecordRepository,
     private val dailyGoalRepository: DailyGoalRepository,
+    private val dailyReviewRepository: DailyReviewRepository? = null,
     private val evaluateSchedule: EvaluateScheduleUseCase = EvaluateScheduleUseCase(),
     private val calculateStreaks: CalculateStreaksUseCase = CalculateStreaksUseCase(),
     private val evaluateMeasurement: EvaluateMeasurementUseCase = EvaluateMeasurementUseCase(),
@@ -57,6 +62,7 @@ class TodayViewModel(
 
     // UI state flows for dialogs and expansion
     private val isAddGoalDialogOpenFlow = MutableStateFlow(false)
+    private val isReviewDialogOpenFlow = MutableStateFlow(false)
     private val goalPendingEditFlow = MutableStateFlow<TodayGoalItem?>(null)
     private val goalPendingDeletionFlow = MutableStateFlow<TodayGoalItem?>(null)
     private val subtaskPendingEditFlow = MutableStateFlow<Pair<String, TodaySubtaskItem>?>(null)
@@ -65,13 +71,16 @@ class TodayViewModel(
     @OptIn(ExperimentalCoroutinesApi::class)
     val uiState: StateFlow<TodayUiState> = currentDateFlow.flatMapLatest { date ->
         val dateString = DateTimeUtils.formatDate(date)
+        val reviewFlow = dailyReviewRepository?.observeReview(dateString) ?: flowOf(null)
 
         combine(
             habitRepository.observeActiveHabits(),
             habitRecordRepository.observeRecordsForDate(dateString),
             dailyGoalRepository.observeGoalsForDate(dateString),
+            reviewFlow,
             userMessageFlow,
             isAddGoalDialogOpenFlow,
+            isReviewDialogOpenFlow,
             goalPendingEditFlow,
             goalPendingDeletionFlow,
             subtaskPendingEditFlow,
@@ -83,14 +92,16 @@ class TodayViewModel(
             val recordEntities = args[1] as List<HabitRecordEntity>
             @Suppress("UNCHECKED_CAST")
             val goalWithSubtasksList = args[2] as List<com.habit1.app.data.local.db.entity.DailyGoalWithSubtasks>
-            val message = args[3] as String?
-            val isAddGoalOpen = args[4] as Boolean
-            val goalPendingEdit = args[5] as TodayGoalItem?
-            val goalPendingDeletion = args[6] as TodayGoalItem?
+            val reviewEntity = args[3] as DailyReviewEntity?
+            val message = args[4] as String?
+            val isAddGoalOpen = args[5] as Boolean
+            val isReviewDialogOpen = args[6] as Boolean
+            val goalPendingEdit = args[7] as TodayGoalItem?
+            val goalPendingDeletion = args[8] as TodayGoalItem?
             @Suppress("UNCHECKED_CAST")
-            val subtaskPendingEdit = args[7] as Pair<String, TodaySubtaskItem>?
+            val subtaskPendingEdit = args[9] as Pair<String, TodaySubtaskItem>?
             @Suppress("UNCHECKED_CAST")
-            val collapsedGoalIds = args[8] as Set<String>
+            val collapsedGoalIds = args[10] as Set<String>
 
             val habits = activeEntities.map { it.toDomain() }
             val recordsMap = recordEntities.associateBy { it.habitId }
@@ -192,6 +203,8 @@ class TodayViewModel(
                 completedGoalsCount = completedGoalsCount,
                 totalGoalsCount = totalGoalsCount,
                 overallProgress = overallProgress,
+                dailyReview = reviewEntity?.toDomain(),
+                isReviewDialogOpen = isReviewDialogOpen,
                 isLoading = false,
                 userMessage = message,
                 isAddGoalDialogOpen = isAddGoalOpen,
@@ -257,9 +270,16 @@ class TodayViewModel(
                 is TodayUiEvent.DeleteSubtask -> dailyGoalRepository.deleteSubtask(event.subtaskId)
                 is TodayUiEvent.MoveSubtaskUp -> handleReorderSubtask(event.goalId, event.subtaskId, moveUp = true)
                 is TodayUiEvent.MoveSubtaskDown -> handleReorderSubtask(event.goalId, event.subtaskId, moveUp = false)
+
+                // Daily Reflection actions
+                is TodayUiEvent.OpenReviewDialog -> isReviewDialogOpenFlow.value = true
+                is TodayUiEvent.DismissReviewDialog -> isReviewDialogOpenFlow.value = false
+                is TodayUiEvent.SaveReview -> handleSaveReview(event.notes, event.mood)
+                is TodayUiEvent.DeleteReview -> handleDeleteReview()
             }
         }
     }
+
 
     private suspend fun handleToggleHabit(habitId: String) {
         val habitEntity = habitRepository.getHabitById(habitId) ?: return
@@ -527,17 +547,50 @@ class TodayViewModel(
         habitRepository.createHabit(habit.toEntity())
     }
 
+    private suspend fun handleSaveReview(notes: String?, mood: String?) {
+        val repo = dailyReviewRepository ?: return
+        val date = currentDateFlow.value
+        val dateString = DateTimeUtils.formatDate(date)
+        val now = System.currentTimeMillis()
+        val existing = repo.getReview(dateString)
+        val created = existing?.createdAt ?: now
+        val entity = DailyReviewEntity(
+            date = dateString,
+            notes = notes?.trim()?.ifBlank { null },
+            mood = mood?.trim()?.ifBlank { null },
+            createdAt = created,
+            updatedAt = now
+        )
+        repo.saveReview(entity)
+        isReviewDialogOpenFlow.value = false
+    }
+
+    private suspend fun handleDeleteReview() {
+        val repo = dailyReviewRepository ?: return
+        val date = currentDateFlow.value
+        val dateString = DateTimeUtils.formatDate(date)
+        repo.deleteReview(dateString)
+        isReviewDialogOpenFlow.value = false
+    }
+
     class Factory(
         private val habitRepository: HabitRepository,
         private val habitRecordRepository: HabitRecordRepository,
-        private val dailyGoalRepository: DailyGoalRepository
+        private val dailyGoalRepository: DailyGoalRepository,
+        private val dailyReviewRepository: DailyReviewRepository? = null
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(TodayViewModel::class.java)) {
-                return TodayViewModel(habitRepository, habitRecordRepository, dailyGoalRepository) as T
+                return TodayViewModel(
+                    habitRepository = habitRepository,
+                    habitRecordRepository = habitRecordRepository,
+                    dailyGoalRepository = dailyGoalRepository,
+                    dailyReviewRepository = dailyReviewRepository
+                ) as T
             }
             throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
         }
     }
 }
+

@@ -1,5 +1,6 @@
 package com.habit1.app.ui.today
 
+import com.habit1.app.domain.model.DailyReview
 import com.habit1.app.domain.model.MeasurementType
 import com.habit1.app.domain.model.StreakResult
 import java.time.LocalDate
@@ -61,6 +62,8 @@ data class TodayUiState(
     val completedGoalsCount: Int = 0,
     val totalGoalsCount: Int = 0,
     val overallProgress: Float = 0.0f,
+    val dailyReview: DailyReview? = null,
+    val isReviewDialogOpen: Boolean = false,
     val isLoading: Boolean = false,
     val userMessage: String? = null,
     val isAddGoalDialogOpen: Boolean = false,
@@ -68,3 +71,4 @@ data class TodayUiState(
     val goalPendingDeletion: TodayGoalItem? = null,
     val subtaskPendingEdit: Pair<String, TodaySubtaskItem>? = null
 )
+

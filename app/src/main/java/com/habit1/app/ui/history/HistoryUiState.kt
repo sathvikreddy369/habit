@@ -1,6 +1,7 @@
 package com.habit1.app.ui.history
 
 import com.habit1.app.domain.model.CalendarDayStatus
+import com.habit1.app.domain.model.DailyReview
 import com.habit1.app.ui.today.TodayGoalItem
 import java.time.LocalDate
 import java.time.YearMonth
@@ -28,8 +29,10 @@ data class SelectedDateBreakdown(
     val date: LocalDate,
     val formattedDate: String,
     val habits: List<HabitDayBreakdownItem> = emptyList(),
-    val goals: List<TodayGoalItem> = emptyList()
+    val goals: List<TodayGoalItem> = emptyList(),
+    val dailyReview: DailyReview? = null
 )
+
 
 data class MonthSummary(
     val totalHabitCompletions: Int,

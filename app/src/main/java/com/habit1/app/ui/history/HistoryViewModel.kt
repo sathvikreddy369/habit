@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.habit1.app.core.util.DateTimeUtils
 import com.habit1.app.data.local.db.entity.HabitRecordEntity
 import com.habit1.app.data.repository.DailyGoalRepository
+import com.habit1.app.data.repository.DailyReviewRepository
 import com.habit1.app.data.repository.HabitRecordRepository
 import com.habit1.app.data.repository.HabitRepository
 import com.habit1.app.domain.mapper.EntityMappers.toDomain
@@ -22,6 +23,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -35,6 +37,7 @@ class HistoryViewModel(
     private val habitRepository: HabitRepository,
     private val habitRecordRepository: HabitRecordRepository,
     private val dailyGoalRepository: DailyGoalRepository,
+    private val dailyReviewRepository: DailyReviewRepository? = null,
     private val evaluateHabitHistory: EvaluateHabitHistoryUseCase = EvaluateHabitHistoryUseCase(),
     private val evaluateSchedule: EvaluateScheduleUseCase = EvaluateScheduleUseCase(),
     private val evaluateMeasurement: EvaluateMeasurementUseCase = EvaluateMeasurementUseCase(),
@@ -57,12 +60,19 @@ class HistoryViewModel(
         val startDateStr = DateTimeUtils.formatDate(firstDay)
         val endDateStr = DateTimeUtils.formatDate(lastDay)
 
+        val selectedReviewFlow = selectedDateFlow.flatMapLatest { date ->
+            val dateString = DateTimeUtils.formatDate(date)
+            dailyReviewRepository?.observeReview(dateString) ?: flowOf(null)
+        }
+
         combine(
             habitRepository.observeAllHabits(), // Includes archived habits
             habitRecordRepository.observeRecordsForDateRange(startDateStr, endDateStr),
             dailyGoalRepository.observeGoalsForDateRange(startDateStr, endDateStr),
-            selectedDateFlow
-        ) { allHabitEntities, recordEntities, goalEntities, selectedDate ->
+            selectedDateFlow,
+            selectedReviewFlow
+        ) { allHabitEntities, recordEntities, goalEntities, selectedDate, selectedReview ->
+
             val allHabits = allHabitEntities.map { it.toDomain() }
             val recordsByDate = recordEntities.groupBy { it.date }
             val goalsByDate = goalEntities.groupBy { it.goal.targetDate }
@@ -202,7 +212,8 @@ class HistoryViewModel(
                     date = selectedDate,
                     formattedDate = selectedDate.format(dateFormatter),
                     habits = habitBreakdown,
-                    goals = goalBreakdown
+                    goals = goalBreakdown,
+                    dailyReview = selectedReview?.toDomain()
                 ),
                 monthSummary = MonthSummary(
                     totalHabitCompletions = monthHabitCompletions,
@@ -249,14 +260,21 @@ class HistoryViewModel(
     class Factory(
         private val habitRepository: HabitRepository,
         private val habitRecordRepository: HabitRecordRepository,
-        private val dailyGoalRepository: DailyGoalRepository
+        private val dailyGoalRepository: DailyGoalRepository,
+        private val dailyReviewRepository: DailyReviewRepository? = null
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(HistoryViewModel::class.java)) {
-                return HistoryViewModel(habitRepository, habitRecordRepository, dailyGoalRepository) as T
+                return HistoryViewModel(
+                    habitRepository = habitRepository,
+                    habitRecordRepository = habitRecordRepository,
+                    dailyGoalRepository = dailyGoalRepository,
+                    dailyReviewRepository = dailyReviewRepository
+                ) as T
             }
             throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
         }
     }
 }
+

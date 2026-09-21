@@ -36,6 +36,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.habit1.app.ui.components.DailyReviewCard
+import com.habit1.app.ui.components.DailyReviewEditorDialog
 import com.habit1.app.ui.components.GoalCard
 import com.habit1.app.ui.components.GoalEditorDialog
 import com.habit1.app.ui.components.HabitCard
@@ -48,11 +50,12 @@ import com.habit1.app.ui.components.TodayHeader
 @Composable
 fun TodayScreen(
     viewModel: TodayViewModel,
+    modifier: Modifier = Modifier,
     onNavigateToHabits: () -> Unit = {},
     onNavigateToHistory: () -> Unit = {},
-    onNavigateToSettings: () -> Unit = {},
-    modifier: Modifier = Modifier
+    onNavigateToSettings: () -> Unit = {}
 ) {
+
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -232,8 +235,26 @@ fun TodayScreen(
                     }
                 }
             }
+
+            // Daily Reflection Section
+            item(key = "daily_reflection") {
+                Spacer(modifier = Modifier.height(16.dp))
+                SectionHeader(
+                    title = "Daily Reflection",
+                    countText = if (uiState.dailyReview != null) "Recorded" else "Optional"
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                DailyReviewCard(
+                    review = uiState.dailyReview,
+                    onAddClick = { viewModel.onEvent(TodayUiEvent.OpenReviewDialog) },
+                    onEditClick = { viewModel.onEvent(TodayUiEvent.OpenReviewDialog) },
+                    onDeleteClick = { viewModel.onEvent(TodayUiEvent.DeleteReview) },
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                )
+            }
         }
     }
+
 
     // Add Goal Dialog
     if (uiState.isAddGoalDialogOpen) {
@@ -326,15 +347,33 @@ fun TodayScreen(
             }
         )
     }
+
+    // Daily Reflection Editor Dialog
+    if (uiState.isReviewDialogOpen) {
+        DailyReviewEditorDialog(
+            initialNotes = uiState.dailyReview?.notes,
+            initialMood = uiState.dailyReview?.mood,
+            isEditMode = uiState.dailyReview != null,
+            onDismiss = { viewModel.onEvent(TodayUiEvent.DismissReviewDialog) },
+            onSave = { notes, mood ->
+                viewModel.onEvent(TodayUiEvent.SaveReview(notes, mood))
+            },
+            onDelete = if (uiState.dailyReview != null) {
+                { viewModel.onEvent(TodayUiEvent.DeleteReview) }
+            } else null
+        )
+    }
 }
+
 
 @Composable
 private fun SectionHeader(
     title: String,
     countText: String,
-    onAddAction: (() -> Unit)? = null,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onAddAction: (() -> Unit)? = null
 ) {
+
     Row(
         modifier = modifier
             .fillMaxWidth()

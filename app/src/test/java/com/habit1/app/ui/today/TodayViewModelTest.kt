@@ -10,6 +10,8 @@ import com.habit1.app.data.local.db.entity.GoalSubtaskEntity
 import com.habit1.app.data.local.db.entity.HabitEntity
 import com.habit1.app.data.repository.DailyGoalRepository
 import com.habit1.app.data.repository.DailyGoalRepositoryImpl
+import com.habit1.app.data.repository.DailyReviewRepository
+import com.habit1.app.data.repository.DailyReviewRepositoryImpl
 import com.habit1.app.data.repository.HabitRecordRepository
 import com.habit1.app.data.repository.HabitRecordRepositoryImpl
 import com.habit1.app.data.repository.HabitRepository
@@ -36,7 +38,7 @@ import java.time.ZoneId
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34])
+@Config(manifest = Config.NONE)
 class TodayViewModelTest {
 
     private val testDispatcher = StandardTestDispatcher()
@@ -44,6 +46,7 @@ class TodayViewModelTest {
     private lateinit var habitRepository: HabitRepository
     private lateinit var habitRecordRepository: HabitRecordRepository
     private lateinit var dailyGoalRepository: DailyGoalRepository
+    private lateinit var dailyReviewRepository: DailyReviewRepository
     private lateinit var viewModel: TodayViewModel
 
     private val zoneId = ZoneId.of("UTC")
@@ -57,11 +60,13 @@ class TodayViewModelTest {
         habitRepository = HabitRepositoryImpl(database.habitDao(), testDispatcher)
         habitRecordRepository = HabitRecordRepositoryImpl(database.habitRecordDao(), testDispatcher)
         dailyGoalRepository = DailyGoalRepositoryImpl(database.dailyGoalDao(), testDispatcher)
+        dailyReviewRepository = DailyReviewRepositoryImpl(database.dailyReviewDao(), testDispatcher)
 
         viewModel = TodayViewModel(
             habitRepository = habitRepository,
             habitRecordRepository = habitRecordRepository,
             dailyGoalRepository = dailyGoalRepository,
+            dailyReviewRepository = dailyReviewRepository,
             zoneId = zoneId
         )
     }
@@ -506,5 +511,50 @@ class TodayViewModelTest {
             assertEquals(0.0, stateCoerced.habits[0].actualValue, 0.001)
         }
     }
+
+    @Test
+    fun dailyReview_dialogStateFlow() = runTest(testDispatcher) {
+        viewModel.uiState.test {
+            awaitItem() // loading
+            val initial = awaitItem()
+            assertFalse(initial.isReviewDialogOpen)
+
+            viewModel.onEvent(TodayUiEvent.OpenReviewDialog)
+            val openState = awaitItem()
+            assertTrue(openState.isReviewDialogOpen)
+
+            viewModel.onEvent(TodayUiEvent.DismissReviewDialog)
+            val closeState = awaitItem()
+            assertFalse(closeState.isReviewDialogOpen)
+        }
+    }
+
+    @Test
+    fun dailyReview_saveAndObserveAndCleanFlow() = runTest(testDispatcher) {
+        viewModel.uiState.test {
+            awaitItem() // loading
+            val initial = awaitItem()
+            assertNull(initial.dailyReview)
+
+            // Save review
+            viewModel.onEvent(TodayUiEvent.SaveReview("Felt great today!", "Energized"))
+            advanceUntilIdle()
+
+            val stateWithReview = awaitItem()
+            assertNotNull(stateWithReview.dailyReview)
+            assertEquals("Felt great today!", stateWithReview.dailyReview!!.notes)
+            assertEquals("Energized", stateWithReview.dailyReview!!.mood)
+            assertFalse(stateWithReview.isReviewDialogOpen)
+
+            // Delete review
+            viewModel.onEvent(TodayUiEvent.DeleteReview)
+            advanceUntilIdle()
+
+            val stateAfterDelete = awaitItem()
+            assertNull(stateAfterDelete.dailyReview)
+            assertFalse(stateAfterDelete.isReviewDialogOpen)
+        }
+    }
 }
+
 

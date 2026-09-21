@@ -39,4 +39,11 @@ sealed interface TodayUiEvent {
     data class DeleteSubtask(val goalId: String, val subtaskId: String) : TodayUiEvent
     data class MoveSubtaskUp(val goalId: String, val subtaskId: String) : TodayUiEvent
     data class MoveSubtaskDown(val goalId: String, val subtaskId: String) : TodayUiEvent
+
+    // Daily Reflection Actions
+    data object OpenReviewDialog : TodayUiEvent
+    data object DismissReviewDialog : TodayUiEvent
+    data class SaveReview(val notes: String?, val mood: String?) : TodayUiEvent
+    data object DeleteReview : TodayUiEvent
 }
+
