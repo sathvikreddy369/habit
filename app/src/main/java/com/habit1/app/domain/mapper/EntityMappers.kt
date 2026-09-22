@@ -189,4 +189,20 @@ object EntityMappers {
             updatedAt = updatedAt.toEpochMilli()
         )
     }
+
+    fun com.habit1.app.data.local.db.entity.DailyGoalHistoryAggregateEntity.toDomain(): com.habit1.app.domain.model.DailyGoalHistoryAggregate {
+        return com.habit1.app.domain.model.DailyGoalHistoryAggregate(
+            date = date,
+            completedCount = completedCount,
+            totalCount = totalCount
+        )
+    }
+
+    fun com.habit1.app.domain.model.DailyGoalHistoryAggregate.toEntity(): com.habit1.app.data.local.db.entity.DailyGoalHistoryAggregateEntity {
+        return com.habit1.app.data.local.db.entity.DailyGoalHistoryAggregateEntity(
+            date = date,
+            completedCount = completedCount,
+            totalCount = totalCount
+        )
+    }
 }

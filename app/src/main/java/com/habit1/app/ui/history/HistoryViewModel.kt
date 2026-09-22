@@ -60,7 +60,8 @@ class HistoryViewModel(
         val allHabitEntities: List<com.habit1.app.data.local.db.entity.HabitEntity>,
         val recordEntities: List<com.habit1.app.data.local.db.entity.HabitRecordEntity>,
         val goalEntities: List<com.habit1.app.data.local.db.entity.DailyGoalWithSubtasks>,
-        val reviewEntities: List<com.habit1.app.data.local.db.entity.DailyReviewEntity>
+        val reviewEntities: List<com.habit1.app.data.local.db.entity.DailyReviewEntity>,
+        val aggregates: List<com.habit1.app.domain.model.DailyGoalHistoryAggregate>
     )
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -74,9 +75,10 @@ class HistoryViewModel(
             habitRepository.observeAllHabits(),
             habitRecordRepository.observeRecordsForDateRange(yearStartDate, yearEndDate),
             dailyGoalRepository.observeGoalsForDateRange(yearStartDate, yearEndDate),
+            dailyGoalRepository.observeAggregatesForDateRange(yearStartDate, yearEndDate),
             reviewsFlow
-        ) { habits, records, goals, reviews ->
-            HistoryYearData(habits, records, goals, reviews)
+        ) { habits, records, goals, aggregates, reviews ->
+            HistoryYearData(habits, records, goals, reviews, aggregates)
         }
 
         combine(
@@ -90,11 +92,13 @@ class HistoryViewModel(
             val recordEntities = yearData.recordEntities
             val goalEntities = yearData.goalEntities
             val reviewEntities = yearData.reviewEntities
+            val aggregates = yearData.aggregates
 
             val allHabits = allHabitEntities.map { it.toDomain() }
             val recordsByDate = recordEntities.groupBy { it.date }
             val goalsByDate = goalEntities.groupBy { it.goal.targetDate }
             val reviewsByDate = reviewEntities.associateBy { it.date }
+            val aggregatesByDate = aggregates.associateBy { it.date }
 
             // 1. Build 12-month Yearly Overview in-memory
             val yearlyOverview = (1..12).map { monthNum ->
@@ -111,6 +115,7 @@ class HistoryViewModel(
                     val dStr = DateTimeUtils.formatDate(cursor)
                     val dRecords = recordsByDate[dStr] ?: emptyList()
                     val dGoals = goalsByDate[dStr] ?: emptyList()
+                    val dAggregate = aggregatesByDate[dStr]
 
                     val scheduled = allHabits.filter { habit ->
                         val creationDate = DateTimeUtils.toLocalDate(habit.createdAt, zoneId)
@@ -118,13 +123,17 @@ class HistoryViewModel(
                     }
 
                     val compHabits = dRecords.count { it.isCompleted }
-                    val compGoals = dGoals.count { it.goal.isCompleted }
+                    val (compGoals, totalGoals) = when {
+                        dAggregate != null -> dAggregate.completedCount to dAggregate.totalCount
+                        dGoals.isNotEmpty() -> dGoals.count { it.goal.isCompleted } to dGoals.size
+                        else -> 0 to 0
+                    }
 
                     if (!cursor.isAfter(today)) {
                         yCompletions += compHabits
                         yScheduledDays += scheduled.size
                     }
-                    yTotalGoals += dGoals.size
+                    yTotalGoals += totalGoals
                     yCompletedGoals += compGoals
 
                     cursor = cursor.plusDays(1)
@@ -166,6 +175,7 @@ class HistoryViewModel(
                 val dateStr = DateTimeUtils.formatDate(dayCursor)
                 val dayRecords = recordsByDate[dateStr] ?: emptyList()
                 val dayGoals = goalsByDate[dateStr] ?: emptyList()
+                val dayAggregate = aggregatesByDate[dateStr]
                 val hasReviewForDay = reviewsByDate.containsKey(dateStr)
 
                 // Count scheduled habits for dayCursor
@@ -176,7 +186,11 @@ class HistoryViewModel(
 
                 val completedHabitsForDay = dayRecords.count { it.isCompleted }
                 val partialHabitsForDay = dayRecords.count { !it.isCompleted && it.actualValue > 0.0 }
-                val completedGoalsForDay = dayGoals.count { it.goal.isCompleted }
+                val (completedGoalsForDay, totalGoalsForDay) = when {
+                    dayAggregate != null -> dayAggregate.completedCount to dayAggregate.totalCount
+                    dayGoals.isNotEmpty() -> dayGoals.count { it.goal.isCompleted } to dayGoals.size
+                    else -> 0 to 0
+                }
 
                 calendarDays.add(
                     HistoryCalendarDayItem(
@@ -188,9 +202,9 @@ class HistoryViewModel(
                         partialHabitsCount = partialHabitsForDay,
                         totalScheduledHabitsCount = scheduledForDay.size,
                         completedGoalsCount = completedGoalsForDay,
-                        totalGoalsCount = dayGoals.size,
+                        totalGoalsCount = totalGoalsForDay,
                         hasReview = hasReviewForDay,
-                        hasRecordedActivity = dayRecords.isNotEmpty() || dayGoals.isNotEmpty() || hasReviewForDay
+                        hasRecordedActivity = dayRecords.isNotEmpty() || totalGoalsForDay > 0 || hasReviewForDay
                     )
                 )
 
@@ -199,7 +213,7 @@ class HistoryViewModel(
                     monthHabitCompletions += completedHabitsForDay
                     monthHabitScheduledDays += scheduledForDay.size
                 }
-                monthTotalGoals += dayGoals.size
+                monthTotalGoals += totalGoalsForDay
                 monthCompletedGoals += completedGoalsForDay
 
                 dayCursor = dayCursor.plusDays(1)
@@ -210,6 +224,7 @@ class HistoryViewModel(
             val selectedDayRecords = recordsByDate[selectedDateStr]?.associateBy { it.habitId } ?: emptyMap()
             val selectedDayGoals = goalsByDate[selectedDateStr] ?: emptyList()
             val selectedDayReview = reviewsByDate[selectedDateStr]
+            val selectedDayAggregate = aggregatesByDate[selectedDateStr]
 
             val habitBreakdown = allHabits.mapNotNull { habit ->
                 val creationDate = DateTimeUtils.toLocalDate(habit.createdAt, zoneId)
@@ -314,7 +329,8 @@ class HistoryViewModel(
                     formattedDate = selectedDate.format(dateFormatter),
                     habits = habitBreakdown,
                     goals = goalBreakdown,
-                    dailyReview = selectedDayReview?.toDomain()
+                    dailyReview = selectedDayReview?.toDomain(),
+                    historicalGoalAggregate = selectedDayAggregate
                 ),
                 monthSummary = MonthSummary(
                     totalHabitCompletions = monthHabitCompletions,

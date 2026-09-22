@@ -22,7 +22,8 @@ data class BackupPreviewInfo(
     val subtasksCount: Int,
     val reviewsCount: Int,
     val conflictingRecordsCount: Int = 0,
-    val conflictingHabitsCount: Int = 0
+    val conflictingHabitsCount: Int = 0,
+    val aggregatesCount: Int = 0
 )
 
 /**
@@ -68,6 +69,7 @@ object BackupValidator {
     const val MAX_GOALS = 5_000
     const val MAX_SUBTASKS = 20_000
     const val MAX_REVIEWS = 5_000
+    const val MAX_AGGREGATES = 10_000
 
     const val MAX_ID_LENGTH = 64
     const val MAX_NAME_LENGTH = 100
@@ -140,6 +142,11 @@ object BackupValidator {
         if (payload.reviews.size > MAX_REVIEWS) {
             return BackupValidationResult.Invalid(
                 BackupValidationError.ResourceLimitExceeded("Reviews", payload.reviews.size, MAX_REVIEWS)
+            )
+        }
+        if (payload.aggregates.size > MAX_AGGREGATES) {
+            return BackupValidationResult.Invalid(
+                BackupValidationError.ResourceLimitExceeded("Aggregates", payload.aggregates.size, MAX_AGGREGATES)
             )
         }
 
@@ -401,6 +408,36 @@ object BackupValidator {
             }
         }
 
+        // 9. Aggregates Invariants & Constraints
+        val aggregateDates = mutableSetOf<String>()
+        for (aggregate in payload.aggregates) {
+            if (!isValidLocalDate(aggregate.date)) {
+                return BackupValidationResult.Invalid(
+                    BackupValidationError.InvalidDomainInvariant("DailyGoalHistoryAggregate", aggregate.date, "Invalid aggregate date '${aggregate.date}'.")
+                )
+            }
+            if (!aggregateDates.add(aggregate.date)) {
+                return BackupValidationResult.Invalid(
+                    BackupValidationError.DuplicateKey("aggregates", aggregate.date)
+                )
+            }
+            if (aggregate.completedCount < 0) {
+                return BackupValidationResult.Invalid(
+                    BackupValidationError.InvalidDomainInvariant("DailyGoalHistoryAggregate", aggregate.date, "completedCount cannot be negative: ${aggregate.completedCount}")
+                )
+            }
+            if (aggregate.totalCount < 0) {
+                return BackupValidationResult.Invalid(
+                    BackupValidationError.InvalidDomainInvariant("DailyGoalHistoryAggregate", aggregate.date, "totalCount cannot be negative: ${aggregate.totalCount}")
+                )
+            }
+            if (aggregate.completedCount > aggregate.totalCount) {
+                return BackupValidationResult.Invalid(
+                    BackupValidationError.InvalidDomainInvariant("DailyGoalHistoryAggregate", aggregate.date, "completedCount (${aggregate.completedCount}) cannot exceed totalCount (${aggregate.totalCount})")
+                )
+            }
+        }
+
         val conflictingHabitsCount = habitIds.intersect(existingHabitIds).size
 
         val preview = BackupPreviewInfo(
@@ -414,7 +451,8 @@ object BackupValidator {
             subtasksCount = payload.subtasks.size,
             reviewsCount = payload.reviews.size,
             conflictingRecordsCount = conflictingRecordsCount,
-            conflictingHabitsCount = conflictingHabitsCount
+            conflictingHabitsCount = conflictingHabitsCount,
+            aggregatesCount = payload.aggregates.size
         )
 
         return BackupValidationResult.Valid(preview)

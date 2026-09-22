@@ -30,7 +30,13 @@ interface DailyGoalRepository {
     /**
      * Cleans up ephemeral past completed goals whose target date is before [beforeDate].
      * Associated subtasks are cleanly removed.
+     * Historical completion aggregates (date, completedCount, totalCount) are atomically persisted.
      * Past incomplete goals, current goals, and future goals are preserved.
      */
     suspend fun cleanupCompletedGoalsBeforeDate(beforeDate: String): Int
+
+    // Historical Aggregates
+    fun observeAggregatesForDateRange(startDate: String, endDate: String): Flow<List<com.habit1.app.domain.model.DailyGoalHistoryAggregate>>
+    suspend fun getAggregatesForDateRange(startDate: String, endDate: String): List<com.habit1.app.domain.model.DailyGoalHistoryAggregate>
+    suspend fun getAggregateForDate(date: String): com.habit1.app.domain.model.DailyGoalHistoryAggregate?
 }

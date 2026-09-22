@@ -373,6 +373,7 @@ fun HistoryScreen(
                 val isSelectedToday = breakdown.date == today
                 val hasNoActivity = breakdown.habits.none { it.isCompleted || it.isPartial } &&
                     breakdown.goals.isEmpty() &&
+                    breakdown.historicalGoalAggregate == null &&
                     breakdown.dailyReview == null
 
                 item(key = "date_breakdown_header") {
@@ -507,8 +508,101 @@ fun HistoryScreen(
                     }
                 }
 
-                // Goals breakdown for selected day
-                if (breakdown.goals.isNotEmpty()) {
+                // Goals breakdown for selected day (Supports both Historical Aggregates and Detailed Goals)
+                if (breakdown.historicalGoalAggregate != null) {
+                    val agg = breakdown.historicalGoalAggregate
+                    val pct = if (agg.totalCount > 0) ((agg.completedCount.toDouble() / agg.totalCount.toDouble()) * 100.0).toInt() else 0
+                    item(key = "breakdown_goals_title") {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Daily Goals",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.secondary
+                            )
+                            Text(
+                                text = "${agg.completedCount} of ${agg.totalCount} completed · $pct%",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    if (breakdown.goals.isEmpty()) {
+                        item(key = "breakdown_aggregate_notice") {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Text(
+                                        text = "Detailed goal records are no longer retained.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        item(key = "breakdown_aggregate_notice") {
+                            Text(
+                                text = "Detailed goal records are no longer retained for completed items.",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(vertical = 4.dp)
+                            )
+                        }
+                        items(breakdown.goals, key = { "breakdown_goal_${it.id}" }) { goal ->
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Checkbox(
+                                            checked = goal.isCompleted,
+                                            onCheckedChange = null,
+                                            enabled = false,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = goal.title,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            textDecoration = if (goal.isCompleted) TextDecoration.LineThrough else TextDecoration.None
+                                        )
+                                    }
+                                    if (goal.subtasks.isNotEmpty()) {
+                                        val completedSubs = goal.subtasks.count { it.isCompleted }
+                                        Text(
+                                            text = "$completedSubs/${goal.subtasks.size} subtasks completed",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.padding(start = 28.dp, top = 4.dp)
+                                        )
+                                    }
+                                    if (!goal.notes.isNullOrBlank()) {
+                                        Text(
+                                            text = goal.notes,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.padding(start = 28.dp, top = 4.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else if (breakdown.goals.isNotEmpty()) {
                     val completedGoals = breakdown.goals.count { it.isCompleted }
                     item(key = "breakdown_goals_title") {
                         Spacer(modifier = Modifier.height(4.dp))

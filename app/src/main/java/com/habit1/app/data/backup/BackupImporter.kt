@@ -33,7 +33,8 @@ data class BackupRestoreSummary(
     val goalsRestored: Int,
     val subtasksRestored: Int,
     val reviewsRestored: Int,
-    val conflictingRecordsPreserved: Int = 0
+    val conflictingRecordsPreserved: Int = 0,
+    val aggregatesRestored: Int = 0
 )
 
 /**
@@ -76,6 +77,7 @@ class BackupImporter(
             // and parent-to-child insert order.
             database.withTransaction {
                 // Child-to-parent deletion
+                database.dailyGoalDao().deleteAllAggregates()
                 database.dailyGoalDao().deleteAllSubtasks()
                 database.dailyGoalDao().deleteAllGoals()
                 database.habitRecordDao().deleteAllRecords()
@@ -98,6 +100,9 @@ class BackupImporter(
                 if (payload.reviews.isNotEmpty()) {
                     database.dailyReviewDao().upsertAll(payload.reviews.map { it.toEntity() })
                 }
+                if (payload.aggregates.isNotEmpty()) {
+                    database.dailyGoalDao().upsertAllAggregates(payload.aggregates.map { it.toEntity() })
+                }
             }
         } catch (t: Throwable) {
             // Transaction Failure Recovery: Room rolled back table changes.
@@ -119,7 +124,8 @@ class BackupImporter(
             recordsRestored = payload.records.size,
             goalsRestored = payload.goals.size,
             subtasksRestored = payload.subtasks.size,
-            reviewsRestored = payload.reviews.size
+            reviewsRestored = payload.reviews.size,
+            aggregatesRestored = payload.aggregates.size
         )
     }
 
@@ -135,6 +141,7 @@ class BackupImporter(
             val existingRecords = database.habitRecordDao().getAllRecordsList().associateBy {
                 Pair(it.habitId, it.date)
             }
+            val existingAggregates = database.dailyGoalDao().getAllAggregates().associateBy { it.date }
 
             // 1. Merge Habits
             for (backupHabit in payload.habits) {
@@ -196,6 +203,17 @@ class BackupImporter(
                     }
                 }
             }
+
+            // 6. Merge Historical Daily Goal Aggregates
+            for (backupAggregate in payload.aggregates) {
+                val current = existingAggregates[backupAggregate.date]
+                if (current == null) {
+                    database.dailyGoalDao().upsertAggregate(backupAggregate.toEntity())
+                } else if (backupAggregate.totalCount > current.totalCount ||
+                    (backupAggregate.totalCount == current.totalCount && backupAggregate.completedCount > current.completedCount)) {
+                    database.dailyGoalDao().upsertAggregate(backupAggregate.toEntity())
+                }
+            }
         }
 
         // Post-Merge Alarm Synchronization
@@ -208,7 +226,8 @@ class BackupImporter(
             goalsRestored = payload.goals.size,
             subtasksRestored = payload.subtasks.size,
             reviewsRestored = payload.reviews.size,
-            conflictingRecordsPreserved = conflictingRecordsPreserved
+            conflictingRecordsPreserved = conflictingRecordsPreserved,
+            aggregatesRestored = payload.aggregates.size
         )
     }
 }

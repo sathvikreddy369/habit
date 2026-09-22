@@ -15,6 +15,9 @@ import com.habit1.app.data.local.db.entity.GoalSubtaskEntity
 import com.habit1.app.data.local.db.entity.HabitEntity
 import com.habit1.app.data.local.db.entity.HabitRecordEntity
 
+import androidx.room.migration.Migration
+import com.habit1.app.data.local.db.entity.DailyGoalHistoryAggregateEntity
+
 /**
  * Authoritative local SQLite database for the application.
  * WAL mode enabled for concurrent non-blocking reads and writes.
@@ -25,9 +28,10 @@ import com.habit1.app.data.local.db.entity.HabitRecordEntity
         HabitRecordEntity::class,
         DailyGoalEntity::class,
         GoalSubtaskEntity::class,
-        DailyReviewEntity::class
+        DailyReviewEntity::class,
+        DailyGoalHistoryAggregateEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -40,12 +44,29 @@ abstract class AppDatabase : RoomDatabase() {
     companion object {
         const val DATABASE_NAME = "habit_app.db"
 
+        val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `daily_goal_history_aggregates` (
+                        `date` TEXT NOT NULL,
+                        `completed_count` INTEGER NOT NULL,
+                        `total_count` INTEGER NOT NULL,
+                        PRIMARY KEY(`date`),
+                        CHECK (`completed_count` >= 0 AND `total_count` >= 0 AND `completed_count` <= `total_count`)
+                    )
+                    """.trimIndent()
+                )
+            }
+        }
+
         fun buildDatabase(context: Context): AppDatabase {
             return Room.databaseBuilder(
                 context.applicationContext,
                 AppDatabase::class.java,
                 DATABASE_NAME
             )
+                .addMigrations(MIGRATION_1_2)
                 .setJournalMode(JournalMode.WRITE_AHEAD_LOGGING)
                 .addCallback(object : Callback() {
                     override fun onOpen(db: SupportSQLiteDatabase) {
@@ -65,6 +86,7 @@ abstract class AppDatabase : RoomDatabase() {
                 context,
                 AppDatabase::class.java
             )
+                .addMigrations(MIGRATION_1_2)
                 .allowMainThreadQueries()
                 .setQueryExecutor(executor)
                 .setTransactionExecutor(executor)

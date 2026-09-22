@@ -121,9 +121,71 @@ interface DailyGoalDao {
     @Query("DELETE FROM daily_goals WHERE target_date < :beforeDate AND is_completed = 1")
     suspend fun deleteCompletedGoalsBeforeDate(beforeDate: String): Int
 
+    @Query("SELECT DISTINCT target_date FROM daily_goals WHERE target_date < :beforeDate AND is_completed = 1")
+    suspend fun getDatesWithCompletedGoalsBeforeDate(beforeDate: String): List<String>
+
+    // --- Historical Daily Goal Aggregates ---
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAggregate(aggregate: com.habit1.app.data.local.db.entity.DailyGoalHistoryAggregateEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAllAggregates(aggregates: List<com.habit1.app.data.local.db.entity.DailyGoalHistoryAggregateEntity>)
+
+    @Query("SELECT * FROM daily_goal_history_aggregates WHERE date = :date LIMIT 1")
+    suspend fun getAggregateForDate(date: String): com.habit1.app.data.local.db.entity.DailyGoalHistoryAggregateEntity?
+
+    @Query("SELECT * FROM daily_goal_history_aggregates WHERE date BETWEEN :startDate AND :endDate ORDER BY date ASC")
+    fun observeAggregatesForDateRange(startDate: String, endDate: String): Flow<List<com.habit1.app.data.local.db.entity.DailyGoalHistoryAggregateEntity>>
+
+    @Query("SELECT * FROM daily_goal_history_aggregates WHERE date BETWEEN :startDate AND :endDate ORDER BY date ASC")
+    suspend fun getAggregatesForDateRange(startDate: String, endDate: String): List<com.habit1.app.data.local.db.entity.DailyGoalHistoryAggregateEntity>
+
+    @Query("SELECT * FROM daily_goal_history_aggregates ORDER BY date ASC")
+    suspend fun getAllAggregates(): List<com.habit1.app.data.local.db.entity.DailyGoalHistoryAggregateEntity>
+
+    @Query("DELETE FROM daily_goal_history_aggregates")
+    suspend fun deleteAllAggregates()
+
     @Transaction
     suspend fun cleanupCompletedGoalsBeforeDate(beforeDate: String): Int {
+        // 1. Identify distinct past dates with completed goals eligible for cleanup
+        val affectedDates = getDatesWithCompletedGoalsBeforeDate(beforeDate)
+        if (affectedDates.isEmpty()) return 0
+
+        // 2. Compute and persist historical aggregates for each affected date
+        for (date in affectedDates) {
+            val goalsOnDate = getGoalsForDate(date)
+            val currentCompleted = goalsOnDate.count { it.goal.isCompleted }
+            val currentTotal = goalsOnDate.size
+
+            val existingAggregate = getAggregateForDate(date)
+            val finalCompleted = if (existingAggregate != null) {
+                (existingAggregate.completedCount + currentCompleted)
+            } else {
+                currentCompleted
+            }
+            val finalTotal = if (existingAggregate != null) {
+                // If previous aggregate had totalCount, add any newly appeared goals
+                maxOf(existingAggregate.totalCount, finalCompleted)
+            } else {
+                currentTotal
+            }
+
+            if (finalTotal > 0) {
+                upsertAggregate(
+                    com.habit1.app.data.local.db.entity.DailyGoalHistoryAggregateEntity(
+                        date = date,
+                        completedCount = finalCompleted,
+                        totalCount = finalTotal
+                    )
+                )
+            }
+        }
+
+        // 3. Atomically delete subtasks for completed goals
         deleteSubtasksForCompletedGoalsBeforeDate(beforeDate)
+
+        // 4. Atomically delete completed goals
         return deleteCompletedGoalsBeforeDate(beforeDate)
     }
 

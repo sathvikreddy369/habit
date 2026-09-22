@@ -4,9 +4,11 @@ import com.habit1.app.data.local.db.dao.DailyGoalDao
 import com.habit1.app.data.local.db.entity.DailyGoalEntity
 import com.habit1.app.data.local.db.entity.DailyGoalWithSubtasks
 import com.habit1.app.data.local.db.entity.GoalSubtaskEntity
+import com.habit1.app.domain.mapper.EntityMappers.toDomain
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 
 class DailyGoalRepositoryImpl(
@@ -117,4 +119,26 @@ class DailyGoalRepositoryImpl(
         withContext(ioDispatcher) {
             dailyGoalDao.cleanupCompletedGoalsBeforeDate(beforeDate)
         }
+
+    override fun observeAggregatesForDateRange(
+        startDate: String,
+        endDate: String
+    ): Flow<List<com.habit1.app.domain.model.DailyGoalHistoryAggregate>> {
+        return dailyGoalDao.observeAggregatesForDateRange(startDate, endDate)
+            .map { list -> list.map { it.toDomain() } }
+    }
+
+    override suspend fun getAggregatesForDateRange(
+        startDate: String,
+        endDate: String
+    ): List<com.habit1.app.domain.model.DailyGoalHistoryAggregate> =
+        withContext(ioDispatcher) {
+            dailyGoalDao.getAggregatesForDateRange(startDate, endDate).map { it.toDomain() }
+        }
+
+    override suspend fun getAggregateForDate(date: String): com.habit1.app.domain.model.DailyGoalHistoryAggregate? =
+        withContext(ioDispatcher) {
+            dailyGoalDao.getAggregateForDate(date)?.toDomain()
+        }
 }
+

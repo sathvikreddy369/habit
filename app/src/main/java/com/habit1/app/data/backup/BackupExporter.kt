@@ -22,7 +22,8 @@ data class BackupExportSummary(
     val goalsCount: Int,
     val subtasksCount: Int,
     val reviewsCount: Int,
-    val bytesWritten: Long
+    val bytesWritten: Long,
+    val aggregatesCount: Int = 0
 )
 
 /**
@@ -39,8 +40,8 @@ class BackupExporter(
     }
 
     /**
-     * Executes a consistent snapshot read within a Room transaction, builds the envelope,
-     * computes the SHA-256 checksum, and writes the resulting JSON to outputStream.
+     * Snapshots the database inside a single Room transaction, canonicalizes, checksums,
+     * and streams to [outputStream].
      *
      * IMPORTANT: The Room transaction completes immediately after in-memory snapshotting;
      * no slow SAF I/O is held inside the database transaction.
@@ -53,13 +54,15 @@ class BackupExporter(
             val goals = database.dailyGoalDao().getAllGoalsList().map { it.toBackupDto() }
             val subtasks = database.dailyGoalDao().getAllSubtasksList().map { it.toBackupDto() }
             val reviews = database.dailyReviewDao().getAllReviews().map { it.toBackupDto() }
+            val aggregates = database.dailyGoalDao().getAllAggregates().map { it.toBackupDto() }
 
             BackupPayloadDto(
                 habits = habits,
                 records = records,
                 goals = goals,
                 subtasks = subtasks,
-                reviews = reviews
+                reviews = reviews,
+                aggregates = aggregates
             )
         }
 
@@ -93,7 +96,8 @@ class BackupExporter(
             goalsCount = payload.goals.size,
             subtasksCount = payload.subtasks.size,
             reviewsCount = payload.reviews.size,
-            bytesWritten = bytes.size.toLong()
+            bytesWritten = bytes.size.toLong(),
+            aggregatesCount = payload.aggregates.size
         )
     }
 }

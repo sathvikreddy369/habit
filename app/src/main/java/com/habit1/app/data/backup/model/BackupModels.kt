@@ -33,7 +33,15 @@ data class BackupPayloadDto(
     val records: List<HabitRecordBackupDto> = emptyList(),
     val goals: List<DailyGoalBackupDto> = emptyList(),
     val subtasks: List<GoalSubtaskBackupDto> = emptyList(),
-    val reviews: List<DailyReviewBackupDto> = emptyList()
+    val reviews: List<DailyReviewBackupDto> = emptyList(),
+    val aggregates: List<DailyGoalHistoryAggregateBackupDto> = emptyList()
+)
+
+@Serializable
+data class DailyGoalHistoryAggregateBackupDto(
+    val date: String,
+    val completedCount: Int,
+    val totalCount: Int
 )
 
 @Serializable
@@ -216,3 +224,16 @@ fun DailyReviewBackupDto.toEntity(): DailyReviewEntity = DailyReviewEntity(
     createdAt = createdAt,
     updatedAt = updatedAt
 )
+
+fun com.habit1.app.data.local.db.entity.DailyGoalHistoryAggregateEntity.toBackupDto(): DailyGoalHistoryAggregateBackupDto = DailyGoalHistoryAggregateBackupDto(
+    date = date,
+    completedCount = completedCount,
+    totalCount = totalCount
+)
+
+fun DailyGoalHistoryAggregateBackupDto.toEntity(): com.habit1.app.data.local.db.entity.DailyGoalHistoryAggregateEntity = com.habit1.app.data.local.db.entity.DailyGoalHistoryAggregateEntity(
+    date = date,
+    completedCount = completedCount,
+    totalCount = totalCount
+)
+

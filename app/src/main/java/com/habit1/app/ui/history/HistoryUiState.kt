@@ -1,6 +1,7 @@
 package com.habit1.app.ui.history
 
 import com.habit1.app.domain.model.CalendarDayStatus
+import com.habit1.app.domain.model.DailyGoalHistoryAggregate
 import com.habit1.app.domain.model.DailyReview
 import com.habit1.app.ui.today.TodayGoalItem
 import java.time.LocalDate
@@ -34,7 +35,8 @@ data class SelectedDateBreakdown(
     val formattedDate: String,
     val habits: List<HabitDayBreakdownItem> = emptyList(),
     val goals: List<TodayGoalItem> = emptyList(),
-    val dailyReview: DailyReview? = null
+    val dailyReview: DailyReview? = null,
+    val historicalGoalAggregate: DailyGoalHistoryAggregate? = null
 )
 
 

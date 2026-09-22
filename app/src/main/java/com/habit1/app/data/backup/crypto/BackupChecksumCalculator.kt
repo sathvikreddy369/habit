@@ -32,7 +32,8 @@ object BackupChecksumCalculator {
             records = payload.records.sortedWith(compareBy({ it.habitId }, { it.date })),
             goals = payload.goals.sortedBy { it.id },
             subtasks = payload.subtasks.sortedWith(compareBy({ it.goalId }, { it.id })),
-            reviews = payload.reviews.sortedBy { it.date }
+            reviews = payload.reviews.sortedBy { it.date },
+            aggregates = payload.aggregates.sortedBy { it.date }
         )
     }
 
