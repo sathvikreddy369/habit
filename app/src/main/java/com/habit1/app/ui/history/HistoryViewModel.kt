@@ -60,22 +60,20 @@ class HistoryViewModel(
         val startDateStr = DateTimeUtils.formatDate(firstDay)
         val endDateStr = DateTimeUtils.formatDate(lastDay)
 
-        val selectedReviewFlow = selectedDateFlow.flatMapLatest { date ->
-            val dateString = DateTimeUtils.formatDate(date)
-            dailyReviewRepository?.observeReview(dateString) ?: flowOf(null)
-        }
+        val reviewsFlow = dailyReviewRepository?.observeReviewsForDateRange(startDateStr, endDateStr) ?: flowOf(emptyList())
 
         combine(
             habitRepository.observeAllHabits(), // Includes archived habits
             habitRecordRepository.observeRecordsForDateRange(startDateStr, endDateStr),
             dailyGoalRepository.observeGoalsForDateRange(startDateStr, endDateStr),
-            selectedDateFlow,
-            selectedReviewFlow
-        ) { allHabitEntities, recordEntities, goalEntities, selectedDate, selectedReview ->
+            reviewsFlow,
+            selectedDateFlow
+        ) { allHabitEntities, recordEntities, goalEntities, reviewEntities, selectedDate ->
 
             val allHabits = allHabitEntities.map { it.toDomain() }
             val recordsByDate = recordEntities.groupBy { it.date }
             val goalsByDate = goalEntities.groupBy { it.goal.targetDate }
+            val reviewsByDate = reviewEntities.associateBy { it.date }
 
             // 1. Build calendar day items
             val calendarDays = mutableListOf<HistoryCalendarDayItem>()
@@ -89,6 +87,7 @@ class HistoryViewModel(
                 val dateStr = DateTimeUtils.formatDate(dayCursor)
                 val dayRecords = recordsByDate[dateStr] ?: emptyList()
                 val dayGoals = goalsByDate[dateStr] ?: emptyList()
+                val hasReviewForDay = reviewsByDate.containsKey(dateStr)
 
                 // Count scheduled habits for dayCursor
                 val scheduledForDay = allHabits.filter { habit ->
@@ -97,6 +96,7 @@ class HistoryViewModel(
                 }
 
                 val completedHabitsForDay = dayRecords.count { it.isCompleted }
+                val partialHabitsForDay = dayRecords.count { !it.isCompleted && it.actualValue > 0.0 }
                 val completedGoalsForDay = dayGoals.count { it.goal.isCompleted }
 
                 calendarDays.add(
@@ -106,10 +106,12 @@ class HistoryViewModel(
                         isSelected = dayCursor == selectedDate,
                         isCurrentMonth = true,
                         completedHabitsCount = completedHabitsForDay,
+                        partialHabitsCount = partialHabitsForDay,
                         totalScheduledHabitsCount = scheduledForDay.size,
                         completedGoalsCount = completedGoalsForDay,
                         totalGoalsCount = dayGoals.size,
-                        hasRecordedActivity = dayRecords.isNotEmpty() || dayGoals.isNotEmpty()
+                        hasReview = hasReviewForDay,
+                        hasRecordedActivity = dayRecords.isNotEmpty() || dayGoals.isNotEmpty() || hasReviewForDay
                     )
                 )
 
@@ -128,6 +130,7 @@ class HistoryViewModel(
             val selectedDateStr = DateTimeUtils.formatDate(selectedDate)
             val selectedDayRecords = recordsByDate[selectedDateStr]?.associateBy { it.habitId } ?: emptyMap()
             val selectedDayGoals = goalsByDate[selectedDateStr] ?: emptyList()
+            val selectedDayReview = reviewsByDate[selectedDateStr]
 
             val habitBreakdown = allHabits.mapNotNull { habit ->
                 val creationDate = DateTimeUtils.toLocalDate(habit.createdAt, zoneId)
@@ -136,35 +139,50 @@ class HistoryViewModel(
                     null
                 } else {
                     val record = selectedDayRecords[habit.id]
+                    val isCompleted = record != null && record.isCompleted
+                    val isPartial = record != null && !record.isCompleted && record.actualValue > 0.0
+                    val isScheduled = evaluateSchedule.isScheduledOn(habit, selectedDate, zoneId)
+
                     val status: CalendarDayStatus = when {
                         selectedDate.isAfter(today) -> CalendarDayStatus.Future
                         habit.isPaused -> CalendarDayStatus.Paused
-                        record != null && record.isCompleted -> CalendarDayStatus.Completed(
+                        isCompleted -> CalendarDayStatus.Completed(
+                            actualValue = record!!.actualValue,
+                            targetValue = record.targetValue,
+                            unit = record.unit,
+                            measurementType = record.measurementType
+                        )
+                        record != null -> CalendarDayStatus.RecordedIncomplete(
                             actualValue = record.actualValue,
                             targetValue = record.targetValue,
                             unit = record.unit,
                             measurementType = record.measurementType
                         )
-                        record != null && !record.isCompleted -> CalendarDayStatus.RecordedIncomplete(
-                            actualValue = record.actualValue,
-                            targetValue = record.targetValue,
-                            unit = record.unit,
-                            measurementType = record.measurementType
-                        )
-                        else -> {
-                            val isScheduled = evaluateSchedule.isScheduledOn(habit, selectedDate, zoneId)
-                            if (isScheduled) CalendarDayStatus.ProjectedMissed else CalendarDayStatus.ProjectedRest
-                        }
+                        isScheduled -> CalendarDayStatus.ProjectedMissed
+                        else -> CalendarDayStatus.ProjectedRest
                     }
 
                     val formattedProgress = if (record != null) {
-                        "${record.actualValue}/${record.targetValue} ${record.unit ?: ""}".trim()
+                        if (record.measurementType == "BOOLEAN") {
+                            if (record.isCompleted) "Completed" else "Not completed"
+                        } else {
+                            val actualStr = formatStatValue(record.actualValue)
+                            val targetStr = formatStatValue(record.targetValue)
+                            val unitStr = record.unit?.takeIf { it.isNotBlank() }?.let { " $it" } ?: ""
+                            val pct = if (record.targetValue > 0.0) {
+                                ((record.actualValue / record.targetValue) * 100).toInt()
+                            } else {
+                                0
+                            }
+                            "$actualStr / $targetStr$unitStr • $pct%"
+                        }
                     } else {
                         when (status) {
                             CalendarDayStatus.ProjectedMissed -> "Missed (Projected)"
                             CalendarDayStatus.ProjectedRest -> "Rest Day (Projected)"
                             CalendarDayStatus.Paused -> "Paused"
-                            else -> ""
+                            CalendarDayStatus.Future -> "Upcoming"
+                            else -> "No record"
                         }
                     }
 
@@ -172,7 +190,9 @@ class HistoryViewModel(
                         habitId = habit.id,
                         habitName = habit.name,
                         status = status,
-                        formattedProgress = formattedProgress
+                        formattedProgress = formattedProgress,
+                        isPartial = isPartial,
+                        isCompleted = isCompleted
                     )
                 }
             }
@@ -213,7 +233,7 @@ class HistoryViewModel(
                     formattedDate = selectedDate.format(dateFormatter),
                     habits = habitBreakdown,
                     goals = goalBreakdown,
-                    dailyReview = selectedReview?.toDomain()
+                    dailyReview = selectedDayReview?.toDomain()
                 ),
                 monthSummary = MonthSummary(
                     totalHabitCompletions = monthHabitCompletions,
@@ -253,7 +273,19 @@ class HistoryViewModel(
                     selectedMonthFlow.value = next
                     selectedDateFlow.value = next.atDay(1)
                 }
+                is HistoryUiEvent.JumpToToday -> {
+                    selectedMonthFlow.value = YearMonth.from(today)
+                    selectedDateFlow.value = today
+                }
             }
+        }
+    }
+
+    private fun formatStatValue(value: Double): String {
+        return if (value % 1.0 == 0.0) {
+            value.toLong().toString()
+        } else {
+            "%.1f".format(Locale.US, value)
         }
     }
 

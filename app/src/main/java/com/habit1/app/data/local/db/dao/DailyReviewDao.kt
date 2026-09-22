@@ -22,6 +22,9 @@ interface DailyReviewDao {
     @Query("SELECT * FROM daily_reviews WHERE date BETWEEN :startDate AND :endDate ORDER BY date ASC")
     suspend fun getReviewsForDateRange(startDate: String, endDate: String): List<DailyReviewEntity>
 
+    @Query("SELECT * FROM daily_reviews WHERE date BETWEEN :startDate AND :endDate ORDER BY date ASC")
+    fun observeReviewsForDateRange(startDate: String, endDate: String): Flow<List<DailyReviewEntity>>
+
     @Query("DELETE FROM daily_reviews WHERE date = :date")
     suspend fun deleteReview(date: String)
 

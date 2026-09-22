@@ -272,5 +272,151 @@ class HistoryViewModelTest {
             cancelAndIgnoreRemainingEvents()
         }
     }
+
+    @Test
+    fun testJumpToToday_resetsMonthAndDate() = runTest(testDispatcher) {
+        viewModel.uiState.test {
+            awaitItem() // loading
+            awaitItem() // initial
+
+            // Move to previous month
+            viewModel.onEvent(HistoryUiEvent.PreviousMonth)
+            val prev = awaitItem()
+            val initialMonth = prev.selectedMonth.plusMonths(1)
+
+            // Jump to today
+            viewModel.onEvent(HistoryUiEvent.JumpToToday)
+            val todayState = awaitItem()
+            assertEquals(initialMonth, todayState.selectedMonth)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun testQuantitativeProgressFormatting_withUnitsAndPercentages() = runTest(testDispatcher) {
+        val targetDate = LocalDate.of(2026, 9, 10)
+        val habit = HabitEntity(
+            id = "h_quant",
+            name = "Reading",
+            measurementType = "DURATION",
+            targetValue = 60.0,
+            unit = "min",
+            scheduleType = "DAILY",
+            scheduleConfig = "{}",
+            displayOrder = 0,
+            isArchived = false,
+            createdAt = pastMillis,
+            updatedAt = pastMillis
+        )
+        database.habitDao().insert(habit)
+
+        val record = HabitRecordEntity(
+            id = "r_quant",
+            habitId = "h_quant",
+            date = "2026-09-10",
+            actualValue = 45.0,
+            targetValue = 60.0,
+            unit = "min",
+            measurementType = "DURATION",
+            isCompleted = false,
+            recordedAt = pastMillis
+        )
+        database.habitRecordDao().upsert(record)
+
+        viewModel.uiState.test {
+            awaitItem() // loading
+            var state = awaitItem()
+
+            viewModel.onEvent(HistoryUiEvent.SelectDate(targetDate))
+            state = awaitItem()
+            while (state.selectedDateBreakdown?.habits?.any { it.habitId == "h_quant" } != true) {
+                state = awaitItem()
+            }
+
+            val item = state.selectedDateBreakdown!!.habits.first { it.habitId == "h_quant" }
+            assertEquals("45 / 60 min • 75%", item.formattedProgress)
+            assertTrue(item.isPartial)
+            assertEquals(false, item.isCompleted)
+            assertTrue(item.status is CalendarDayStatus.RecordedIncomplete)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun testGoalAndSubtasksIndependence() = runTest(testDispatcher) {
+        val targetDate = LocalDate.of(2026, 9, 12)
+        val goal = DailyGoalEntity(
+            id = "g_indep",
+            title = "Write Report",
+            targetDate = "2026-09-12",
+            isCompleted = false,
+            displayOrder = 0,
+            createdAt = pastMillis,
+            updatedAt = pastMillis
+        )
+        database.dailyGoalDao().insertGoal(goal)
+
+        val subtask1 = com.habit1.app.data.local.db.entity.GoalSubtaskEntity(
+            id = "s1",
+            goalId = "g_indep",
+            title = "Section 1",
+            isCompleted = true,
+            displayOrder = 0,
+            createdAt = pastMillis
+        )
+        val subtask2 = com.habit1.app.data.local.db.entity.GoalSubtaskEntity(
+            id = "s2",
+            goalId = "g_indep",
+            title = "Section 2",
+            isCompleted = false,
+            displayOrder = 1,
+            createdAt = pastMillis
+        )
+        database.dailyGoalDao().insertAllSubtasks(listOf(subtask1, subtask2))
+
+        viewModel.uiState.test {
+            awaitItem() // loading
+            var state = awaitItem()
+
+            viewModel.onEvent(HistoryUiEvent.SelectDate(targetDate))
+            state = awaitItem()
+            while (state.selectedDateBreakdown?.goals?.any { it.id == "g_indep" } != true) {
+                state = awaitItem()
+            }
+
+            val goalItem = state.selectedDateBreakdown!!.goals.first { it.id == "g_indep" }
+            assertEquals(false, goalItem.isCompleted) // Goal incomplete
+            assertEquals(2, goalItem.subtasks.size)
+            assertEquals(1, goalItem.subtasks.count { it.isCompleted }) // 1 of 2 subtasks complete
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun testCalendarIndicators_trackHabitsGoalsAndReview() = runTest(testDispatcher) {
+        val targetDate = LocalDate.of(2026, 9, 20)
+        database.dailyReviewDao().upsert(
+            com.habit1.app.data.local.db.entity.DailyReviewEntity(
+                date = "2026-09-20",
+                notes = "Productive Sunday",
+                mood = "Focused",
+                createdAt = pastMillis,
+                updatedAt = pastMillis
+            )
+        )
+
+        viewModel.uiState.test {
+            awaitItem() // loading
+            var state = awaitItem()
+            while (state.calendarDays.none { it.date == targetDate && it.hasReview }) {
+                state = awaitItem()
+            }
+
+            val day = state.calendarDays.first { it.date == targetDate }
+            assertTrue(day.hasReview)
+            assertTrue(day.hasRecordedActivity)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
 }
 

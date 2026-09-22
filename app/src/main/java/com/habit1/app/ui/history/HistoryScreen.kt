@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -19,17 +18,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
@@ -40,6 +34,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -47,15 +42,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.habit1.app.domain.model.CalendarDayStatus
 import java.time.DayOfWeek
 import java.time.LocalDate
+import java.time.YearMonth
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,8 +64,10 @@ fun HistoryScreen(
     modifier: Modifier = Modifier,
     onInspectHabit: (habitId: String) -> Unit = {}
 ) {
-
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val today = LocalDate.now()
+    val isViewingCurrentMonth = uiState.selectedMonth == YearMonth.from(today)
+    val isViewingToday = uiState.selectedDate == today
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -91,7 +92,7 @@ fun HistoryScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 1. Month Navigation Header
+            // 1. Month Navigation Header with Today shortcut
             item(key = "month_nav") {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -102,18 +103,43 @@ fun HistoryScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         IconButton(onClick = { viewModel.onEvent(HistoryUiEvent.PreviousMonth) }) {
                             Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Previous Month")
                         }
-                        Text(
-                            text = uiState.formattedMonth,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = uiState.formattedMonth,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+
+                            if (!isViewingCurrentMonth || !isViewingToday) {
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = MaterialTheme.colorScheme.primaryContainer,
+                                    modifier = Modifier.clickable {
+                                        viewModel.onEvent(HistoryUiEvent.JumpToToday)
+                                    }
+                                ) {
+                                    Text(
+                                        text = "Today",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    )
+                                }
+                            }
+                        }
+
                         IconButton(onClick = { viewModel.onEvent(HistoryUiEvent.NextMonth) }) {
                             Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Next Month")
                         }
@@ -137,7 +163,7 @@ fun HistoryScreen(
                                     text = dayLabel,
                                     style = MaterialTheme.typography.labelMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.width(40.dp),
+                                    modifier = Modifier.width(44.dp),
                                     textAlign = TextAlign.Center
                                 )
                             }
@@ -155,7 +181,7 @@ fun HistoryScreen(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(vertical = 4.dp),
+                                    .padding(vertical = 2.dp),
                                 horizontalArrangement = Arrangement.SpaceAround
                             ) {
                                 for (colIndex in 0 until 7) {
@@ -168,11 +194,16 @@ fun HistoryScreen(
                                             onClick = { viewModel.onEvent(HistoryUiEvent.SelectDate(dayItem.date)) }
                                         )
                                     } else {
-                                        Spacer(modifier = Modifier.size(40.dp))
+                                        Spacer(modifier = Modifier.size(44.dp))
                                     }
                                 }
                             }
                         }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Calendar Legend
+                        CalendarLegend()
                     }
                 }
             }
@@ -196,7 +227,11 @@ fun HistoryScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Column {
+                                Column(
+                                    modifier = Modifier.semantics {
+                                        contentDescription = "Habits consistency: ${summary.habitCompletionRate.toInt()} percent, ${summary.totalHabitCompletions} of ${summary.totalHabitScheduledDays} scheduled days completed."
+                                    }
+                                ) {
                                     Text("Habits Consistency", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     Text(
                                         text = "${summary.habitCompletionRate.toInt()}% (${summary.totalHabitCompletions}/${summary.totalHabitScheduledDays})",
@@ -205,7 +240,11 @@ fun HistoryScreen(
                                         color = MaterialTheme.colorScheme.primary
                                     )
                                 }
-                                Column {
+                                Column(
+                                    modifier = Modifier.semantics {
+                                        contentDescription = "Daily goals consistency: ${summary.goalCompletionRate.toInt()} percent, ${summary.completedGoals} of ${summary.totalGoals} goals completed."
+                                    }
+                                ) {
                                     Text("Daily Goals", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     Text(
                                         text = "${summary.goalCompletionRate.toInt()}% (${summary.completedGoals}/${summary.totalGoals})",
@@ -222,47 +261,100 @@ fun HistoryScreen(
 
             // 4. Selected Date Breakdown
             uiState.selectedDateBreakdown?.let { breakdown ->
+                val isSelectedToday = breakdown.date == today
+                val hasNoActivity = breakdown.habits.none { it.isCompleted || it.isPartial } &&
+                    breakdown.goals.isEmpty() &&
+                    breakdown.dailyReview == null
+
                 item(key = "date_breakdown_header") {
-                    Text(
-                        text = breakdown.formattedDate,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = breakdown.formattedDate,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        if (isSelectedToday) {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = MaterialTheme.colorScheme.secondaryContainer
+                            ) {
+                                Text(
+                                    text = "Today",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                    }
                 }
 
-                if (breakdown.habits.isEmpty() && breakdown.goals.isEmpty()) {
-                    item(key = "date_breakdown_empty") {
+                // Factual empty state for days with no recorded activity
+                if (hasNoActivity) {
+                    item(key = "date_breakdown_no_activity") {
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
                         ) {
-                            Text(
-                                text = "No habits or goals scheduled for this date.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(16.dp)
-                            )
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Text(
+                                    text = "No activity recorded for this day.",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "No habit completions, daily goals, or reflections were logged on this date.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
                 }
 
                 // Habits breakdown for selected day
                 if (breakdown.habits.isNotEmpty()) {
+                    val completedCount = breakdown.habits.count { it.isCompleted }
                     item(key = "breakdown_habits_title") {
-                        Text(
-                            text = "Habits Activity",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.primary
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Habits Activity",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = "$completedCount of ${breakdown.habits.size} completed",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
 
                     items(breakdown.habits, key = { "breakdown_habit_${it.habitId}" }) { item ->
+                        val itemDescription = "${item.habitName}, ${item.formattedProgress}. Tap to view habit history."
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { onInspectHabit(item.habitId) },
+                                .clickable(
+                                    onClickLabel = "View ${item.habitName} history",
+                                    onClick = { onInspectHabit(item.habitId) }
+                                )
+                                .semantics { contentDescription = itemDescription },
                             shape = RoundedCornerShape(12.dp),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
@@ -289,7 +381,18 @@ fun HistoryScreen(
                                     }
                                 }
 
-                                StatusBadge(status = item.status)
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    StatusBadge(status = item.status)
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -297,13 +400,26 @@ fun HistoryScreen(
 
                 // Goals breakdown for selected day
                 if (breakdown.goals.isNotEmpty()) {
+                    val completedGoals = breakdown.goals.count { it.isCompleted }
                     item(key = "breakdown_goals_title") {
                         Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Daily Goals",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.secondary
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Daily Goals",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.secondary
+                            )
+                            Text(
+                                text = "$completedGoals of ${breakdown.goals.size} completed",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
 
                     items(breakdown.goals, key = { "breakdown_goal_${it.id}" }) { goal ->
@@ -337,22 +453,32 @@ fun HistoryScreen(
                                         modifier = Modifier.padding(start = 28.dp, top = 4.dp)
                                     )
                                 }
+                                if (!goal.notes.isNullOrBlank()) {
+                                    Text(
+                                        text = goal.notes,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(start = 28.dp, top = 4.dp)
+                                    )
+                                }
                             }
                         }
                     }
                 }
 
-                // Daily Reflection for selected date (if recorded)
-                breakdown.dailyReview?.let { review ->
-                    item(key = "breakdown_reflection_header") {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Daily Reflection",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.tertiary
-                        )
-                    }
+                // Daily Reflection Section
+                item(key = "breakdown_reflection_header") {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Daily Reflection",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.tertiary
+                    )
+                }
 
+                if (breakdown.dailyReview != null) {
+                    val review = breakdown.dailyReview
                     item(key = "breakdown_reflection_card") {
                         Card(
                             modifier = Modifier.fillMaxWidth(),
@@ -397,11 +523,27 @@ fun HistoryScreen(
                                 }
 
                                 Text(
-                                    text = "This is a user-written reflection, not a calculated productivity result.",
+                                    text = "User reflection recorded on this date.",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
                                 )
                             }
+                        }
+                    }
+                } else {
+                    item(key = "breakdown_reflection_empty") {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                        ) {
+                            Text(
+                                text = "No reflection recorded for this date.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(14.dp)
+                            )
                         }
                     }
                 }
@@ -409,7 +551,6 @@ fun HistoryScreen(
         }
     }
 }
-
 
 @Composable
 private fun CalendarDayCell(
@@ -420,10 +561,21 @@ private fun CalendarDayCell(
     val isSelected = item.isSelected
     val isToday = item.isToday
 
+    val cellDescription = buildString {
+        append(item.date.format(DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy", Locale.getDefault())))
+        if (isToday) append(", Today")
+        if (isSelected) append(", Selected")
+        if (item.completedHabitsCount > 0) append(", ${item.completedHabitsCount} habits completed")
+        if (item.partialHabitsCount > 0) append(", ${item.partialHabitsCount} habits partial")
+        if (item.completedGoalsCount > 0) append(", ${item.completedGoalsCount} goals completed")
+        if (item.hasReview) append(", Daily reflection recorded")
+        if (!item.hasRecordedActivity) append(", No activity recorded")
+    }
+
     Column(
         modifier = modifier
-            .size(40.dp)
-            .clip(CircleShape)
+            .size(width = 44.dp, height = 48.dp)
+            .clip(RoundedCornerShape(12.dp))
             .background(
                 when {
                     isSelected -> MaterialTheme.colorScheme.primaryContainer
@@ -434,9 +586,10 @@ private fun CalendarDayCell(
             .border(
                 width = if (isToday && !isSelected) 1.dp else 0.dp,
                 color = if (isToday && !isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                shape = CircleShape
+                shape = RoundedCornerShape(12.dp)
             )
-            .clickable(onClick = onClick),
+            .clickable(onClick = onClick)
+            .semantics { contentDescription = cellDescription },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
@@ -451,24 +604,106 @@ private fun CalendarDayCell(
             }
         )
 
-        // Status dot indicator
-        if (item.completedHabitsCount > 0 || item.completedGoalsCount > 0) {
-            Box(
-                modifier = Modifier
-                    .size(4.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary)
-            )
-        } else if (item.hasRecordedActivity) {
-            Box(
-                modifier = Modifier
-                    .size(4.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.outline)
-            )
-        } else {
-            Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(2.dp))
+
+        // Multi-indicator row
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Habit dot
+            if (item.completedHabitsCount > 0) {
+                Box(
+                    modifier = Modifier
+                        .size(4.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary)
+                )
+            } else if (item.partialHabitsCount > 0) {
+                Box(
+                    modifier = Modifier
+                        .size(4.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.tertiary)
+                )
+            }
+
+            // Goal dot
+            if (item.completedGoalsCount > 0) {
+                Box(
+                    modifier = Modifier
+                        .size(4.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.secondary)
+                )
+            }
+
+            // Review dot
+            if (item.hasReview) {
+                Box(
+                    modifier = Modifier
+                        .size(3.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.onSurfaceVariant)
+                )
+            }
+
+            if (item.completedHabitsCount == 0 && item.partialHabitsCount == 0 && item.completedGoalsCount == 0 && !item.hasReview) {
+                if (item.hasRecordedActivity) {
+                    Box(
+                        modifier = Modifier
+                            .size(3.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.6f))
+                    )
+                } else {
+                    Spacer(modifier = Modifier.height(4.dp))
+                }
+            }
         }
+    }
+}
+
+@Composable
+private fun CalendarLegend(
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(top = 4.dp, start = 4.dp, end = 4.dp),
+        horizontalArrangement = Arrangement.SpaceAround,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        LegendItem(color = MaterialTheme.colorScheme.primary, label = "Completed")
+        LegendItem(color = MaterialTheme.colorScheme.tertiary, label = "Partial")
+        LegendItem(color = MaterialTheme.colorScheme.secondary, label = "Goal")
+        LegendItem(color = MaterialTheme.colorScheme.onSurfaceVariant, label = "Reflection")
+    }
+}
+
+@Composable
+private fun LegendItem(
+    color: Color,
+    label: String,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(6.dp)
+                .clip(CircleShape)
+                .background(color)
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
@@ -478,13 +713,51 @@ private fun StatusBadge(
     modifier: Modifier = Modifier
 ) {
     val (label, bgColor, textColor) = when (status) {
-        is CalendarDayStatus.Completed -> Triple("Completed", MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.onPrimaryContainer)
-        is CalendarDayStatus.RecordedIncomplete -> Triple("Incomplete", MaterialTheme.colorScheme.errorContainer, MaterialTheme.colorScheme.onErrorContainer)
-        CalendarDayStatus.ProjectedMissed -> Triple("Missed", MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.onSurfaceVariant)
-        CalendarDayStatus.ProjectedRest -> Triple("Rest", MaterialTheme.colorScheme.surface, MaterialTheme.colorScheme.outline)
-        CalendarDayStatus.Paused -> Triple("Paused", MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.outline)
-        CalendarDayStatus.PreCreation -> Triple("Pre-Creation", MaterialTheme.colorScheme.surface, MaterialTheme.colorScheme.outline)
-        CalendarDayStatus.Future -> Triple("Upcoming", MaterialTheme.colorScheme.surface, MaterialTheme.colorScheme.outline)
+        is CalendarDayStatus.Completed -> Triple(
+            "Completed",
+            MaterialTheme.colorScheme.primaryContainer,
+            MaterialTheme.colorScheme.onPrimaryContainer
+        )
+        is CalendarDayStatus.RecordedIncomplete -> {
+            if (status.actualValue > 0.0) {
+                Triple(
+                    "Partial",
+                    MaterialTheme.colorScheme.tertiaryContainer,
+                    MaterialTheme.colorScheme.onTertiaryContainer
+                )
+            } else {
+                Triple(
+                    "Incomplete",
+                    MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.7f),
+                    MaterialTheme.colorScheme.onErrorContainer
+                )
+            }
+        }
+        CalendarDayStatus.ProjectedMissed -> Triple(
+            "Missed",
+            MaterialTheme.colorScheme.surfaceVariant,
+            MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        CalendarDayStatus.ProjectedRest -> Triple(
+            "Rest",
+            MaterialTheme.colorScheme.surface,
+            MaterialTheme.colorScheme.outline
+        )
+        CalendarDayStatus.Paused -> Triple(
+            "Paused",
+            MaterialTheme.colorScheme.surfaceVariant,
+            MaterialTheme.colorScheme.outline
+        )
+        CalendarDayStatus.PreCreation -> Triple(
+            "Pre-Creation",
+            MaterialTheme.colorScheme.surface,
+            MaterialTheme.colorScheme.outline
+        )
+        CalendarDayStatus.Future -> Triple(
+            "Upcoming",
+            MaterialTheme.colorScheme.surface,
+            MaterialTheme.colorScheme.outline
+        )
     }
 
     Surface(

@@ -6,4 +6,5 @@ sealed interface HistoryUiEvent {
     data class SelectDate(val date: LocalDate) : HistoryUiEvent
     data object PreviousMonth : HistoryUiEvent
     data object NextMonth : HistoryUiEvent
+    data object JumpToToday : HistoryUiEvent
 }

@@ -15,6 +15,9 @@ class DailyReviewRepositoryImpl(
     override fun observeReview(date: String): Flow<DailyReviewEntity?> =
         dailyReviewDao.observeReview(date).flowOn(ioDispatcher)
 
+    override fun observeReviewsForDateRange(startDate: String, endDate: String): Flow<List<DailyReviewEntity>> =
+        dailyReviewDao.observeReviewsForDateRange(startDate, endDate).flowOn(ioDispatcher)
+
     override suspend fun getReview(date: String): DailyReviewEntity? =
         withContext(ioDispatcher) {
             dailyReviewDao.getReview(date)

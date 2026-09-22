@@ -12,9 +12,11 @@ data class HistoryCalendarDayItem(
     val isSelected: Boolean,
     val isCurrentMonth: Boolean,
     val completedHabitsCount: Int,
+    val partialHabitsCount: Int = 0,
     val totalScheduledHabitsCount: Int,
     val completedGoalsCount: Int,
     val totalGoalsCount: Int,
+    val hasReview: Boolean = false,
     val hasRecordedActivity: Boolean
 )
 
@@ -22,7 +24,9 @@ data class HabitDayBreakdownItem(
     val habitId: String,
     val habitName: String,
     val status: CalendarDayStatus,
-    val formattedProgress: String
+    val formattedProgress: String,
+    val isPartial: Boolean = false,
+    val isCompleted: Boolean = false
 )
 
 data class SelectedDateBreakdown(

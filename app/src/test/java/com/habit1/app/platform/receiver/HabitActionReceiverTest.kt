@@ -22,7 +22,7 @@ import org.robolectric.annotation.Config
 class HabitActionReceiverTest {
 
     private lateinit var app: HabitApplication
-    private val testDateStr = "2026-09-21"
+    private val testDateStr = com.habit1.app.core.util.DateTimeUtils.formatDate(java.time.LocalDate.now())
 
     @Before
     fun setup() {
