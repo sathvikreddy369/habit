@@ -4,11 +4,13 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -16,6 +18,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledIconButton
@@ -156,7 +160,7 @@ fun HabitCard(
                 is MeasurementType.BooleanChoice -> {
                     FilledIconButton(
                         onClick = onToggle,
-                        modifier = Modifier.size(44.dp),
+                        modifier = Modifier.size(48.dp),
                         shape = CircleShape,
                         colors = IconButtonDefaults.filledIconButtonColors(
                             containerColor = checkColor,
@@ -165,7 +169,7 @@ fun HabitCard(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Check,
-                            contentDescription = if (habitItem.isCompleted) "Completed" else "Mark Done",
+                            contentDescription = if (habitItem.isCompleted) "Mark ${habitItem.name} not completed" else "Mark ${habitItem.name} completed",
                             modifier = Modifier.size(24.dp)
                         )
                     }
@@ -177,7 +181,11 @@ fun HabitCard(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         OutlinedIconButton(
                             onClick = onDecrement,
-                            modifier = Modifier.size(36.dp),
+                            modifier = Modifier
+                                .size(44.dp)
+                                .semantics {
+                                    contentDescription = "Decrease ${habitItem.name}"
+                                },
                             shape = CircleShape
                         ) {
                             Text(
@@ -198,21 +206,34 @@ fun HabitCard(
                             },
                             shape = RoundedCornerShape(8.dp),
                             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                            modifier = Modifier.padding(horizontal = 2.dp)
+                            modifier = Modifier
+                                .padding(horizontal = 2.dp)
+                                .heightIn(min = 44.dp)
+                                .semantics {
+                                    contentDescription = "Set ${habitItem.name} value directly, current value $formattedActualValue"
+                                }
                         ) {
-                            Text(
-                                text = formattedActualValue,
-                                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
-                                color = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
-                            )
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                            ) {
+                                Text(
+                                    text = formattedActualValue,
+                                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
                         }
 
                         Spacer(modifier = Modifier.width(4.dp))
 
                         OutlinedIconButton(
                             onClick = onIncrement,
-                            modifier = Modifier.size(36.dp),
+                            modifier = Modifier
+                                .size(44.dp)
+                                .semantics {
+                                    contentDescription = "Increase ${habitItem.name}"
+                                },
                             shape = CircleShape
                         ) {
                             Text(
@@ -226,7 +247,7 @@ fun HabitCard(
 
                         FilledIconButton(
                             onClick = onToggle,
-                            modifier = Modifier.size(36.dp),
+                            modifier = Modifier.size(44.dp),
                             shape = CircleShape,
                             colors = IconButtonDefaults.filledIconButtonColors(
                                 containerColor = checkColor,
@@ -235,7 +256,7 @@ fun HabitCard(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Check,
-                                contentDescription = "Mark Target Done",
+                                contentDescription = if (habitItem.isCompleted) "Mark ${habitItem.name} incomplete" else "Mark ${habitItem.name} complete",
                                 modifier = Modifier.size(20.dp)
                             )
                         }

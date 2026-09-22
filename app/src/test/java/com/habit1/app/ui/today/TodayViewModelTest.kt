@@ -604,6 +604,129 @@ class TodayViewModelTest {
             assertFalse(stateAfterDelete.isReviewDialogOpen)
         }
     }
+
+    @Test
+    fun habitAndGoalProgress_areStrictlySeparated() = runTest(testDispatcher) {
+        viewModel.uiState.test {
+            awaitItem() // loading
+            awaitItem() // empty
+
+            val now = System.currentTimeMillis()
+            val past = now - 86400000L
+            val todayStr = DateTimeUtils.formatDate(DateTimeUtils.today(zoneId))
+
+            // 1. Add 1 habit
+            habitRepository.createHabit(
+                HabitEntity(
+                    id = "h_sep",
+                    name = "Daily Exercise",
+                    description = null,
+                    measurementType = "BOOLEAN",
+                    targetValue = 1.0,
+                    unit = null,
+                    scheduleType = "DAILY",
+                    scheduleConfig = "{}",
+                    displayOrder = 0,
+                    isArchived = false,
+                    createdAt = past,
+                    updatedAt = past
+                )
+            )
+
+            val stateWithHabit = awaitItem()
+            assertEquals(1, stateWithHabit.habits.size)
+
+            // 2. Add 2 goals
+            dailyGoalRepository.createGoal(
+                DailyGoalEntity(
+                    id = "g_sep1",
+                    title = "Goal 1",
+                    targetDate = todayStr,
+                    isCompleted = false,
+                    displayOrder = 0,
+                    notes = null,
+                    createdAt = now,
+                    updatedAt = now
+                )
+            )
+            val stateWithGoal1 = awaitItem()
+
+            dailyGoalRepository.createGoal(
+                DailyGoalEntity(
+                    id = "g_sep2",
+                    title = "Goal 2",
+                    targetDate = todayStr,
+                    isCompleted = true,
+                    displayOrder = 1,
+                    notes = null,
+                    createdAt = now,
+                    updatedAt = now
+                )
+            )
+            val stateWithGoals = awaitItem()
+
+            // Complete the habit via ViewModel
+            viewModel.onEvent(TodayUiEvent.ToggleHabit("h_sep"))
+            val finalState = awaitItem()
+
+            assertEquals(1, finalState.completedHabitsCount)
+            assertEquals(1, finalState.totalScheduledHabitsCount)
+            assertEquals(1.0f, finalState.habitProgress, 0.001f)
+
+            assertEquals(1, finalState.completedGoalsCount)
+            assertEquals(2, finalState.totalGoalsCount)
+            assertEquals(0.5f, finalState.goalProgress, 0.001f)
+
+            // Confirm habits and goals are strictly not merged
+            assertEquals(1.0f, finalState.habitProgress, 0.001f)
+            assertEquals(0.5f, finalState.goalProgress, 0.001f)
+        }
+    }
+
+    @Test
+    fun quantitativeProgressFormatting_withPercentageAndOverTargetPreservation() = runTest(testDispatcher) {
+        viewModel.uiState.test {
+            awaitItem() // loading
+            awaitItem() // empty
+
+            val now = System.currentTimeMillis()
+            val past = now - 86400000L
+
+            habitRepository.createHabit(
+                HabitEntity(
+                    id = "h_pushups",
+                    name = "Pushups",
+                    description = null,
+                    measurementType = "COUNT",
+                    targetValue = 50.0,
+                    unit = "reps",
+                    scheduleType = "DAILY",
+                    scheduleConfig = "{}",
+                    displayOrder = 0,
+                    isArchived = false,
+                    createdAt = past,
+                    updatedAt = past
+                )
+            )
+
+            val initialLoaded = awaitItem()
+            assertEquals("0 / 50 reps • 0%", initialLoaded.habits[0].formattedProgress)
+            assertFalse(initialLoaded.habits[0].isCompleted)
+
+            // Set actual value to 25 -> 50%
+            viewModel.onEvent(TodayUiEvent.SetHabitValue("h_pushups", 25.0))
+            val halfState = awaitItem()
+            assertEquals("25 / 50 reps • 50%", halfState.habits[0].formattedProgress)
+            assertFalse(halfState.habits[0].isCompleted)
+
+            // Set actual value to 75 -> 150% (over-target preserved!)
+            viewModel.onEvent(TodayUiEvent.SetHabitValue("h_pushups", 75.0))
+            val overTargetState = awaitItem()
+            assertEquals("75 / 50 reps • 150%", overTargetState.habits[0].formattedProgress)
+            assertEquals(75.0, overTargetState.habits[0].actualValue, 0.001)
+            assertTrue(overTargetState.habits[0].isCompleted)
+        }
+    }
 }
 
 

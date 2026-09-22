@@ -18,29 +18,38 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
 /**
- * Calm, focused header for the Today screen displaying date and daily progress.
+ * Calm, focused header for the Today screen displaying civil date and daily progress.
+ *
+ * Strict UX Principle:
+ * Keeps habits and daily goals strictly separate. Never combines them into a single percentage.
  */
 @Composable
 fun TodayHeader(
     formattedDate: String,
-    completedCount: Int,
-    totalCount: Int,
-    progress: Float,
+    completedHabitsCount: Int,
+    totalScheduledHabitsCount: Int,
+    habitProgress: Float,
+    completedGoalsCount: Int = 0,
+    totalGoalsCount: Int = 0,
+    goalProgress: Float = 0.0f,
     modifier: Modifier = Modifier
 ) {
-    val animatedProgress by animateFloatAsState(
-        targetValue = progress,
+    val animatedHabitProgress by animateFloatAsState(
+        targetValue = habitProgress,
         animationSpec = ProgressIndicatorDefaults.ProgressAnimationSpec,
-        label = "daily_progress"
+        label = "daily_habit_progress"
     )
 
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 16.dp)
+            .padding(horizontal = 20.dp, vertical = 12.dp)
     ) {
         Text(
             text = "Today",
@@ -53,46 +62,86 @@ fun TodayHeader(
             color = MaterialTheme.colorScheme.onBackground
         )
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // Habit Progress Section
+        val habitSummaryText = if (totalScheduledHabitsCount == 0) {
+            "No habits scheduled"
+        } else if (completedHabitsCount == totalScheduledHabitsCount) {
+            "All $totalScheduledHabitsCount habits completed"
+        } else {
+            "$completedHabitsCount of $totalScheduledHabitsCount habits completed"
+        }
+
+        val habitPercent = (habitProgress * 100).toInt()
 
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .semantics {
+                    contentDescription = "$habitSummaryText, $habitPercent percent completed"
+                },
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            val progressText = if (totalCount == 0) {
-                "No tasks scheduled"
-            } else if (completedCount == totalCount) {
-                "All $totalCount completed"
-            } else {
-                "$completedCount of $totalCount completed"
-            }
-
             Text(
-                text = progressText,
+                text = habitSummaryText,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurface
             )
 
-            if (totalCount > 0) {
+            if (totalScheduledHabitsCount > 0) {
                 Text(
-                    text = "${(progress * 100).toInt()}%",
-                    style = MaterialTheme.typography.labelLarge,
+                    text = "$habitPercent%",
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
                     color = MaterialTheme.colorScheme.primary
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        if (totalScheduledHabitsCount > 0) {
+            Spacer(modifier = Modifier.height(8.dp))
+            LinearProgressIndicator(
+                progress = { animatedHabitProgress },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(3.dp)),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        }
 
-        LinearProgressIndicator(
-            progress = { animatedProgress },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(6.dp)
-                .clip(RoundedCornerShape(3.dp)),
-            color = MaterialTheme.colorScheme.primary,
-            trackColor = MaterialTheme.colorScheme.surfaceVariant
-        )
+        // Daily Goals Progress (Separate from habits)
+        if (totalGoalsCount > 0) {
+            Spacer(modifier = Modifier.height(10.dp))
+            val goalSummaryText = if (completedGoalsCount == totalGoalsCount) {
+                "All $totalGoalsCount daily goals completed"
+            } else {
+                "$completedGoalsCount of $totalGoalsCount daily goals completed"
+            }
+            val goalPercent = (goalProgress * 100).toInt()
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .semantics {
+                        contentDescription = "$goalSummaryText, $goalPercent percent completed"
+                    },
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = goalSummaryText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = "$goalPercent%",
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium),
+                    color = MaterialTheme.colorScheme.secondary
+                )
+            }
+        }
     }
 }

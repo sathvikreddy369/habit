@@ -61,6 +61,8 @@ data class TodayUiState(
     val totalScheduledHabitsCount: Int = 0,
     val completedGoalsCount: Int = 0,
     val totalGoalsCount: Int = 0,
+    val habitProgress: Float = 0.0f,
+    val goalProgress: Float = 0.0f,
     val overallProgress: Float = 0.0f,
     val dailyReview: DailyReview? = null,
     val isReviewDialogOpen: Boolean = false,

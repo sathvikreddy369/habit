@@ -142,7 +142,13 @@ class TodayViewModel(
                 }
 
                 val progressRatio = evaluateMeasurement.progressRatio(habit.measurement, actualValue)
-                val formattedProgress = evaluateMeasurement.formatProgress(habit.measurement, actualValue)
+                val baseProgress = evaluateMeasurement.formatProgress(habit.measurement, actualValue)
+                val formattedProgress = if (habit.measurement is MeasurementType.BooleanChoice) {
+                    baseProgress
+                } else {
+                    val percent = (progressRatio * 100).toInt()
+                    "$baseProgress • $percent%"
+                }
 
                 val habitHistory = (batchRecordsByHabit[habit.id] ?: emptyList()).map { it.toDomain() }
                 val streak = calculateStreaks.execute(habit, habitHistory, date, zoneId)
@@ -195,6 +201,17 @@ class TodayViewModel(
             val completedGoalsCount = goalUiItems.count { it.isCompleted }
             val totalGoalsCount = goalUiItems.size
 
+            val habitProgress = if (totalHabitsCount > 0) {
+                (completedHabitsCount.toFloat() / totalHabitsCount.toFloat()).coerceIn(0.0f, 1.0f)
+            } else {
+                0.0f
+            }
+            val goalProgress = if (totalGoalsCount > 0) {
+                (completedGoalsCount.toFloat() / totalGoalsCount.toFloat()).coerceIn(0.0f, 1.0f)
+            } else {
+                0.0f
+            }
+
             val totalTasks = totalHabitsCount + totalGoalsCount
             val completedTasks = completedHabitsCount + completedGoalsCount
             val overallProgress = if (totalTasks > 0) {
@@ -212,6 +229,8 @@ class TodayViewModel(
                 totalScheduledHabitsCount = totalHabitsCount,
                 completedGoalsCount = completedGoalsCount,
                 totalGoalsCount = totalGoalsCount,
+                habitProgress = habitProgress,
+                goalProgress = goalProgress,
                 overallProgress = overallProgress,
                 dailyReview = reviewEntity?.toDomain(),
                 isReviewDialogOpen = isReviewDialogOpen,

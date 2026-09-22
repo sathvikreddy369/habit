@@ -1,5 +1,6 @@
 package com.habit1.app.ui.today
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -113,26 +114,29 @@ fun TodayScreen(
                 .padding(innerPadding),
             contentPadding = PaddingValues(bottom = 88.dp)
         ) {
-            // Header: Date & overall progress
+            // Header: Date & separate habit / goal progress
             item(key = "header") {
                 TodayHeader(
                     formattedDate = uiState.formattedDate,
-                    completedCount = uiState.completedHabitsCount + uiState.completedGoalsCount,
-                    totalCount = uiState.totalScheduledHabitsCount + uiState.totalGoalsCount,
-                    progress = uiState.overallProgress,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+                    completedHabitsCount = uiState.completedHabitsCount,
+                    totalScheduledHabitsCount = uiState.totalScheduledHabitsCount,
+                    habitProgress = uiState.habitProgress,
+                    completedGoalsCount = uiState.completedGoalsCount,
+                    totalGoalsCount = uiState.totalGoalsCount,
+                    goalProgress = uiState.goalProgress,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                 )
             }
 
             // Scheduled Habits Section
-            if (uiState.habits.isNotEmpty()) {
-                item(key = "habits_header") {
-                    SectionHeader(
-                        title = "Habits",
-                        countText = "${uiState.completedHabitsCount}/${uiState.totalScheduledHabitsCount}"
-                    )
-                }
+            item(key = "habits_header") {
+                SectionHeader(
+                    title = "Habits",
+                    countText = "${uiState.completedHabitsCount}/${uiState.totalScheduledHabitsCount}"
+                )
+            }
 
+            if (uiState.habits.isNotEmpty()) {
                 items(
                     items = uiState.habits,
                     key = { "habit_${it.id}" }
@@ -145,6 +149,44 @@ fun TodayScreen(
                         onSetValue = { value -> viewModel.onEvent(TodayUiEvent.SetHabitValue(habitItem.id, value)) },
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
                     )
+                }
+            } else if (!uiState.isLoading) {
+                item(key = "habits_empty_state") {
+                    androidx.compose.material3.Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 6.dp),
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
+                        colors = androidx.compose.material3.CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface
+                        ),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(20.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = "No habits scheduled for today",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Create your first habit or adjust schedules to start tracking today.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            androidx.compose.material3.OutlinedButton(
+                                onClick = onNavigateToHabits
+                            ) {
+                                Text("Manage Habits")
+                            }
+                        }
+                    }
                 }
             }
 
@@ -187,51 +229,35 @@ fun TodayScreen(
                 }
             } else if (!uiState.isLoading) {
                 item(key = "goals_empty_state") {
-                    Box(
+                    androidx.compose.material3.Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 24.dp, vertical = 16.dp),
-                        contentAlignment = Alignment.Center
+                            .padding(horizontal = 16.dp, vertical = 4.dp)
+                            .clickable { viewModel.onEvent(TodayUiEvent.OpenAddGoalDialog) },
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+                        colors = androidx.compose.material3.CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface
+                        ),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
                     ) {
-                        Text(
-                            text = "No goals planned for today. Tap '+' to set an intentional outcome.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-
-            // Full Screen Empty State (both habits and goals empty)
-            if (uiState.habits.isEmpty() && uiState.goals.isEmpty() && !uiState.isLoading) {
-                item(key = "empty_state") {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 32.dp, vertical = 48.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 14.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "Clear Horizon",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "No habits or goals scheduled for today.",
+                                text = "No goals planned for today",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                            Spacer(modifier = Modifier.height(16.dp))
-                            androidx.compose.material3.OutlinedButton(
-                                onClick = onNavigateToHabits
-                            ) {
-                                Text("Manage Habits")
-                            }
+                            Text(
+                                text = "Add Goal",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold
+                            )
                         }
                     }
                 }
