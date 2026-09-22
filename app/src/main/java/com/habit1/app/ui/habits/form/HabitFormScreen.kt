@@ -449,7 +449,7 @@ fun HabitFormScreen(
                             Spacer(modifier = Modifier.width(12.dp))
                             Column {
                                 Text(
-                                    text = DateTimeUtils.formatLocalizedTime(currentLocalTime, is24Hour),
+                                    text = DateTimeUtils.format12HourTime(currentLocalTime),
                                     style = MaterialTheme.typography.titleMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )

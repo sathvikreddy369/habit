@@ -107,6 +107,22 @@ class MainActivity : ComponentActivity() {
                                 onInspectHabit = { habitId ->
                                     backstack.add(Screen.HabitHistory(habitId))
                                 },
+                                onNavigateToTemplates = {
+                                    backstack.add(Screen.HabitTemplates)
+                                },
+                                onNavigateBack = {
+                                    if (backstack.size > 1) {
+                                        backstack.removeAt(backstack.size - 1)
+                                    }
+                                }
+                            )
+                        }
+
+                        is Screen.HabitTemplates -> {
+                            com.habit1.app.ui.habits.templates.HabitTemplatesScreen(
+                                onSelectTemplate = { templateId ->
+                                    backstack.add(Screen.HabitForm(habitId = null, templateId = templateId))
+                                },
                                 onNavigateBack = {
                                     if (backstack.size > 1) {
                                         backstack.removeAt(backstack.size - 1)
@@ -116,12 +132,14 @@ class MainActivity : ComponentActivity() {
                         }
 
                         is Screen.HabitForm -> {
+                            val formKey = currentScreen.habitId ?: ("new_habit_" + (currentScreen.templateId ?: "empty"))
                             val habitFormViewModel: HabitFormViewModel = viewModel(
-                                key = currentScreen.habitId ?: "new_habit",
+                                key = formKey,
                                 factory = HabitFormViewModel.Factory(
                                     habitRepository = app.container.habitRepository,
                                     reminderCoordinator = app.container.reminderCoordinator,
-                                    habitId = currentScreen.habitId
+                                    habitId = currentScreen.habitId,
+                                    templateId = currentScreen.templateId
                                 )
                             )
                             HabitFormScreen(

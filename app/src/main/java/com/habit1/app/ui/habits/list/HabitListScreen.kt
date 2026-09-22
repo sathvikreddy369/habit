@@ -45,6 +45,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -57,6 +58,7 @@ fun HabitListScreen(
     onEditHabit: (habitId: String) -> Unit,
     onNavigateBack: () -> Unit,
     onInspectHabit: (habitId: String) -> Unit = {},
+    onNavigateToTemplates: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -65,13 +67,18 @@ fun HabitListScreen(
         modifier = modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
-                title = { Text("Habits", style = MaterialTheme.typography.titleLarge) },
+                title = { Text("Habits & Reminders", style = MaterialTheme.typography.titleLarge) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back"
                         )
+                    }
+                },
+                actions = {
+                    TextButton(onClick = onNavigateToTemplates) {
+                        Text("Templates", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
                     }
                 }
             )
@@ -289,11 +296,23 @@ private fun HabitManagementCard(
 
             Spacer(modifier = Modifier.height(6.dp))
 
-            Text(
-                text = "${habit.measurementSummary} • ${habit.scheduleSummary}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.primary
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "${habit.measurementSummary} • ${habit.scheduleSummary}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+
+                Text(
+                    text = habit.reminderSummary ?: "🔔 Off",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (habit.reminderSummary != null) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outline
+                )
+            }
 
             Spacer(modifier = Modifier.height(12.dp))
 

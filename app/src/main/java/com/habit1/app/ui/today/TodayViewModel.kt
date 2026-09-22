@@ -70,6 +70,13 @@ class TodayViewModel(
     private val subtaskPendingEditFlow = MutableStateFlow<Pair<String, TodaySubtaskItem>?>(null)
     private val collapsedGoalIdsFlow = MutableStateFlow<Set<String>>(emptySet())
 
+    init {
+        scope.launch {
+            val todayStr = DateTimeUtils.formatDate(DateTimeUtils.today(zoneId))
+            dailyGoalRepository.cleanupCompletedGoalsBeforeDate(todayStr)
+        }
+    }
+
     @OptIn(ExperimentalCoroutinesApi::class)
     val uiState: StateFlow<TodayUiState> = currentDateFlow.flatMapLatest { date ->
         val dateString = DateTimeUtils.formatDate(date)

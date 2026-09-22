@@ -13,7 +13,8 @@ data class HabitListItem(
     val isArchived: Boolean,
     val displayOrder: Int,
     val canMoveUp: Boolean = false,
-    val canMoveDown: Boolean = false
+    val canMoveDown: Boolean = false,
+    val reminderSummary: String? = null
 )
 
 /**

@@ -6,7 +6,8 @@ package com.habit1.app.ui.navigation
 sealed interface Screen {
     data object Today : Screen
     data object HabitList : Screen
-    data class HabitForm(val habitId: String? = null) : Screen
+    data class HabitForm(val habitId: String? = null, val templateId: String? = null) : Screen
+    data object HabitTemplates : Screen
     data object History : Screen
     data class HabitHistory(val habitId: String) : Screen
     data object Settings : Screen

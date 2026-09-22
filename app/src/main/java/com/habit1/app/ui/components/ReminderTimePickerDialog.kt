@@ -44,15 +44,13 @@ fun ReminderTimePickerDialog(
     onClear: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    val context = LocalContext.current
-    val is24Hour = DateFormat.is24HourFormat(context)
     val initialHour = initialTime?.hour ?: 8
     val initialMinute = initialTime?.minute ?: 30
 
     val timePickerState = rememberTimePickerState(
         initialHour = initialHour,
         initialMinute = initialMinute,
-        is24Hour = is24Hour
+        is24Hour = false
     )
     var isKeyboardInputMode by remember { mutableStateOf(false) }
 

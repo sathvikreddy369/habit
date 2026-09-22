@@ -115,6 +115,18 @@ interface DailyGoalDao {
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertAllSubtasks(subtasks: List<GoalSubtaskEntity>)
 
+    @Query("DELETE FROM goal_subtasks WHERE goal_id IN (SELECT id FROM daily_goals WHERE target_date < :beforeDate AND is_completed = 1)")
+    suspend fun deleteSubtasksForCompletedGoalsBeforeDate(beforeDate: String): Int
+
+    @Query("DELETE FROM daily_goals WHERE target_date < :beforeDate AND is_completed = 1")
+    suspend fun deleteCompletedGoalsBeforeDate(beforeDate: String): Int
+
+    @Transaction
+    suspend fun cleanupCompletedGoalsBeforeDate(beforeDate: String): Int {
+        deleteSubtasksForCompletedGoalsBeforeDate(beforeDate)
+        return deleteCompletedGoalsBeforeDate(beforeDate)
+    }
+
     @Query("DELETE FROM goal_subtasks")
     suspend fun deleteAllSubtasks()
 

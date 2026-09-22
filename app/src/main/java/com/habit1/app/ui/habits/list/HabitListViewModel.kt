@@ -130,6 +130,10 @@ class HabitListViewModel(
                 is HabitSchedule.Interval -> "Every ${s.everyNDays} days"
             }
 
+            val reminderSummary = domain.reminderTime?.let {
+                "🔔 " + com.habit1.app.core.util.DateTimeUtils.format12HourTime(it)
+            }
+
             HabitListItem(
                 id = domain.id,
                 name = domain.name,
@@ -140,7 +144,8 @@ class HabitListViewModel(
                 isArchived = domain.isArchived,
                 displayOrder = domain.displayOrder,
                 canMoveUp = index > 0,
-                canMoveDown = index < size - 1
+                canMoveDown = index < size - 1,
+                reminderSummary = reminderSummary
             )
         }
     }

@@ -26,4 +26,11 @@ interface DailyGoalRepository {
     suspend fun deleteSubtask(id: String)
     suspend fun setSubtaskCompleted(id: String, isCompleted: Boolean)
     suspend fun reorderSubtasks(goalId: String, orderedIds: List<String>)
+
+    /**
+     * Cleans up ephemeral past completed goals whose target date is before [beforeDate].
+     * Associated subtasks are cleanly removed.
+     * Past incomplete goals, current goals, and future goals are preserved.
+     */
+    suspend fun cleanupCompletedGoalsBeforeDate(beforeDate: String): Int
 }

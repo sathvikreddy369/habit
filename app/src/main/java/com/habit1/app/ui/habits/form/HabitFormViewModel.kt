@@ -31,6 +31,7 @@ class HabitFormViewModel(
     private val habitRepository: HabitRepository,
     private val reminderCoordinator: com.habit1.app.domain.reminder.HabitReminderCoordinator? = null,
     private val initialHabitId: String? = null,
+    private val initialTemplateId: String? = null,
     coroutineScope: CoroutineScope? = null
 ) : ViewModel() {
 
@@ -47,6 +48,35 @@ class HabitFormViewModel(
     init {
         if (initialHabitId != null) {
             loadHabit(initialHabitId)
+        } else if (initialTemplateId != null) {
+            loadTemplate(initialTemplateId)
+        }
+    }
+
+    private fun loadTemplate(templateId: String) {
+        val template = com.habit1.app.domain.template.HabitTemplatesProvider.getTemplateById(templateId) ?: return
+        val measurementKind = when (template.measurementType) {
+            "COUNT" -> MeasurementKind.COUNT
+            "DURATION" -> MeasurementKind.DURATION
+            "QUANTITY" -> MeasurementKind.QUANTITY
+            else -> MeasurementKind.BOOLEAN
+        }
+        val targetInput = if (measurementKind == MeasurementKind.DURATION || measurementKind == MeasurementKind.COUNT) {
+            template.targetValue.toInt().toString()
+        } else {
+            template.targetValue.toString()
+        }
+        val reminderStr = template.suggestedReminderTime?.let { com.habit1.app.core.util.DateTimeUtils.formatTime(it) } ?: ""
+
+        _uiState.update {
+            it.copy(
+                name = template.title,
+                description = template.description ?: "",
+                measurementKind = measurementKind,
+                targetInput = targetInput,
+                unitInput = template.unit ?: "",
+                reminderTimeInput = reminderStr
+            )
         }
     }
 
@@ -330,12 +360,13 @@ class HabitFormViewModel(
     class Factory(
         private val habitRepository: HabitRepository,
         private val reminderCoordinator: com.habit1.app.domain.reminder.HabitReminderCoordinator? = null,
-        private val habitId: String? = null
+        private val habitId: String? = null,
+        private val templateId: String? = null
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(HabitFormViewModel::class.java)) {
-                return HabitFormViewModel(habitRepository, reminderCoordinator, habitId) as T
+                return HabitFormViewModel(habitRepository, reminderCoordinator, habitId, templateId) as T
             }
             throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
         }

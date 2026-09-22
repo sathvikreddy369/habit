@@ -418,5 +418,68 @@ class HistoryViewModelTest {
             cancelAndIgnoreRemainingEvents()
         }
     }
+
+    @Test
+    fun testYearNavigation_previousAndNextYear() = runTest(testDispatcher) {
+        viewModel.uiState.test {
+            awaitItem() // loading
+            val initial = awaitItem()
+            val initialYear = initial.selectedYear
+
+            viewModel.onEvent(HistoryUiEvent.NextYear)
+            val nextYearState = awaitItem()
+            assertEquals(initialYear + 1, nextYearState.selectedYear)
+
+            viewModel.onEvent(HistoryUiEvent.PreviousYear)
+            val restoredYearState = awaitItem()
+            assertEquals(initialYear, restoredYearState.selectedYear)
+
+            viewModel.onEvent(HistoryUiEvent.SelectYear(2024)) // Leap year
+            val leapYearState = awaitItem()
+            assertEquals(2024, leapYearState.selectedYear)
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun testYearlyOverview_aggregates12MonthsCorrectly() = runTest(testDispatcher) {
+        viewModel.uiState.test {
+            awaitItem() // loading
+            val state = awaitItem()
+
+            assertEquals(12, state.yearlyOverview.size)
+            assertEquals("January", state.yearlyOverview[0].monthName)
+            assertEquals("December", state.yearlyOverview[11].monthName)
+
+            // Select month from yearly overview
+            val targetYm = YearMonth.of(state.selectedYear, 6)
+            viewModel.onEvent(HistoryUiEvent.SelectMonthFromYear(targetYm))
+            val updatedState = awaitItem()
+            assertEquals(targetYm, updatedState.selectedMonth)
+            assertEquals(HistoryViewMode.MONTH, updatedState.viewMode)
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun testViewModeToggle_monthAndYear() = runTest(testDispatcher) {
+        viewModel.uiState.test {
+            awaitItem() // loading
+            val initial = awaitItem()
+            assertEquals(HistoryViewMode.MONTH, initial.viewMode)
+
+            viewModel.onEvent(HistoryUiEvent.ToggleViewMode(HistoryViewMode.YEAR))
+            val yearModeState = awaitItem()
+            assertEquals(HistoryViewMode.YEAR, yearModeState.viewMode)
+
+            viewModel.onEvent(HistoryUiEvent.ToggleViewMode(HistoryViewMode.MONTH))
+            val monthModeState = awaitItem()
+            assertEquals(HistoryViewMode.MONTH, monthModeState.viewMode)
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
 }
 

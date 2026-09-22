@@ -38,6 +38,24 @@ data class SelectedDateBreakdown(
 )
 
 
+enum class HistoryViewMode {
+    MONTH,
+    YEAR
+}
+
+data class YearMonthSummaryItem(
+    val yearMonth: YearMonth,
+    val monthName: String,
+    val totalHabitCompletions: Int,
+    val totalHabitScheduledDays: Int,
+    val habitCompletionRate: Float,
+    val totalGoals: Int,
+    val completedGoals: Int,
+    val goalCompletionRate: Float,
+    val isCurrentMonth: Boolean,
+    val isFuture: Boolean
+)
+
 data class MonthSummary(
     val totalHabitCompletions: Int,
     val totalHabitScheduledDays: Int,
@@ -48,11 +66,14 @@ data class MonthSummary(
 )
 
 data class HistoryUiState(
+    val viewMode: HistoryViewMode = HistoryViewMode.MONTH,
+    val selectedYear: Int,
     val selectedMonth: YearMonth,
     val formattedMonth: String,
     val selectedDate: LocalDate,
     val calendarDays: List<HistoryCalendarDayItem> = emptyList(),
     val selectedDateBreakdown: SelectedDateBreakdown? = null,
     val monthSummary: MonthSummary? = null,
+    val yearlyOverview: List<YearMonthSummaryItem> = emptyList(),
     val isLoading: Boolean = false
 )

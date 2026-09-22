@@ -112,4 +112,9 @@ class DailyGoalRepositoryImpl(
                 dailyGoalDao.updateAllSubtasks(updated)
             }
         }
+
+    override suspend fun cleanupCompletedGoalsBeforeDate(beforeDate: String): Int =
+        withContext(ioDispatcher) {
+            dailyGoalDao.cleanupCompletedGoalsBeforeDate(beforeDate)
+        }
 }

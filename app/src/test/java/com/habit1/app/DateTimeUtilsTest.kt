@@ -102,4 +102,26 @@ class DateTimeUtilsTest {
         assertFalse(DateTimeUtils.isPast(tomorrow, testZone))
         assertFalse(DateTimeUtils.isFuture(yesterday, testZone))
     }
+
+    @Test
+    fun test12HourTimeFormattingAndParsing_allBoundaryCases() {
+        val testCases = listOf(
+            LocalTime.of(0, 0) to "12:00 AM",
+            LocalTime.of(0, 1) to "12:01 AM",
+            LocalTime.of(6, 30) to "6:30 AM",
+            LocalTime.of(11, 59) to "11:59 AM",
+            LocalTime.of(12, 0) to "12:00 PM",
+            LocalTime.of(12, 1) to "12:01 PM",
+            LocalTime.of(18, 30) to "6:30 PM",
+            LocalTime.of(23, 59) to "11:59 PM"
+        )
+
+        for ((time, stringRep) in testCases) {
+            val formatted = DateTimeUtils.format12HourTime(time)
+            assertEquals("Format failed for $time", stringRep, formatted)
+
+            val parsed = DateTimeUtils.parse12HourTime(stringRep)
+            assertEquals("Parse failed for $stringRep", time, parsed)
+        }
+    }
 }

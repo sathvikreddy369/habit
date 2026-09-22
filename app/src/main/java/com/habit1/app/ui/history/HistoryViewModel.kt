@@ -48,34 +48,113 @@ class HistoryViewModel(
     private val scope: CoroutineScope = coroutineScope ?: viewModelScope
 
     private val today = DateTimeUtils.today(zoneId)
+    private val selectedYearFlow = MutableStateFlow(today.year)
     private val selectedMonthFlow = MutableStateFlow(YearMonth.from(today))
     private val selectedDateFlow = MutableStateFlow(today)
+    private val viewModeFlow = MutableStateFlow(HistoryViewMode.MONTH)
 
     private val monthFormatter = DateTimeFormatter.ofPattern("MMMM yyyy", Locale.getDefault())
     private val dateFormatter = DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy", Locale.getDefault())
 
-    val uiState: StateFlow<HistoryUiState> = selectedMonthFlow.flatMapLatest { month ->
-        val firstDay = month.atDay(1)
-        val lastDay = month.atEndOfMonth()
-        val startDateStr = DateTimeUtils.formatDate(firstDay)
-        val endDateStr = DateTimeUtils.formatDate(lastDay)
+    private data class HistoryYearData(
+        val allHabitEntities: List<com.habit1.app.data.local.db.entity.HabitEntity>,
+        val recordEntities: List<com.habit1.app.data.local.db.entity.HabitRecordEntity>,
+        val goalEntities: List<com.habit1.app.data.local.db.entity.DailyGoalWithSubtasks>,
+        val reviewEntities: List<com.habit1.app.data.local.db.entity.DailyReviewEntity>
+    )
 
-        val reviewsFlow = dailyReviewRepository?.observeReviewsForDateRange(startDateStr, endDateStr) ?: flowOf(emptyList())
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val uiState: StateFlow<HistoryUiState> = selectedYearFlow.flatMapLatest { year ->
+        val yearStartDate = "$year-01-01"
+        val yearEndDate = "$year-12-31"
+
+        val reviewsFlow = dailyReviewRepository?.observeReviewsForDateRange(yearStartDate, yearEndDate) ?: flowOf(emptyList())
+
+        val yearDataFlow = combine(
+            habitRepository.observeAllHabits(),
+            habitRecordRepository.observeRecordsForDateRange(yearStartDate, yearEndDate),
+            dailyGoalRepository.observeGoalsForDateRange(yearStartDate, yearEndDate),
+            reviewsFlow
+        ) { habits, records, goals, reviews ->
+            HistoryYearData(habits, records, goals, reviews)
+        }
 
         combine(
-            habitRepository.observeAllHabits(), // Includes archived habits
-            habitRecordRepository.observeRecordsForDateRange(startDateStr, endDateStr),
-            dailyGoalRepository.observeGoalsForDateRange(startDateStr, endDateStr),
-            reviewsFlow,
-            selectedDateFlow
-        ) { allHabitEntities, recordEntities, goalEntities, reviewEntities, selectedDate ->
+            yearDataFlow,
+            selectedMonthFlow,
+            selectedDateFlow,
+            viewModeFlow
+        ) { yearData, selectedMonth, selectedDate, viewMode ->
+
+            val allHabitEntities = yearData.allHabitEntities
+            val recordEntities = yearData.recordEntities
+            val goalEntities = yearData.goalEntities
+            val reviewEntities = yearData.reviewEntities
 
             val allHabits = allHabitEntities.map { it.toDomain() }
             val recordsByDate = recordEntities.groupBy { it.date }
             val goalsByDate = goalEntities.groupBy { it.goal.targetDate }
             val reviewsByDate = reviewEntities.associateBy { it.date }
 
-            // 1. Build calendar day items
+            // 1. Build 12-month Yearly Overview in-memory
+            val yearlyOverview = (1..12).map { monthNum ->
+                val ym = YearMonth.of(year, monthNum)
+                val ymStart = ym.atDay(1)
+                val ymEnd = ym.atEndOfMonth()
+                var yCompletions = 0
+                var yScheduledDays = 0
+                var yTotalGoals = 0
+                var yCompletedGoals = 0
+                var cursor = ymStart
+
+                while (!cursor.isAfter(ymEnd)) {
+                    val dStr = DateTimeUtils.formatDate(cursor)
+                    val dRecords = recordsByDate[dStr] ?: emptyList()
+                    val dGoals = goalsByDate[dStr] ?: emptyList()
+
+                    val scheduled = allHabits.filter { habit ->
+                        val creationDate = DateTimeUtils.toLocalDate(habit.createdAt, zoneId)
+                        !cursor.isBefore(creationDate) && !habit.isPaused && evaluateSchedule.isScheduledOn(habit, cursor, zoneId)
+                    }
+
+                    val compHabits = dRecords.count { it.isCompleted }
+                    val compGoals = dGoals.count { it.goal.isCompleted }
+
+                    if (!cursor.isAfter(today)) {
+                        yCompletions += compHabits
+                        yScheduledDays += scheduled.size
+                    }
+                    yTotalGoals += dGoals.size
+                    yCompletedGoals += compGoals
+
+                    cursor = cursor.plusDays(1)
+                }
+
+                val yHabitRate = if (yScheduledDays > 0) {
+                    ((yCompletions.toDouble() / yScheduledDays.toDouble()) * 100.0).toFloat().coerceIn(0.0f, 100.0f)
+                } else 0.0f
+
+                val yGoalRate = if (yTotalGoals > 0) {
+                    ((yCompletedGoals.toDouble() / yTotalGoals.toDouble()) * 100.0).toFloat().coerceIn(0.0f, 100.0f)
+                } else 0.0f
+
+                YearMonthSummaryItem(
+                    yearMonth = ym,
+                    monthName = ym.month.getDisplayName(java.time.format.TextStyle.FULL, Locale.getDefault()),
+                    totalHabitCompletions = yCompletions,
+                    totalHabitScheduledDays = yScheduledDays,
+                    habitCompletionRate = yHabitRate,
+                    totalGoals = yTotalGoals,
+                    completedGoals = yCompletedGoals,
+                    goalCompletionRate = yGoalRate,
+                    isCurrentMonth = ym == YearMonth.from(today),
+                    isFuture = ym.isAfter(YearMonth.from(today))
+                )
+            }
+
+            // 2. Build detailed month calendar days
+            val firstDay = selectedMonth.atDay(1)
+            val lastDay = selectedMonth.atEndOfMonth()
             val calendarDays = mutableListOf<HistoryCalendarDayItem>()
             var dayCursor = firstDay
             var monthHabitCompletions = 0
@@ -126,7 +205,7 @@ class HistoryViewModel(
                 dayCursor = dayCursor.plusDays(1)
             }
 
-            // 2. Build selected date breakdown
+            // 3. Build selected date breakdown
             val selectedDateStr = DateTimeUtils.formatDate(selectedDate)
             val selectedDayRecords = recordsByDate[selectedDateStr]?.associateBy { it.habitId } ?: emptyMap()
             val selectedDayGoals = goalsByDate[selectedDateStr] ?: emptyList()
@@ -158,8 +237,8 @@ class HistoryViewModel(
                             unit = record.unit,
                             measurementType = record.measurementType
                         )
-                        isScheduled -> CalendarDayStatus.ProjectedMissed
-                        else -> CalendarDayStatus.ProjectedRest
+                        !isScheduled -> CalendarDayStatus.ProjectedRest
+                        else -> CalendarDayStatus.ProjectedMissed
                     }
 
                     val formattedProgress = if (record != null) {
@@ -224,8 +303,10 @@ class HistoryViewModel(
             } else 0.0f
 
             HistoryUiState(
-                selectedMonth = month,
-                formattedMonth = month.format(monthFormatter),
+                viewMode = viewMode,
+                selectedYear = year,
+                selectedMonth = selectedMonth,
+                formattedMonth = selectedMonth.format(monthFormatter),
                 selectedDate = selectedDate,
                 calendarDays = calendarDays,
                 selectedDateBreakdown = SelectedDateBreakdown(
@@ -243,6 +324,7 @@ class HistoryViewModel(
                     completedGoals = monthCompletedGoals,
                     goalCompletionRate = goalRate
                 ),
+                yearlyOverview = yearlyOverview,
                 isLoading = false
             )
         }
@@ -250,6 +332,8 @@ class HistoryViewModel(
         scope = scope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = HistoryUiState(
+            viewMode = HistoryViewMode.MONTH,
+            selectedYear = today.year,
             selectedMonth = YearMonth.from(today),
             formattedMonth = YearMonth.from(today).format(monthFormatter),
             selectedDate = today,
@@ -266,16 +350,51 @@ class HistoryViewModel(
                 is HistoryUiEvent.PreviousMonth -> {
                     val prev = selectedMonthFlow.value.minusMonths(1)
                     selectedMonthFlow.value = prev
+                    selectedYearFlow.value = prev.year
                     selectedDateFlow.value = prev.atDay(1)
                 }
                 is HistoryUiEvent.NextMonth -> {
                     val next = selectedMonthFlow.value.plusMonths(1)
                     selectedMonthFlow.value = next
+                    selectedYearFlow.value = next.year
                     selectedDateFlow.value = next.atDay(1)
                 }
                 is HistoryUiEvent.JumpToToday -> {
+                    selectedYearFlow.value = today.year
                     selectedMonthFlow.value = YearMonth.from(today)
                     selectedDateFlow.value = today
+                    viewModeFlow.value = HistoryViewMode.MONTH
+                }
+                is HistoryUiEvent.PreviousYear -> {
+                    val newYear = selectedYearFlow.value - 1
+                    selectedYearFlow.value = newYear
+                    selectedMonthFlow.value = YearMonth.of(newYear, selectedMonthFlow.value.month)
+                    selectedDateFlow.value = selectedMonthFlow.value.atDay(1)
+                }
+                is HistoryUiEvent.NextYear -> {
+                    val newYear = selectedYearFlow.value + 1
+                    selectedYearFlow.value = newYear
+                    selectedMonthFlow.value = YearMonth.of(newYear, selectedMonthFlow.value.month)
+                    selectedDateFlow.value = selectedMonthFlow.value.atDay(1)
+                }
+                is HistoryUiEvent.SelectYear -> {
+                    selectedYearFlow.value = event.year
+                    selectedMonthFlow.value = YearMonth.of(event.year, selectedMonthFlow.value.month)
+                    selectedDateFlow.value = selectedMonthFlow.value.atDay(1)
+                }
+                is HistoryUiEvent.JumpToCurrentYear -> {
+                    selectedYearFlow.value = today.year
+                    selectedMonthFlow.value = YearMonth.of(today.year, selectedMonthFlow.value.month)
+                    selectedDateFlow.value = selectedMonthFlow.value.atDay(1)
+                }
+                is HistoryUiEvent.ToggleViewMode -> {
+                    viewModeFlow.value = event.mode
+                }
+                is HistoryUiEvent.SelectMonthFromYear -> {
+                    selectedYearFlow.value = event.yearMonth.year
+                    selectedMonthFlow.value = event.yearMonth
+                    selectedDateFlow.value = event.yearMonth.atDay(1)
+                    viewModeFlow.value = HistoryViewMode.MONTH
                 }
             }
         }

@@ -420,6 +420,137 @@ class RoomDatabaseTest {
         assertEquals(0, remainingGoals.size)
     }
 
+    @Test
+    fun testDailyGoalStorageLifecycleCleanup() = runBlocking {
+        val now = System.currentTimeMillis()
+
+        // Insert a regular habit and record to verify they remain untouched
+        val habit = HabitEntity(
+            id = "habit_perm",
+            name = "Permanent Habit",
+            description = null,
+            measurementType = "BOOLEAN",
+            targetValue = 1.0,
+            unit = null,
+            scheduleType = "DAILY",
+            scheduleConfig = "{}",
+            displayOrder = 0,
+            isArchived = false,
+            createdAt = now,
+            updatedAt = now
+        )
+        habitDao.insert(habit)
+        val record = HabitRecordEntity(
+            id = "rec_perm",
+            habitId = "habit_perm",
+            date = "2026-09-10",
+            isCompleted = true,
+            actualValue = 1.0,
+            targetValue = 1.0,
+            unit = null,
+            measurementType = "BOOLEAN",
+            recordedAt = now
+        )
+        recordDao.upsert(record)
+
+        // 1. Past Completed Goal (targetDate = 2026-09-10, isCompleted = true) -> ELIGIBLE for cleanup
+        val pastCompletedGoal = DailyGoalEntity(
+            id = "goal_past_comp",
+            title = "Past Completed Goal",
+            targetDate = "2026-09-10",
+            isCompleted = true,
+            displayOrder = 0,
+            createdAt = now,
+            updatedAt = now
+        )
+        goalDao.insertGoal(pastCompletedGoal)
+        val subtaskPastComp = GoalSubtaskEntity(
+            id = "sub_past_comp",
+            goalId = "goal_past_comp",
+            title = "Subtask of past completed goal",
+            isCompleted = true,
+            displayOrder = 0,
+            createdAt = now
+        )
+        goalDao.insertSubtask(subtaskPastComp)
+
+        // 2. Past Incomplete Goal (targetDate = 2026-09-10, isCompleted = false) -> PRESERVED per PRD Section 7
+        val pastIncompleteGoal = DailyGoalEntity(
+            id = "goal_past_incomp",
+            title = "Past Incomplete Goal",
+            targetDate = "2026-09-10",
+            isCompleted = false,
+            displayOrder = 1,
+            createdAt = now,
+            updatedAt = now
+        )
+        goalDao.insertGoal(pastIncompleteGoal)
+        val subtaskPastIncomp = GoalSubtaskEntity(
+            id = "sub_past_incomp",
+            goalId = "goal_past_incomp",
+            title = "Subtask of past incomplete goal",
+            isCompleted = false,
+            displayOrder = 0,
+            createdAt = now
+        )
+        goalDao.insertSubtask(subtaskPastIncomp)
+
+        // 3. Today Completed Goal (targetDate = 2026-09-22, isCompleted = true) -> PRESERVED
+        val todayCompletedGoal = DailyGoalEntity(
+            id = "goal_today_comp",
+            title = "Today Completed Goal",
+            targetDate = "2026-09-22",
+            isCompleted = true,
+            displayOrder = 0,
+            createdAt = now,
+            updatedAt = now
+        )
+        goalDao.insertGoal(todayCompletedGoal)
+
+        // 4. Future Goal (targetDate = 2026-09-25, isCompleted = false) -> PRESERVED
+        val futureGoal = DailyGoalEntity(
+            id = "goal_future",
+            title = "Future Goal",
+            targetDate = "2026-09-25",
+            isCompleted = false,
+            displayOrder = 0,
+            createdAt = now,
+            updatedAt = now
+        )
+        goalDao.insertGoal(futureGoal)
+
+        // Run cleanup with beforeDate = "2026-09-22" (today)
+        val deletedCount = goalDao.cleanupCompletedGoalsBeforeDate("2026-09-22")
+        assertEquals(1, deletedCount)
+
+        // Verify:
+        // 1. Past completed goal was removed
+        assertNull("Past completed goal must be deleted", goalDao.getGoalById("goal_past_comp"))
+        // 2. Its subtask was removed
+        val subtasksPastComp = goalDao.getSubtasksForGoal("goal_past_comp")
+        assertTrue("Subtasks of deleted goal must be removed", subtasksPastComp.isEmpty())
+
+        // 3. Past incomplete goal remains intact
+        assertNotNull("Past incomplete goal must be preserved", goalDao.getGoalById("goal_past_incomp"))
+        val subtasksPastIncomp = goalDao.getSubtasksForGoal("goal_past_incomp")
+        assertEquals("Subtask of preserved goal must remain", 1, subtasksPastIncomp.size)
+
+        // 4. Today completed goal remains intact
+        assertNotNull("Today's completed goal must be preserved", goalDao.getGoalById("goal_today_comp"))
+
+        // 5. Future goal remains intact
+        assertNotNull("Future goal must be preserved", goalDao.getGoalById("goal_future"))
+
+        // 6. Regular habit and historical habit records are completely untouched
+        assertNotNull("Regular habit must be untouched", habitDao.getById("habit_perm"))
+        val fetchedRecord = recordDao.getRecord("habit_perm", "2026-09-10")
+        assertNotNull("Habit history record must be untouched", fetchedRecord)
+
+        // 7. Repeated cleanup is idempotent and safe
+        val secondRunDeletedCount = goalDao.cleanupCompletedGoalsBeforeDate("2026-09-22")
+        assertEquals(0, secondRunDeletedCount)
+    }
+
     // --- 8. Daily Reviews ---
     @Test
     fun testDailyReviewOperations() = runBlocking {

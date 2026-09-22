@@ -81,7 +81,7 @@ fun TodayScreen(
                     }
                     TextButton(onClick = onNavigateToHabits) {
                         Text(
-                            text = "Habits",
+                            text = "Habits & Reminders",
                             style = MaterialTheme.typography.labelLarge
                         )
                     }
@@ -183,7 +183,7 @@ fun TodayScreen(
                             androidx.compose.material3.OutlinedButton(
                                 onClick = onNavigateToHabits
                             ) {
-                                Text("Manage Habits")
+                                Text("Manage Habits & Reminders")
                             }
                         }
                     }

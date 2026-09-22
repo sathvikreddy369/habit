@@ -32,19 +32,50 @@ object DateTimeUtils {
     /**
      * Formats [time] for user presentation respecting 12-hour (e.g. "8:30 AM") or 24-hour (e.g. "08:30") display.
      */
+    /**
+     * Formats [time] for user presentation respecting 12-hour (e.g. "8:30 AM") or 24-hour (e.g. "08:30") display.
+     */
     fun formatLocalizedTime(time: LocalTime, is24Hour: Boolean = false): String {
         return if (is24Hour) {
             time.format(TIME_ISO_FORMATTER)
         } else {
-            val hour = when (time.hour) {
-                0 -> 12
-                in 1..12 -> time.hour
-                else -> time.hour - 12
-            }
-            val minute = String.format(java.util.Locale.US, "%02d", time.minute)
-            val amPm = if (time.hour < 12) "AM" else "PM"
-            "$hour:$minute $amPm"
+            format12HourTime(time)
         }
+    }
+
+    /**
+     * Formats [time] strictly as 12-hour AM/PM (e.g. "12:00 AM", "6:30 PM", "12:00 PM").
+     */
+    fun format12HourTime(time: LocalTime): String {
+        val hour = when (time.hour) {
+            0 -> 12
+            in 1..12 -> time.hour
+            else -> time.hour - 12
+        }
+        val minute = String.format(java.util.Locale.US, "%02d", time.minute)
+        val amPm = if (time.hour < 12) "AM" else "PM"
+        return "$hour:$minute $amPm"
+    }
+
+    /**
+     * Parses a 12-hour AM/PM time string (e.g. "12:00 AM", "6:30 PM", "11:59 pm") to a LocalTime.
+     */
+    fun parse12HourTime(timeString: String): LocalTime {
+        val trimmed = timeString.trim().uppercase(java.util.Locale.US)
+        val regex = Regex("""^(\d{1,2}):(\d{2})\s*(AM|PM)$""")
+        val match = regex.find(trimmed) ?: throw IllegalArgumentException("Invalid 12-hour time format: $timeString")
+        val (hourStr, minStr, amPm) = match.destructured
+        var hour = hourStr.toInt()
+        val minute = minStr.toInt()
+        if (hour !in 1..12 || minute !in 0..59) {
+            throw IllegalArgumentException("Hour must be 1..12 and minute 0..59: $timeString")
+        }
+        if (amPm == "AM") {
+            if (hour == 12) hour = 0
+        } else {
+            if (hour != 12) hour += 12
+        }
+        return LocalTime.of(hour, minute)
     }
 
     fun daysBetween(start: LocalDate, end: LocalDate): Long = ChronoUnit.DAYS.between(start, end)
