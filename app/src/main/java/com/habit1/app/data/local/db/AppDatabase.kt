@@ -52,8 +52,7 @@ abstract class AppDatabase : RoomDatabase() {
                         `date` TEXT NOT NULL,
                         `completed_count` INTEGER NOT NULL,
                         `total_count` INTEGER NOT NULL,
-                        PRIMARY KEY(`date`),
-                        CHECK (`completed_count` >= 0 AND `total_count` >= 0 AND `completed_count` <= `total_count`)
+                        PRIMARY KEY(`date`)
                     )
                     """.trimIndent()
                 )

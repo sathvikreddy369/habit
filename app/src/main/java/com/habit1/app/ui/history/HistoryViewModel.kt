@@ -124,8 +124,15 @@ class HistoryViewModel(
 
                     val compHabits = dRecords.count { it.isCompleted }
                     val (compGoals, totalGoals) = when {
-                        dAggregate != null -> dAggregate.completedCount to dAggregate.totalCount
-                        dGoals.isNotEmpty() -> dGoals.count { it.goal.isCompleted } to dGoals.size
+                        dAggregate != null && dGoals.none { it.goal.isCompleted } -> {
+                            dAggregate.completedCount to dAggregate.totalCount
+                        }
+                        dGoals.isNotEmpty() -> {
+                            dGoals.count { it.goal.isCompleted } to dGoals.size
+                        }
+                        dAggregate != null -> {
+                            dAggregate.completedCount to dAggregate.totalCount
+                        }
                         else -> 0 to 0
                     }
 
@@ -187,8 +194,15 @@ class HistoryViewModel(
                 val completedHabitsForDay = dayRecords.count { it.isCompleted }
                 val partialHabitsForDay = dayRecords.count { !it.isCompleted && it.actualValue > 0.0 }
                 val (completedGoalsForDay, totalGoalsForDay) = when {
-                    dayAggregate != null -> dayAggregate.completedCount to dayAggregate.totalCount
-                    dayGoals.isNotEmpty() -> dayGoals.count { it.goal.isCompleted } to dayGoals.size
+                    dayAggregate != null && dayGoals.none { it.goal.isCompleted } -> {
+                        dayAggregate.completedCount to dayAggregate.totalCount
+                    }
+                    dayGoals.isNotEmpty() -> {
+                        dayGoals.count { it.goal.isCompleted } to dayGoals.size
+                    }
+                    dayAggregate != null -> {
+                        dayAggregate.completedCount to dayAggregate.totalCount
+                    }
                     else -> 0 to 0
                 }
 
@@ -252,6 +266,7 @@ class HistoryViewModel(
                             unit = record.unit,
                             measurementType = record.measurementType
                         )
+                        selectedDate == today -> if (isScheduled) CalendarDayStatus.Future else CalendarDayStatus.ProjectedRest
                         !isScheduled -> CalendarDayStatus.ProjectedRest
                         else -> CalendarDayStatus.ProjectedMissed
                     }
@@ -275,7 +290,7 @@ class HistoryViewModel(
                             CalendarDayStatus.ProjectedMissed -> "Missed (Projected)"
                             CalendarDayStatus.ProjectedRest -> "Rest Day (Projected)"
                             CalendarDayStatus.Paused -> "Paused"
-                            CalendarDayStatus.Future -> "Upcoming"
+                            CalendarDayStatus.Future -> if (selectedDate == today) "Upcoming (Today)" else "Upcoming"
                             else -> "No record"
                         }
                     }
@@ -330,7 +345,7 @@ class HistoryViewModel(
                     habits = habitBreakdown,
                     goals = goalBreakdown,
                     dailyReview = selectedDayReview?.toDomain(),
-                    historicalGoalAggregate = selectedDayAggregate
+                    historicalGoalAggregate = if (selectedDayAggregate != null && selectedDayGoals.none { it.goal.isCompleted }) selectedDayAggregate else null
                 ),
                 monthSummary = MonthSummary(
                     totalHabitCompletions = monthHabitCompletions,

@@ -91,6 +91,14 @@ object HabitValidator {
         return errors
     }
 
+    fun parseDecimal(raw: String): Double? {
+        val trimmed = raw.trim()
+        if (trimmed.isEmpty()) return null
+        val normalized = trimmed.replace(',', '.')
+        if (normalized.count { it == '.' } > 1) return null
+        return normalized.toDoubleOrNull()
+    }
+
     fun validateRawMeasurement(
         kind: MeasurementKind,
         targetStr: String,
@@ -114,7 +122,7 @@ object HabitValidator {
                 }
             }
             MeasurementKind.QUANTITY -> {
-                val target = targetStr.trim().toDoubleOrNull()
+                val target = parseDecimal(targetStr)
                 if (target == null || target <= 0.0) {
                     errors.add(HabitValidationError.TargetMustBePositive)
                 }

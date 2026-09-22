@@ -87,7 +87,11 @@ class ComputeHabitAnalyticsUseCase(
                     } else {
                         val isScheduled = evaluateSchedule.isScheduledOn(habitForSchedule, currentDate, zoneId)
                         if (isScheduled) {
-                            CalendarDayStatus.ProjectedMissed
+                            if (currentDate == todayDate) {
+                                CalendarDayStatus.Future
+                            } else {
+                                CalendarDayStatus.ProjectedMissed
+                            }
                         } else {
                             CalendarDayStatus.ProjectedRest
                         }

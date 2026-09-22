@@ -244,6 +244,13 @@ open class NotificationHelper(
     }
 
     /**
+     * Dismisses any active notification in the status bar by its integer [notificationId].
+     */
+    open fun cancelNotification(notificationId: Int) {
+        notificationManager.cancel(notificationId)
+    }
+
+    /**
      * Dismisses any active notification in the status bar for [habitId].
      */
     open fun cancelNotification(habitId: String) {

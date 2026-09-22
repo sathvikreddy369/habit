@@ -58,7 +58,7 @@ object NumericInputValidator {
                 }
             }
             is MeasurementType.Quantity -> {
-                val parsed = trimmed.toDoubleOrNull()
+                val parsed = com.habit1.app.domain.validation.HabitValidator.parseDecimal(trimmed)
                 if (parsed == null || parsed < 0.0) {
                     NumericValidationResult.Invalid("Enter a valid amount (e.g. 3.5)")
                 } else {

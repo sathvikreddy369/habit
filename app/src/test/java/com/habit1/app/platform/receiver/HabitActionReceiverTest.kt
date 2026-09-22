@@ -151,4 +151,73 @@ class HabitActionReceiverTest {
         // Should not throw or crash
         receiver.onReceive(app, intent)
     }
+
+    @Test
+    fun testActionYes_repeatedTapsAreIdempotent() = runBlocking {
+        val habit = HabitEntity(
+            id = "act_idem_habit",
+            name = "Reading",
+            measurementType = "BOOLEAN",
+            targetValue = 1.0,
+            unit = null,
+            scheduleType = "DAILY",
+            scheduleConfig = "{}",
+            reminderTime = "10:00",
+            displayOrder = 0,
+            isPaused = false,
+            isArchived = false,
+            createdAt = System.currentTimeMillis(),
+            updatedAt = System.currentTimeMillis()
+        )
+        app.container.habitRepository.createHabit(habit)
+
+        val intent = Intent(HabitActionReceiver.ACTION_HABIT_RECORD_YES).apply {
+            putExtra(HabitActionReceiver.EXTRA_HABIT_ID, "act_idem_habit")
+            putExtra(HabitActionReceiver.EXTRA_TARGET_DATE, testDateStr)
+            putExtra(HabitActionReceiver.EXTRA_NOTIFICATION_ID, 9999)
+        }
+
+        val receiver = HabitActionReceiver()
+        receiver.onReceive(app, intent)
+        delay(150)
+        receiver.onReceive(app, intent)
+        delay(150)
+
+        val records = app.container.habitRecordRepository.getRecordsForHabit("act_idem_habit")
+        assertEquals(1, records.size)
+        assertTrue(records[0].isCompleted)
+    }
+
+    @Test
+    fun testAction_staleDeletedOrPausedHabit_safelyIgnored() = runBlocking {
+        val habit = HabitEntity(
+            id = "act_paused_habit",
+            name = "Paused Habit",
+            measurementType = "BOOLEAN",
+            targetValue = 1.0,
+            unit = null,
+            scheduleType = "DAILY",
+            scheduleConfig = "{}",
+            reminderTime = "11:00",
+            displayOrder = 0,
+            isPaused = true,
+            isArchived = false,
+            createdAt = System.currentTimeMillis(),
+            updatedAt = System.currentTimeMillis()
+        )
+        app.container.habitRepository.createHabit(habit)
+
+        val intent = Intent(HabitActionReceiver.ACTION_HABIT_RECORD_YES).apply {
+            putExtra(HabitActionReceiver.EXTRA_HABIT_ID, "act_paused_habit")
+            putExtra(HabitActionReceiver.EXTRA_TARGET_DATE, testDateStr)
+            putExtra(HabitActionReceiver.EXTRA_NOTIFICATION_ID, 8888)
+        }
+
+        val receiver = HabitActionReceiver()
+        receiver.onReceive(app, intent)
+        delay(150)
+
+        val record = app.container.habitRecordRepository.getRecord("act_paused_habit", testDateStr)
+        org.junit.Assert.assertNull("No record should be created for paused habit", record)
+    }
 }

@@ -182,7 +182,7 @@ class HabitFormViewModel(
                             if (isFromBoolean || current == null || current <= 0) "30" else current.toString()
                         }
                         MeasurementKind.QUANTITY -> {
-                            val current = it.targetInput.trim().toDoubleOrNull()
+                            val current = HabitValidator.parseDecimal(it.targetInput)
                             if (isFromBoolean || current == null || current <= 0.0) "2.0" else it.targetInput.trim()
                         }
                     }
@@ -274,7 +274,7 @@ class HabitFormViewModel(
                         targetMinutes = state.targetInput.trim().toInt()
                     )
                     MeasurementKind.QUANTITY -> MeasurementType.Quantity(
-                        target = state.targetInput.trim().toDouble(),
+                        target = HabitValidator.parseDecimal(state.targetInput) ?: 1.0,
                         unit = state.unitInput.trim()
                     )
                 }

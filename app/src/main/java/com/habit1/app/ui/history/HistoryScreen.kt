@@ -543,7 +543,7 @@ fun HistoryScreen(
                             ) {
                                 Column(modifier = Modifier.padding(12.dp)) {
                                     Text(
-                                        text = "Detailed goal records are no longer retained.",
+                                        text = "Historical summary available. Detailed goal records were not retained for this date.",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -553,7 +553,7 @@ fun HistoryScreen(
                     } else {
                         item(key = "breakdown_aggregate_notice") {
                             Text(
-                                text = "Detailed goal records are no longer retained for completed items.",
+                                text = "Historical summary includes completed goals that were previously aggregated.",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(vertical = 4.dp)

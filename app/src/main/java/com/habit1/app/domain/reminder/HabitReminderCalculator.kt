@@ -46,7 +46,17 @@ class HabitReminderCalculator(
 
         // 2. Iterate future dates to find the next scheduled civil date
         var candidateDate = today.plusDays(1)
-        val maxSearchDays = 366 * 2 // Horizon of 2 years (covers any interval schedule)
+        val maxSearchDays = when (val schedule = habit.schedule) {
+            is com.habit1.app.domain.model.HabitSchedule.Interval -> {
+                val daysToAnchor = if (schedule.anchorDate.isAfter(today)) {
+                    java.time.temporal.ChronoUnit.DAYS.between(today, schedule.anchorDate).toInt()
+                } else {
+                    0
+                }
+                maxOf(732, daysToAnchor + schedule.everyNDays + 1)
+            }
+            else -> 732
+        }
         var count = 0
 
         while (count < maxSearchDays) {

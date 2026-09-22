@@ -93,21 +93,7 @@ class HabitActionReceiver : BroadcastReceiver() {
                 }
 
                 if (result.isSuccess) {
-                    val habit = habitRepository.getHabitById(habitId)?.toDomain()
-                    if (habit != null) {
-                        val message = when (action) {
-                            ACTION_HABIT_RECORD_YES -> "Marked as done for today."
-                            ACTION_HABIT_RECORD_NO -> "Marked not done for today."
-                            ACTION_HABIT_RECORD_DONE -> "Marked as completed."
-                            else -> "Updated."
-                        }
-                        notificationHelper.updateNotificationAfterAction(
-                            habit = habit,
-                            targetDate = targetDateStr,
-                            confirmationMessage = message,
-                            notificationId = notificationId
-                        )
-                    }
+                    notificationHelper.cancelNotification(notificationId)
                 }
             } catch (t: Throwable) {
                 t.printStackTrace()

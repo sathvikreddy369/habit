@@ -76,8 +76,9 @@ class EvaluateHabitHistoryUseCaseTest {
         assertEquals(0, summary.streakResult.currentStreak)
         assertEquals(0, summary.streakResult.longestStreak)
         assertEquals(10, summary.historyDays.size)
-        // All 10 unrecorded days should be ProjectedMissed
-        assertTrue(summary.historyDays.all { it.status is CalendarDayStatus.ProjectedMissed })
+        // 9 past unrecorded days should be ProjectedMissed, today pending day is Future
+        assertEquals(9, summary.historyDays.count { it.status is CalendarDayStatus.ProjectedMissed })
+        assertEquals(1, summary.historyDays.count { it.status is CalendarDayStatus.Future })
     }
 
     @Test
@@ -159,9 +160,9 @@ class EvaluateHabitHistoryUseCaseTest {
         assertEquals(20.0, incompleteStatus.actualValue, 0.001)
         assertEquals(50.0, incompleteStatus.targetValue, 0.001)
 
-        // Day 3 is ProjectedMissed
+        // Day 3 (today, unrecorded) is Future (upcoming)
         val day3 = summary.historyDays.find { it.date == LocalDate.of(2026, 9, 3) }
-        assertTrue(day3?.status is CalendarDayStatus.ProjectedMissed)
+        assertTrue(day3?.status is CalendarDayStatus.Future)
     }
 
     @Test
@@ -198,9 +199,9 @@ class EvaluateHabitHistoryUseCaseTest {
         val tuesdayDay = summary.historyDays.find { it.date == LocalDate.of(2026, 9, 1) }
         assertTrue(tuesdayDay?.status is CalendarDayStatus.ProjectedMissed)
 
-        // Thursday Sep 3 (no record, is today) -> ProjectedMissed
+        // Thursday Sep 3 (no record, is today) -> Future
         val thursdayDay = summary.historyDays.find { it.date == LocalDate.of(2026, 9, 3) }
-        assertTrue(thursdayDay?.status is CalendarDayStatus.ProjectedMissed)
+        assertTrue(thursdayDay?.status is CalendarDayStatus.Future)
     }
 
     @Test
@@ -227,7 +228,7 @@ class EvaluateHabitHistoryUseCaseTest {
         assertTrue("Unrecorded day not in current schedule is projected rest", monday?.status is CalendarDayStatus.ProjectedRest)
 
         val tuesday = summary.historyDays.find { it.date == LocalDate.of(2026, 9, 1) }
-        assertTrue("Unrecorded day in current schedule is projected missed", tuesday?.status is CalendarDayStatus.ProjectedMissed)
+        assertTrue("Today unrecorded day in current schedule is Future (upcoming)", tuesday?.status is CalendarDayStatus.Future)
     }
 
     @Test
