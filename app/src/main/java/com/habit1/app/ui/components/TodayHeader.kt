@@ -31,7 +31,7 @@ import androidx.compose.ui.unit.dp
  */
 @Composable
 fun TodayHeader(
-    formattedDate: String,
+    formattedDate: String = "",
     completedHabitsCount: Int,
     totalScheduledHabitsCount: Int,
     habitProgress: Float,
@@ -49,20 +49,8 @@ fun TodayHeader(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 12.dp)
+            .padding(vertical = 4.dp)
     ) {
-        Text(
-            text = "Today",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.primary
-        )
-        Text(
-            text = formattedDate,
-            style = MaterialTheme.typography.headlineLarge,
-            color = MaterialTheme.colorScheme.onBackground
-        )
-
-        Spacer(modifier = Modifier.height(14.dp))
 
         // Habit Progress Section
         val habitSummaryText = if (totalScheduledHabitsCount == 0) {

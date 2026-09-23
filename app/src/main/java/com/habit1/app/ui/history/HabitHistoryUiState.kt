@@ -8,6 +8,11 @@ import com.habit1.app.domain.model.HabitHistoryDay
 import com.habit1.app.domain.model.HabitHistorySummary
 import java.time.LocalDate
 
+data class PeriodStat(
+    val completed: Int = 0,
+    val total: Int = 7
+)
+
 data class HabitHistoryUiState(
     val habit: Habit? = null,
     val summary: HabitHistorySummary? = null,
@@ -19,5 +24,8 @@ data class HabitHistoryUiState(
     val canNavigateNext: Boolean = false,
     val isCurrentRange: Boolean = true,
     val selectedDayDetail: HabitHistoryDay? = null,
+    val weekStat: PeriodStat = PeriodStat(0, 7),
+    val monthStat: PeriodStat = PeriodStat(0, 30),
+    val yearStat: PeriodStat = PeriodStat(0, 365),
     val isLoading: Boolean = false
 )

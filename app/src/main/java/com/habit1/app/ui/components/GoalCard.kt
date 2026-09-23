@@ -2,8 +2,10 @@ package com.habit1.app.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -16,11 +18,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.ui.draw.clip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
@@ -82,29 +86,30 @@ fun GoalCard(
         ),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp)
-        ) {
-            // Main Goal Header Row: [Checkbox] [Title + Progress] [Menu]
+        Column(modifier = Modifier.fillMaxWidth()) {
+            // Main Goal Header Row: [Accent Bar] [Title + Subtask stats] [Menu] [Check Circle]
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Checkbox(
-                    checked = goalItem.isCompleted,
-                    onCheckedChange = { onToggle() }
+                // Left color accent bar (secondary/tertiary color for goals)
+                Box(
+                    modifier = Modifier
+                        .width(4.dp)
+                        .height(38.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(if (goalItem.isCompleted) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.secondary)
                 )
 
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(12.dp))
 
+                // Left / Center content: Title, notes, subtask progress
                 Column(
                     modifier = Modifier
                         .weight(1f)
-                        .clickable {
-                            if (goalItem.subtasks.isNotEmpty()) onToggleExpanded()
-                        }
+                        .padding(end = 8.dp)
                 ) {
                     Text(
                         text = goalItem.title,
@@ -115,7 +120,7 @@ fun GoalCard(
                             MaterialTheme.colorScheme.onSurface
                         },
                         textDecoration = if (goalItem.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
-                        maxLines = 2,
+                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
 
@@ -131,13 +136,17 @@ fun GoalCard(
                     }
 
                     if (totalSubtasks > 0) {
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.clickable { onToggleExpanded() }
+                        ) {
                             Text(
                                 text = "$completedSubtasks/$totalSubtasks subtasks",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.primary
                             )
+                            Spacer(modifier = Modifier.width(2.dp))
                             Icon(
                                 imageVector = if (goalItem.isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                                 contentDescription = if (goalItem.isExpanded) "Collapse subtasks" else "Expand subtasks",
@@ -149,67 +158,108 @@ fun GoalCard(
                 }
 
                 // Goal Overflow Menu
-                IconButton(
-                    onClick = { goalMenuExpanded = true },
-                    modifier = Modifier.size(32.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.MoreVert,
-                        contentDescription = "Goal options",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                Box {
+                    IconButton(
+                        onClick = { goalMenuExpanded = true },
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.MoreVert,
+                            contentDescription = "Goal options",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
+                    DropdownMenu(
+                        expanded = goalMenuExpanded,
+                        onDismissRequest = { goalMenuExpanded = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Edit Goal") },
+                            onClick = {
+                                goalMenuExpanded = false
+                                onEditGoal()
+                            },
+                            leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Move to Tomorrow") },
+                            onClick = {
+                                goalMenuExpanded = false
+                                onMoveGoalTomorrow()
+                            },
+                            leadingIcon = { Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null) }
+                        )
+                        if (goalItem.canMoveUp) {
+                            DropdownMenuItem(
+                                text = { Text("Move Up") },
+                                onClick = {
+                                    goalMenuExpanded = false
+                                    onMoveGoalUp()
+                                },
+                                leadingIcon = { Icon(Icons.Default.KeyboardArrowUp, contentDescription = null) }
+                            )
+                        }
+                        if (goalItem.canMoveDown) {
+                            DropdownMenuItem(
+                                text = { Text("Move Down") },
+                                onClick = {
+                                    goalMenuExpanded = false
+                                    onMoveGoalDown()
+                                },
+                                leadingIcon = { Icon(Icons.Default.KeyboardArrowDown, contentDescription = null) }
+                            )
+                        }
+                        DropdownMenuItem(
+                            text = {
+                                Text("Delete Goal", color = MaterialTheme.colorScheme.error)
+                            },
+                            onClick = {
+                                goalMenuExpanded = false
+                                onDeleteGoal()
+                            },
+                            leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) }
+                        )
+                    }
                 }
 
-                DropdownMenu(
-                    expanded = goalMenuExpanded,
-                    onDismissRequest = { goalMenuExpanded = false }
+                Spacer(modifier = Modifier.width(4.dp))
+
+                // Round Check Toggle Button (44dp, matching HabitCard)
+                val checkColor by androidx.compose.animation.animateColorAsState(
+                    targetValue = if (goalItem.isCompleted) {
+                        MaterialTheme.colorScheme.secondary
+                    } else {
+                        MaterialTheme.colorScheme.surfaceVariant
+                    },
+                    label = "goal_check_color"
+                )
+                val iconTint by androidx.compose.animation.animateColorAsState(
+                    targetValue = if (goalItem.isCompleted) {
+                        androidx.compose.ui.graphics.Color.White
+                    } else {
+                        MaterialTheme.colorScheme.outline
+                    },
+                    label = "goal_icon_tint"
+                )
+
+                androidx.compose.material3.Surface(
+                    shape = androidx.compose.foundation.shape.CircleShape,
+                    color = checkColor,
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clickable { onToggle() },
+                    border = if (!goalItem.isCompleted) BorderStroke(1.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)) else null
                 ) {
-                    DropdownMenuItem(
-                        text = { Text("Edit Goal") },
-                        onClick = {
-                            goalMenuExpanded = false
-                            onEditGoal()
-                        },
-                        leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Move to Tomorrow") },
-                        onClick = {
-                            goalMenuExpanded = false
-                            onMoveGoalTomorrow()
-                        },
-                        leadingIcon = { Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null) }
-                    )
-                    if (goalItem.canMoveUp) {
-                        DropdownMenuItem(
-                            text = { Text("Move Up") },
-                            onClick = {
-                                goalMenuExpanded = false
-                                onMoveGoalUp()
-                            },
-                            leadingIcon = { Icon(Icons.Default.KeyboardArrowUp, contentDescription = null) }
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = if (goalItem.isCompleted) "Completed" else "Mark complete",
+                            tint = iconTint,
+                            modifier = Modifier.size(22.dp)
                         )
                     }
-                    if (goalItem.canMoveDown) {
-                        DropdownMenuItem(
-                            text = { Text("Move Down") },
-                            onClick = {
-                                goalMenuExpanded = false
-                                onMoveGoalDown()
-                            },
-                            leadingIcon = { Icon(Icons.Default.KeyboardArrowDown, contentDescription = null) }
-                        )
-                    }
-                    DropdownMenuItem(
-                        text = {
-                            Text("Delete Goal", color = MaterialTheme.colorScheme.error)
-                        },
-                        onClick = {
-                            goalMenuExpanded = false
-                            onDeleteGoal()
-                        },
-                        leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) }
-                    )
                 }
             }
 

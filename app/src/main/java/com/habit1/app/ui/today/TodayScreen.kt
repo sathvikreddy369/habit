@@ -84,6 +84,7 @@ fun TodayScreen(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
         topBar = {
             androidx.compose.material3.TopAppBar(
                 title = {
@@ -94,6 +95,17 @@ fun TodayScreen(
                     )
                 },
                 actions = {
+                    IconButton(
+                        onClick = { showCreateSheet = true },
+                        modifier = Modifier.semantics {
+                            contentDescription = "Create Habit or Daily Goal"
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "Create Habit or Daily Goal"
+                        )
+                    }
                     IconButton(
                         onClick = onNavigateToSettings,
                         modifier = Modifier.semantics {
@@ -108,27 +120,15 @@ fun TodayScreen(
                 }
             )
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showCreateSheet = true },
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "Create Habit or Daily Goal"
-                )
-            }
-        }
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { innerPadding ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
-            contentPadding = PaddingValues(bottom = 88.dp)
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp)
         ) {
-            // Header: Date & separate habit / goal progress
+            // Header: Goal & habit progress overview
             item(key = "header") {
                 TodayHeader(
                     formattedDate = uiState.formattedDate,
@@ -138,76 +138,13 @@ fun TodayScreen(
                     completedGoalsCount = uiState.completedGoalsCount,
                     totalGoalsCount = uiState.totalGoalsCount,
                     goalProgress = uiState.goalProgress,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
                 )
             }
 
-            // Scheduled Habits Section
-            item(key = "habits_header") {
-                SectionHeader(
-                    title = "Habits",
-                    countText = "${uiState.completedHabitsCount}/${uiState.totalScheduledHabitsCount}"
-                )
-            }
-
-            if (uiState.habits.isNotEmpty()) {
-                items(
-                    items = uiState.habits,
-                    key = { "habit_${it.id}" }
-                ) { habitItem ->
-                    HabitCard(
-                        habitItem = habitItem,
-                        onToggle = { viewModel.onEvent(TodayUiEvent.ToggleHabit(habitItem.id)) },
-                        onIncrement = { viewModel.onEvent(TodayUiEvent.IncrementHabit(habitItem.id)) },
-                        onDecrement = { viewModel.onEvent(TodayUiEvent.DecrementHabit(habitItem.id)) },
-                        onSetValue = { value -> viewModel.onEvent(TodayUiEvent.SetHabitValue(habitItem.id, value)) },
-                        onClick = { onInspectHabit(habitItem.id) },
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
-                    )
-                }
-            } else if (!uiState.isLoading) {
-                item(key = "habits_empty_state") {
-                    androidx.compose.material3.Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 6.dp),
-                        shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
-                        colors = androidx.compose.material3.CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surface
-                        ),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(20.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(
-                                text = "No habits scheduled for today",
-                                style = MaterialTheme.typography.titleSmall,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "Create your first habit or adjust schedules to start tracking today.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
-                            androidx.compose.material3.OutlinedButton(
-                                onClick = onNavigateToHabits
-                            ) {
-                                Text("Manage Habits & Reminders")
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Daily Goals Section
+            // 1. Daily Goals Section (Prioritized at top)
             item(key = "goals_header") {
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(4.dp))
                 SectionHeader(
                     title = "Daily Goals",
                     countText = "${uiState.completedGoalsCount}/${uiState.totalGoalsCount}",
@@ -278,9 +215,73 @@ fun TodayScreen(
                 }
             }
 
-            // Daily Reflection Section
+            // 2. Scheduled Habits Section
+            item(key = "habits_header") {
+                Spacer(modifier = Modifier.height(10.dp))
+                SectionHeader(
+                    title = "Habits",
+                    countText = "${uiState.completedHabitsCount}/${uiState.totalScheduledHabitsCount}"
+                )
+            }
+
+            if (uiState.habits.isNotEmpty()) {
+                items(
+                    items = uiState.habits,
+                    key = { "habit_${it.id}" }
+                ) { habitItem ->
+                    HabitCard(
+                        habitItem = habitItem,
+                        onToggle = { viewModel.onEvent(TodayUiEvent.ToggleHabit(habitItem.id)) },
+                        onIncrement = { viewModel.onEvent(TodayUiEvent.IncrementHabit(habitItem.id)) },
+                        onDecrement = { viewModel.onEvent(TodayUiEvent.DecrementHabit(habitItem.id)) },
+                        onSetValue = { value -> viewModel.onEvent(TodayUiEvent.SetHabitValue(habitItem.id, value)) },
+                        onClick = { onInspectHabit(habitItem.id) },
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                    )
+                }
+            } else if (!uiState.isLoading) {
+                item(key = "habits_empty_state") {
+                    androidx.compose.material3.Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 6.dp),
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
+                        colors = androidx.compose.material3.CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface
+                        ),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(20.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = "No habits scheduled for today",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Create your first habit or adjust schedules to start tracking today.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            androidx.compose.material3.OutlinedButton(
+                                onClick = onNavigateToHabits
+                            ) {
+                                Text("Manage Habits & Reminders")
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 3. Daily Reflection Section
             item(key = "daily_reflection") {
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(12.dp))
                 SectionHeader(
                     title = "Daily Reflection",
                     countText = if (uiState.dailyReview != null) "Recorded" else "Optional"
@@ -516,7 +517,7 @@ private fun SectionHeader(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 4.dp),
+            .padding(horizontal = 16.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {

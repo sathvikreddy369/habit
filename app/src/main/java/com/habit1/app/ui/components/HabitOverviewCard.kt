@@ -27,13 +27,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 /**
- * Overview statistics card with circular progress score ring and high-level completion indicators.
+ * Overview statistics card with circular progress score ring and exact calendar-based period completion indicators.
  */
 @Composable
 fun HabitOverviewCard(
     scorePercent: Int,
-    monthDelta: Int?,
-    yearPercent: Int,
+    weekCompleted: Int,
+    weekTotal: Int = 7,
+    monthCompleted: Int,
+    monthTotal: Int,
+    yearCompleted: Int,
+    yearTotal: Int,
     totalCompletions: Int,
     accentColor: Color,
     modifier: Modifier = Modifier
@@ -51,14 +55,14 @@ fun HabitOverviewCard(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // Donut score ring
+            // Donut score ring with center score percent
             Box(
                 contentAlignment = Alignment.Center,
-                modifier = Modifier.size(64.dp)
+                modifier = Modifier.size(56.dp)
             ) {
                 val sweepAngle = (scorePercent / 100f).coerceIn(0f, 1f) * 360f
-                Canvas(modifier = Modifier.size(60.dp)) {
-                    val strokeWidth = 8.dp.toPx()
+                Canvas(modifier = Modifier.size(52.dp)) {
+                    val strokeWidth = 6.dp.toPx()
                     // Track
                     drawCircle(
                         color = accentColor.copy(alpha = 0.15f),
@@ -75,27 +79,31 @@ fun HabitOverviewCard(
                         )
                     }
                 }
+                Text(
+                    text = "$scorePercent%",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
             }
 
-            // Stat 1: Score
+            // Stat 1: Week (exact 7 days)
             StatMetricItem(
-                value = "$scorePercent%",
-                label = "Score",
+                value = "$weekCompleted/$weekTotal",
+                label = "Week",
                 accentColor = accentColor
             )
 
-            // Stat 2: Month delta
-            val monthSign = if (monthDelta != null && monthDelta > 0) "+" else ""
-            val monthText = if (monthDelta != null) "$monthSign$monthDelta%" else "—"
+            // Stat 2: Month (exact days in month)
             StatMetricItem(
-                value = monthText,
+                value = "$monthCompleted/$monthTotal",
                 label = "Month",
                 accentColor = accentColor
             )
 
-            // Stat 3: Year delta / rate
+            // Stat 3: Year (exact 365 or 366 days)
             StatMetricItem(
-                value = "+$yearPercent%",
+                value = "$yearCompleted/$yearTotal",
                 label = "Year",
                 accentColor = accentColor
             )

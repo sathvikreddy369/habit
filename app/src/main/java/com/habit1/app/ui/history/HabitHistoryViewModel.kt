@@ -93,6 +93,33 @@ class HabitHistoryViewModel(
                     zoneId = zoneId
                 )
 
+                // Accurate Calendar-based Period Stats:
+                // Week: exactly 7 days (Monday to Sunday)
+                val monday = today.with(DayOfWeek.MONDAY)
+                val sunday = today.with(DayOfWeek.SUNDAY)
+                val weekCompleted = allDomainRecords.count {
+                    it.isCompleted && !it.date.isBefore(monday) && !it.date.isAfter(sunday)
+                }
+                val weekStat = PeriodStat(completed = weekCompleted, total = 7)
+
+                // Month: exactly the days of this particular calendar month (28..31)
+                val monthStart = today.withDayOfMonth(1)
+                val monthEnd = today.withDayOfMonth(today.lengthOfMonth())
+                val monthTotalDays = today.lengthOfMonth()
+                val monthCompleted = allDomainRecords.count {
+                    it.isCompleted && !it.date.isBefore(monthStart) && !it.date.isAfter(monthEnd)
+                }
+                val monthStat = PeriodStat(completed = monthCompleted, total = monthTotalDays)
+
+                // Year: exactly 365 or 366 days in this particular calendar year
+                val yearStart = today.withDayOfYear(1)
+                val yearEnd = today.withDayOfYear(today.lengthOfYear())
+                val yearTotalDays = today.lengthOfYear()
+                val yearCompleted = allDomainRecords.count {
+                    it.isCompleted && !it.date.isBefore(yearStart) && !it.date.isAfter(yearEnd)
+                }
+                val yearStat = PeriodStat(completed = yearCompleted, total = yearTotalDays)
+
                 HabitHistoryUiState(
                     habit = domainHabit,
                     summary = summary,
@@ -104,6 +131,9 @@ class HabitHistoryViewModel(
                     canNavigateNext = config.canNavigateNext,
                     isCurrentRange = config.isCurrentRange,
                     selectedDayDetail = selectedDayDetail,
+                    weekStat = weekStat,
+                    monthStat = monthStat,
+                    yearStat = yearStat,
                     isLoading = false
                 )
             }

@@ -64,7 +64,9 @@ data class MonthSummary(
     val habitCompletionRate: Float,
     val totalGoals: Int,
     val completedGoals: Int,
-    val goalCompletionRate: Float
+    val goalCompletionRate: Float,
+    val daysWithCompletions: Int = 0,
+    val daysInMonth: Int = 30
 )
 
 data class HistoryUiState(

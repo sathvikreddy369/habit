@@ -24,5 +24,6 @@ sealed interface HabitFormUiEvent {
     data object ResetSaveState : HabitFormUiEvent
     data object ArchiveHabit : HabitFormUiEvent
     data object UnarchiveHabit : HabitFormUiEvent
+    data object TogglePauseHabit : HabitFormUiEvent
     data object DeleteHabit : HabitFormUiEvent
 }

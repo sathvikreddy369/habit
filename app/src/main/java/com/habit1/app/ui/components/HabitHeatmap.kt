@@ -315,7 +315,7 @@ private fun WeekHeatmapCell(
             Text(
                 text = day.date.dayOfMonth.toString(),
                 style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
-                fontWeight = if (status is CalendarDayStatus.Completed || isToday) FontWeight.Bold else FontWeight.Normal,
+                fontWeight = if (status is CalendarDayStatus.Completed || isToday) FontWeight.Bold else FontWeight.SemiBold,
                 color = textColor,
                 textAlign = TextAlign.Center
             )
@@ -326,7 +326,7 @@ private fun WeekHeatmapCell(
                     modifier = Modifier
                         .size(4.dp)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+                        .background(textColor.copy(alpha = 0.7f))
                 )
             }
         }
@@ -441,21 +441,27 @@ private fun MonthCalendarCell(
             .semantics { contentDescription = accessibilityLabel },
         contentAlignment = Alignment.Center
     ) {
-        if (status is CalendarDayStatus.ProjectedRest) {
-            Box(
-                modifier = Modifier
-                    .size(4.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
-            )
-        } else {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
             Text(
                 text = day.date.dayOfMonth.toString(),
                 style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
-                fontWeight = if (status is CalendarDayStatus.Completed || isToday) FontWeight.Bold else FontWeight.Normal,
+                fontWeight = if (status is CalendarDayStatus.Completed || isToday) FontWeight.Bold else FontWeight.SemiBold,
                 color = textColor,
                 textAlign = TextAlign.Center
             )
+
+            if (status is CalendarDayStatus.ProjectedRest) {
+                Spacer(modifier = Modifier.height(1.dp))
+                Box(
+                    modifier = Modifier
+                        .size(3.dp)
+                        .clip(CircleShape)
+                        .background(textColor.copy(alpha = 0.7f))
+                )
+            }
         }
     }
 }
@@ -699,41 +705,41 @@ private fun resolveCellStyle(
 
         CalendarDayStatus.ProjectedMissed -> {
             Triple(
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                todayBorder ?: BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                MaterialTheme.colorScheme.onSurface,
+                todayBorder ?: BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
             )
         }
 
         CalendarDayStatus.ProjectedRest -> {
             Triple(
-                Color.Transparent,
-                MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
-                todayBorder
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
+                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.80f),
+                todayBorder ?: BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
             )
         }
 
         CalendarDayStatus.Paused -> {
             Triple(
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
-                todayBorder
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.30f),
+                MaterialTheme.colorScheme.onSurfaceVariant,
+                todayBorder ?: BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
             )
         }
 
         CalendarDayStatus.PreCreation -> {
             Triple(
-                Color.Transparent,
-                MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
-                null
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.15f),
+                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
             )
         }
 
         CalendarDayStatus.Future -> {
             Triple(
-                Color.Transparent,
-                MaterialTheme.colorScheme.outline.copy(alpha = 0.25f),
-                todayBorder ?: BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.20f),
+                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.70f),
+                todayBorder ?: BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
             )
         }
     }

@@ -76,6 +76,7 @@ fun HistoryScreen(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
                 title = { Text("History", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) },
@@ -340,12 +341,12 @@ fun HistoryScreen(
                             ) {
                                 Column(
                                     modifier = Modifier.semantics {
-                                        contentDescription = "Habits consistency: ${summary.habitCompletionRate.toInt()} percent, ${summary.totalHabitCompletions} of ${summary.totalHabitScheduledDays} scheduled days completed."
+                                        contentDescription = "Habits consistency: ${summary.habitCompletionRate.toInt()} percent, ${summary.daysWithCompletions} of ${summary.daysInMonth} days completed."
                                     }
                                 ) {
                                     Text("Habits Consistency", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     Text(
-                                        text = "${summary.habitCompletionRate.toInt()}% (${summary.totalHabitCompletions}/${summary.totalHabitScheduledDays})",
+                                        text = "${summary.habitCompletionRate.toInt()}% (${summary.daysWithCompletions}/${summary.daysInMonth} days)",
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.primary

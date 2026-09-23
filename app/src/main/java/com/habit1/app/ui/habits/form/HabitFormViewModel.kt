@@ -255,6 +255,22 @@ class HabitFormViewModel(
                     _uiState.update { it.copy(isSaved = true) }
                 }
             }
+            is HabitFormUiEvent.TogglePauseHabit -> {
+                val id = _uiState.value.habitId ?: return
+                val newPausedState = !_uiState.value.originalIsPaused
+                viewModelScope.launch {
+                    habitRepository.pauseHabit(id, isPaused = newPausedState)
+                    if (newPausedState) {
+                        reminderCoordinator?.onHabitPaused(id)
+                    } else {
+                        val updated = habitRepository.getHabitById(id)
+                        if (updated != null) {
+                            reminderCoordinator?.onHabitCreated(updated.toDomain())
+                        }
+                    }
+                    _uiState.update { it.copy(isSaved = true) }
+                }
+            }
             is HabitFormUiEvent.DeleteHabit -> {
                 val id = _uiState.value.habitId ?: return
                 viewModelScope.launch {

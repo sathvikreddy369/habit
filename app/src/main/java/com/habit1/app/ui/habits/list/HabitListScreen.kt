@@ -67,6 +67,7 @@ fun HabitListScreen(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
                 title = { Text("Habits", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) },
@@ -84,17 +85,11 @@ fun HabitListScreen(
                     TextButton(onClick = onNavigateToTemplates) {
                         Text("Templates", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
                     }
+                    IconButton(onClick = onCreateHabit) {
+                        Icon(imageVector = Icons.Default.Add, contentDescription = "Add Habit")
+                    }
                 }
             )
-        },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = onCreateHabit,
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-            ) {
-                Icon(imageVector = Icons.Default.Add, contentDescription = "Add Habit")
-            }
         }
     ) { innerPadding ->
         Column(
@@ -151,7 +146,7 @@ fun HabitListScreen(
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp)
                 ) {
                     items(
                         items = displayedList,
@@ -376,20 +371,6 @@ private fun HabitManagementCard(
                             modifier = Modifier.height(32.dp)
                         ) {
                             Text("History", style = MaterialTheme.typography.labelSmall)
-                        }
-
-                        Spacer(modifier = Modifier.width(6.dp))
-
-                        // Pause / Resume
-                        OutlinedButton(
-                            onClick = onTogglePause,
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
-                            modifier = Modifier.height(32.dp)
-                        ) {
-                            Text(
-                                text = if (habit.isPaused) "Resume" else "Pause",
-                                style = MaterialTheme.typography.labelSmall
-                            )
                         }
 
                         Spacer(modifier = Modifier.width(6.dp))

@@ -175,6 +175,7 @@ class HistoryViewModel(
             var dayCursor = firstDay
             var monthHabitCompletions = 0
             var monthHabitScheduledDays = 0
+            var monthDaysWithCompletions = 0
             var monthTotalGoals = 0
             var monthCompletedGoals = 0
 
@@ -225,7 +226,10 @@ class HistoryViewModel(
                 // Accumulate month totals (exclude future dates from scheduled denominator)
                 if (!dayCursor.isAfter(today)) {
                     monthHabitCompletions += completedHabitsForDay
-                    monthHabitScheduledDays += scheduledForDay.size
+                    monthHabitScheduledDays += maxOf(scheduledForDay.size, completedHabitsForDay)
+                    if (completedHabitsForDay > 0) {
+                        monthDaysWithCompletions++
+                    }
                 }
                 monthTotalGoals += totalGoalsForDay
                 monthCompletedGoals += completedGoalsForDay
@@ -353,7 +357,9 @@ class HistoryViewModel(
                     habitCompletionRate = habitRate,
                     totalGoals = monthTotalGoals,
                     completedGoals = monthCompletedGoals,
-                    goalCompletionRate = goalRate
+                    goalCompletionRate = goalRate,
+                    daysWithCompletions = monthDaysWithCompletions,
+                    daysInMonth = selectedMonth.lengthOfMonth()
                 ),
                 yearlyOverview = yearlyOverview,
                 isLoading = false

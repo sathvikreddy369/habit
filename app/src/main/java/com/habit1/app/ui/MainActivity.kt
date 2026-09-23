@@ -120,11 +120,11 @@ class MainActivity : ComponentActivity() {
 
                     val isRootDestination = currentScreen is Screen.Today ||
                             currentScreen is Screen.HabitList ||
-                            currentScreen is Screen.Analytics ||
                             currentScreen is Screen.History
 
                     Scaffold(
                         modifier = Modifier.fillMaxSize(),
+                        contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
                         bottomBar = {
                             if (isRootDestination) {
                                 NavigationBar {
@@ -160,23 +160,6 @@ class MainActivity : ComponentActivity() {
                                             )
                                         },
                                         label = { Text("Habits") }
-                                    )
-                                    NavigationBarItem(
-                                        selected = currentScreen is Screen.Analytics,
-                                        onClick = {
-                                            if (currentScreen !is Screen.Analytics) {
-                                                backstack.clear()
-                                                backstack.add(Screen.Today)
-                                                backstack.add(Screen.Analytics)
-                                            }
-                                        },
-                                        icon = {
-                                            Icon(
-                                                imageVector = Icons.Default.Assessment,
-                                                contentDescription = "Analytics"
-                                            )
-                                        },
-                                        label = { Text("Analytics") }
                                     )
                                     NavigationBarItem(
                                         selected = currentScreen is Screen.History,

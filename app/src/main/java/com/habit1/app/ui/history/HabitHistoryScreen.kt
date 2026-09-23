@@ -13,6 +13,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -86,6 +89,7 @@ fun HabitHistoryScreen(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
                 title = {
@@ -171,8 +175,13 @@ fun HabitHistoryScreen(
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(innerPadding),
-                contentPadding = PaddingValues(16.dp),
+                    .padding(top = innerPadding.calculateTopPadding()),
+                contentPadding = PaddingValues(
+                    start = 16.dp,
+                    end = 16.dp,
+                    top = 16.dp,
+                    bottom = 16.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+                ),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 // Habit Metadata Header (Question, Frequency, Reminder)
@@ -237,10 +246,6 @@ fun HabitHistoryScreen(
                 item(key = "overview_section") {
                     val scorePercent = analyticsSummary?.completionRate?.toInt()
                         ?: summary?.streakResult?.completionRate?.toInt() ?: 0
-                    val dailyDays = analyticsSummary?.dailyBreakdown ?: summary?.historyDays ?: emptyList()
-                    val last30 = dailyDays.takeLast(30)
-                    val monthCompleted = last30.count { it.status is com.habit1.app.domain.model.CalendarDayStatus.Completed }
-                    val monthDelta = if (last30.isNotEmpty()) (monthCompleted * 100) / last30.size else null
                     val totalCompletions = analyticsSummary?.completedDays ?: summary?.completedDaysCount ?: 0
 
                     Column(modifier = Modifier.fillMaxWidth()) {
@@ -253,8 +258,12 @@ fun HabitHistoryScreen(
                         Spacer(modifier = Modifier.height(8.dp))
                         HabitOverviewCard(
                             scorePercent = scorePercent,
-                            monthDelta = monthDelta,
-                            yearPercent = scorePercent,
+                            weekCompleted = uiState.weekStat.completed,
+                            weekTotal = uiState.weekStat.total,
+                            monthCompleted = uiState.monthStat.completed,
+                            monthTotal = uiState.monthStat.total,
+                            yearCompleted = uiState.yearStat.completed,
+                            yearTotal = uiState.yearStat.total,
                             totalCompletions = totalCompletions,
                             accentColor = habitColor
                         )

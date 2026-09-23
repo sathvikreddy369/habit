@@ -13,6 +13,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
@@ -103,6 +106,7 @@ fun HabitFormScreen(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
                 title = {
@@ -144,7 +148,7 @@ fun HabitFormScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
+                .padding(top = innerPadding.calculateTopPadding())
                 .padding(horizontal = 20.dp)
                 .verticalScroll(rememberScrollState())
         ) {
@@ -631,6 +635,16 @@ fun HabitFormScreen(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
 
+                // Pause / Resume Button
+                OutlinedButton(
+                    onClick = { viewModel.onEvent(HabitFormUiEvent.TogglePauseHabit) },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(if (uiState.originalIsPaused) "Resume Habit" else "Pause Habit")
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -663,7 +677,7 @@ fun HabitFormScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(36.dp))
+            Spacer(modifier = Modifier.height(36.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()))
         }
     }
 
