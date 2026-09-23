@@ -1,9 +1,19 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
     id("com.google.devtools.ksp")
+}
+
+val localProperties = Properties().apply {
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        load(FileInputStream(localPropertiesFile))
+    }
 }
 
 android {
@@ -23,6 +33,26 @@ android {
         }
     }
 
+    signingConfigs {
+        create("release") {
+            val storeFilePath = localProperties.getProperty("habit1.release.storeFile")
+                ?: System.getenv("HABIT1_RELEASE_STORE_FILE")
+            val storePassword = localProperties.getProperty("habit1.release.storePassword")
+                ?: System.getenv("HABIT1_RELEASE_STORE_PASSWORD")
+            val keyAlias = localProperties.getProperty("habit1.release.keyAlias")
+                ?: System.getenv("HABIT1_RELEASE_KEY_ALIAS")
+            val keyPassword = localProperties.getProperty("habit1.release.keyPassword")
+                ?: System.getenv("HABIT1_RELEASE_KEY_PASSWORD")
+
+            if (storeFilePath != null && file(storeFilePath).exists()) {
+                this.storeFile = file(storeFilePath)
+                this.storePassword = storePassword
+                this.keyAlias = keyAlias
+                this.keyPassword = keyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -31,6 +61,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("release")
         }
 
         debug {

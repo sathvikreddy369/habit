@@ -1,5 +1,6 @@
 package com.habit1.app.ui
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -10,8 +11,10 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -30,6 +33,8 @@ import com.habit1.app.ui.today.TodayViewModel
 
 class MainActivity : ComponentActivity() {
 
+    private val pendingDestination = mutableStateOf<Screen?>(null)
+
     private val todayViewModel: TodayViewModel by viewModels {
         val app = application as HabitApplication
         TodayViewModel.Factory(
@@ -40,6 +45,13 @@ class MainActivity : ComponentActivity() {
         )
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        parseDestination(intent)?.let { destination ->
+            pendingDestination.value = destination
+        }
+    }
 
     override fun onResume() {
         super.onResume()
@@ -66,8 +78,26 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    val backstack = remember { mutableStateListOf<Screen>(Screen.Today) }
+                    val initialDestination = remember { parseDestination(intent) }
+                    val backstack = remember {
+                        mutableStateListOf<Screen>().apply {
+                            add(Screen.Today)
+                            if (initialDestination != null) {
+                                add(initialDestination)
+                            }
+                        }
+                    }
                     val currentScreen = backstack.lastOrNull() ?: Screen.Today
+
+                    val newDest = pendingDestination.value
+                    LaunchedEffect(newDest) {
+                        if (newDest != null) {
+                            if (backstack.lastOrNull() != newDest) {
+                                backstack.add(newDest)
+                            }
+                            pendingDestination.value = null
+                        }
+                    }
 
                     BackHandler(enabled = backstack.size > 1) {
                         backstack.removeAt(backstack.size - 1)
@@ -213,6 +243,24 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    companion object {
+        fun parseDestination(intent: Intent?): Screen? {
+            val uri = intent?.data ?: return null
+            if (uri.scheme != "habit1") return null
+            val segments = uri.pathSegments
+            val habitId = when {
+                uri.host == "open_habit" -> segments.firstOrNull()
+                segments.firstOrNull() == "open_habit" -> segments.getOrNull(1)
+                else -> null
+            }
+            return if (!habitId.isNullOrBlank()) {
+                Screen.HabitHistory(habitId)
+            } else {
+                null
             }
         }
     }
