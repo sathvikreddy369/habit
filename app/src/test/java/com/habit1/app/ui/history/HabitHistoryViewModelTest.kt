@@ -27,6 +27,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.time.LocalDate
 import java.time.ZoneId
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -75,12 +76,16 @@ class HabitHistoryViewModelTest {
         )
         database.habitDao().insert(habit)
 
+        val today = LocalDate.now(fixedZone)
+        val date1 = today.minusDays(2).toString()
+        val date2 = today.minusDays(1).toString()
+
         // Insert records
         database.habitRecordDao().upsert(
             HabitRecordEntity(
                 id = "r1",
                 habitId = "habit_123",
-                date = "2026-09-01",
+                date = date1,
                 actualValue = 25.0,
                 targetValue = 20.0,
                 unit = "pages",
@@ -93,7 +98,7 @@ class HabitHistoryViewModelTest {
             HabitRecordEntity(
                 id = "r2",
                 habitId = "habit_123",
-                date = "2026-09-02",
+                date = date2,
                 actualValue = 10.0,
                 targetValue = 20.0,
                 unit = "pages",
@@ -202,17 +207,17 @@ class HabitHistoryViewModelTest {
                 state = awaitItem()
             }
 
-            assertEquals(HeatmapRangePreset.THIRTY_DAYS, state.selectedPreset)
+            assertEquals(HeatmapRangePreset.THIS_WEEK, state.selectedPreset)
             assertEquals(true, state.isCurrentRange)
             assertEquals(false, state.canNavigateNext)
+            assertEquals(7, state.currentRange.dayCount)
             assertNotNull(state.analyticsSummary)
             assertTrue(state.analyticsSummary!!.dailyBreakdown.isNotEmpty())
 
-            // Switch to 7D preset
-            viewModel.onEvent(HabitHistoryUiEvent.SelectPreset(HeatmapRangePreset.SEVEN_DAYS))
+            // Switch to Monthly preset
+            viewModel.onEvent(HabitHistoryUiEvent.SelectPreset(HeatmapRangePreset.MONTHLY))
             state = awaitItem()
-            assertEquals(HeatmapRangePreset.SEVEN_DAYS, state.selectedPreset)
-            assertEquals(7, state.currentRange.dayCount)
+            assertEquals(HeatmapRangePreset.MONTHLY, state.selectedPreset)
 
             // Navigate previous range
             viewModel.onEvent(HabitHistoryUiEvent.PreviousRange)

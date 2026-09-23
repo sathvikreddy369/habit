@@ -41,43 +41,40 @@ class EvaluateHabitHistoryUseCase(
 
         var currentDate = startDate
         while (!currentDate.isAfter(endDate)) {
+            val record = recordsMap[currentDate]
             val status: CalendarDayStatus = when {
                 currentDate.isAfter(todayDate) -> CalendarDayStatus.Future
                 currentDate.isBefore(creationDate) -> CalendarDayStatus.PreCreation
-                habit.isPaused -> CalendarDayStatus.Paused
-                else -> {
-                    val record = recordsMap[currentDate]
-                    if (record != null) {
-                        if (record.isCompleted) {
-                            completedCount++
-                            CalendarDayStatus.Completed(
-                                actualValue = record.actualValue,
-                                targetValue = record.targetValue,
-                                unit = record.unit,
-                                measurementType = record.measurementType
-                            )
-                        } else {
-                            recordedIncompleteCount++
-                            CalendarDayStatus.RecordedIncomplete(
-                                actualValue = record.actualValue,
-                                targetValue = record.targetValue,
-                                unit = record.unit,
-                                measurementType = record.measurementType
-                            )
-                        }
+                record != null -> {
+                    if (record.isCompleted) {
+                        completedCount++
+                        CalendarDayStatus.Completed(
+                            actualValue = record.actualValue,
+                            targetValue = record.targetValue,
+                            unit = record.unit,
+                            measurementType = record.measurementType
+                        )
                     } else {
-                        val isScheduled = evaluateSchedule.isScheduledOn(habit, currentDate, zoneId)
-                        if (isScheduled) {
-                            if (currentDate == todayDate) {
-                                CalendarDayStatus.Future
-                            } else {
-                                projectedMissedCount++
-                                CalendarDayStatus.ProjectedMissed
-                            }
-                        } else {
-                            projectedRestCount++
-                            CalendarDayStatus.ProjectedRest
-                        }
+                        recordedIncompleteCount++
+                        CalendarDayStatus.RecordedIncomplete(
+                            actualValue = record.actualValue,
+                            targetValue = record.targetValue,
+                            unit = record.unit,
+                            measurementType = record.measurementType
+                        )
+                    }
+                }
+                habit.isPaused -> CalendarDayStatus.Paused
+                currentDate == todayDate -> CalendarDayStatus.Future
+                else -> {
+                    val habitForSchedule = if (habit.isArchived) habit.copy(isArchived = false) else habit
+                    val isScheduled = evaluateSchedule.isScheduledOn(habitForSchedule, currentDate, zoneId)
+                    if (isScheduled) {
+                        projectedMissedCount++
+                        CalendarDayStatus.ProjectedMissed
+                    } else {
+                        projectedRestCount++
+                        CalendarDayStatus.ProjectedRest
                     }
                 }
             }

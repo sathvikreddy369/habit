@@ -422,19 +422,15 @@ fun CompletionTrendGraph(
 
                         // 3. Draw X-Axis Labels (Date markers)
                         val xLabelCount = when (selectedPreset) {
-                            HeatmapRangePreset.SEVEN_DAYS -> 4
-                            HeatmapRangePreset.THIRTY_DAYS -> 4
-                            HeatmapRangePreset.THREE_MONTHS -> 4
-                            HeatmapRangePreset.SIX_MONTHS -> 5
-                            HeatmapRangePreset.ONE_YEAR -> 5
+                            HeatmapRangePreset.THIS_WEEK -> 4
+                            HeatmapRangePreset.MONTHLY -> 4
+                            HeatmapRangePreset.YEARLY -> 6
                         }
 
                         val xFormatter = when (selectedPreset) {
-                            HeatmapRangePreset.SEVEN_DAYS -> DateTimeFormatter.ofPattern("MMM d", Locale.getDefault())
-                            HeatmapRangePreset.THIRTY_DAYS -> DateTimeFormatter.ofPattern("MMM d", Locale.getDefault())
-                            HeatmapRangePreset.THREE_MONTHS -> DateTimeFormatter.ofPattern("MMM d", Locale.getDefault())
-                            HeatmapRangePreset.SIX_MONTHS -> DateTimeFormatter.ofPattern("MMM", Locale.getDefault())
-                            HeatmapRangePreset.ONE_YEAR -> DateTimeFormatter.ofPattern("MMM yy", Locale.getDefault())
+                            HeatmapRangePreset.THIS_WEEK -> DateTimeFormatter.ofPattern("EEE d", Locale.getDefault())
+                            HeatmapRangePreset.MONTHLY -> DateTimeFormatter.ofPattern("MMM d", Locale.getDefault())
+                            HeatmapRangePreset.YEARLY -> DateTimeFormatter.ofPattern("MMM", Locale.getDefault())
                         }
 
                         val step = (totalDays - 1).toFloat() / (xLabelCount - 1).coerceAtLeast(1)

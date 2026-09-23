@@ -21,4 +21,7 @@ sealed interface HabitFormUiEvent {
     data class UpdateReminderTime(val reminderTime: String) : HabitFormUiEvent
     data object SaveHabit : HabitFormUiEvent
     data object ResetSaveState : HabitFormUiEvent
+    data object ArchiveHabit : HabitFormUiEvent
+    data object UnarchiveHabit : HabitFormUiEvent
+    data object DeleteHabit : HabitFormUiEvent
 }

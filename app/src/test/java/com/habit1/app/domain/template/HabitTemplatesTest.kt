@@ -38,12 +38,12 @@ class HabitTemplatesTest {
 
     @Test
     fun filterByCategory_returnsOnlyMatchingTemplates() {
-        val engineeringTemplates = HabitTemplatesProvider.filterTemplates(
-            category = HabitTemplateCategory.ENGINEERING_STUDENTS,
+        val studentTemplates = HabitTemplatesProvider.filterTemplates(
+            category = HabitTemplateCategory.STUDENTS,
             searchQuery = ""
         )
-        assertTrue(engineeringTemplates.isNotEmpty())
-        assertTrue(engineeringTemplates.all { it.category == HabitTemplateCategory.ENGINEERING_STUDENTS })
+        assertTrue(studentTemplates.isNotEmpty())
+        assertTrue(studentTemplates.all { it.category == HabitTemplateCategory.STUDENTS })
     }
 
     @Test
@@ -67,7 +67,7 @@ class HabitTemplatesTest {
     @Test
     fun combinedSearchAndCategoryFiltering_worksCorrectly() {
         val filtered = HabitTemplatesProvider.filterTemplates(
-            category = HabitTemplateCategory.ENGINEERING_STUDENTS,
+            category = HabitTemplateCategory.STUDENTS,
             searchQuery = "LeetCode"
         )
         assertEquals(1, filtered.size)

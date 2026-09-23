@@ -120,6 +120,11 @@ class DailyGoalRepositoryImpl(
             dailyGoalDao.cleanupCompletedGoalsBeforeDate(beforeDate)
         }
 
+    override suspend fun cleanupIncompleteGoalsOlderThan(cutoffDate: String): Int =
+        withContext(ioDispatcher) {
+            dailyGoalDao.deleteIncompleteGoalsOlderThan(cutoffDate)
+        }
+
     override fun observeAggregatesForDateRange(
         startDate: String,
         endDate: String

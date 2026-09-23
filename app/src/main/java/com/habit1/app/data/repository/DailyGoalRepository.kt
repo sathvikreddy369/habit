@@ -35,6 +35,13 @@ interface DailyGoalRepository {
      */
     suspend fun cleanupCompletedGoalsBeforeDate(beforeDate: String): Int
 
+    /**
+     * Purges incomplete daily goals older than 7 calendar days before today (target_date <= cutoffDate).
+     * Completed goals are NEVER removed (permanent personal history).
+     * Subtasks of deleted goals cascade delete automatically via Room foreign key.
+     */
+    suspend fun cleanupIncompleteGoalsOlderThan(cutoffDate: String): Int
+
     // Historical Aggregates
     fun observeAggregatesForDateRange(startDate: String, endDate: String): Flow<List<com.habit1.app.domain.model.DailyGoalHistoryAggregate>>
     suspend fun getAggregatesForDateRange(startDate: String, endDate: String): List<com.habit1.app.domain.model.DailyGoalHistoryAggregate>

@@ -39,7 +39,7 @@ class HabitHistoryViewModel(
     private val scope: CoroutineScope = coroutineScope ?: viewModelScope
     private val today = DateTimeUtils.today(zoneId)
 
-    private val selectedPresetFlow = MutableStateFlow(HeatmapRangePreset.THIRTY_DAYS)
+    private val selectedPresetFlow = MutableStateFlow(HeatmapRangePreset.THIS_WEEK)
     private val anchorEndDateFlow = MutableStateFlow(today)
     private val selectedDayDetailFlow = MutableStateFlow<HabitHistoryDay?>(null)
 
@@ -124,11 +124,9 @@ class HabitHistoryViewModel(
                     val preset = selectedPresetFlow.value
                     val currentAnchor = anchorEndDateFlow.value
                     val newAnchor = when (preset) {
-                        HeatmapRangePreset.SEVEN_DAYS -> currentAnchor.minusDays(7)
-                        HeatmapRangePreset.THIRTY_DAYS -> currentAnchor.minusDays(30)
-                        HeatmapRangePreset.THREE_MONTHS -> currentAnchor.minusMonths(3)
-                        HeatmapRangePreset.SIX_MONTHS -> currentAnchor.minusMonths(6)
-                        HeatmapRangePreset.ONE_YEAR -> currentAnchor.minusYears(1)
+                        HeatmapRangePreset.THIS_WEEK -> currentAnchor.minusDays(7)
+                        HeatmapRangePreset.MONTHLY -> currentAnchor.minusMonths(1)
+                        HeatmapRangePreset.YEARLY -> currentAnchor.minusYears(1)
                     }
                     anchorEndDateFlow.value = newAnchor
                 }
@@ -137,11 +135,9 @@ class HabitHistoryViewModel(
                     val preset = selectedPresetFlow.value
                     val currentAnchor = anchorEndDateFlow.value
                     val shifted = when (preset) {
-                        HeatmapRangePreset.SEVEN_DAYS -> currentAnchor.plusDays(7)
-                        HeatmapRangePreset.THIRTY_DAYS -> currentAnchor.plusDays(30)
-                        HeatmapRangePreset.THREE_MONTHS -> currentAnchor.plusMonths(3)
-                        HeatmapRangePreset.SIX_MONTHS -> currentAnchor.plusMonths(6)
-                        HeatmapRangePreset.ONE_YEAR -> currentAnchor.plusYears(1)
+                        HeatmapRangePreset.THIS_WEEK -> currentAnchor.plusDays(7)
+                        HeatmapRangePreset.MONTHLY -> currentAnchor.plusMonths(1)
+                        HeatmapRangePreset.YEARLY -> currentAnchor.plusYears(1)
                     }
                     anchorEndDateFlow.value = if (shifted.isAfter(today)) today else shifted
                 }
@@ -163,17 +159,29 @@ class HabitHistoryViewModel(
 
     private fun resolveRange(preset: HeatmapRangePreset, anchorEndDate: LocalDate): AnalyticsRange {
         return when (preset) {
-            HeatmapRangePreset.SEVEN_DAYS -> AnalyticsRange.ofDaysEndingAt(anchorEndDate, 7)
-            HeatmapRangePreset.THIRTY_DAYS -> AnalyticsRange.ofDaysEndingAt(anchorEndDate, 30)
-            HeatmapRangePreset.THREE_MONTHS -> AnalyticsRange.ofMonthsEndingAt(anchorEndDate, 3)
-            HeatmapRangePreset.SIX_MONTHS -> AnalyticsRange.ofMonthsEndingAt(anchorEndDate, 6)
-            HeatmapRangePreset.ONE_YEAR -> AnalyticsRange.ofYearsEndingAt(anchorEndDate, 1)
+            HeatmapRangePreset.THIS_WEEK -> AnalyticsRange.ofDaysEndingAt(anchorEndDate, 7)
+            HeatmapRangePreset.MONTHLY -> {
+                val start = anchorEndDate.withDayOfMonth(1)
+                val end = anchorEndDate.withDayOfMonth(anchorEndDate.lengthOfMonth())
+                AnalyticsRange(start, end)
+            }
+            HeatmapRangePreset.YEARLY -> {
+                val start = anchorEndDate.withDayOfYear(1)
+                val end = anchorEndDate.withDayOfYear(anchorEndDate.lengthOfYear())
+                AnalyticsRange(start, end)
+            }
         }
     }
 
     private fun formatRange(range: AnalyticsRange): String {
         return if (range.startDate.year == range.endDate.year) {
-            "${range.startDate.format(rangeFormatter)} — ${range.endDate.format(yearFormatter)}"
+            if (range.startDate.month == range.endDate.month && range.startDate.dayOfMonth == 1 && range.endDate.dayOfMonth == range.endDate.lengthOfMonth()) {
+                range.startDate.format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale.getDefault()))
+            } else if (range.startDate.dayOfYear == 1 && range.endDate.dayOfYear == range.endDate.lengthOfYear()) {
+                range.startDate.format(DateTimeFormatter.ofPattern("yyyy", Locale.getDefault()))
+            } else {
+                "${range.startDate.format(rangeFormatter)} — ${range.endDate.format(yearFormatter)}"
+            }
         } else {
             "${range.startDate.format(yearFormatter)} — ${range.endDate.format(yearFormatter)}"
         }

@@ -7,9 +7,7 @@ import java.time.LocalTime
  */
 enum class HabitTemplateCategory(val displayName: String) {
     STUDENTS("Students"),
-    ENGINEERING_STUDENTS("Engineering Students"),
     WORKING_PROFESSIONALS("Working Professionals"),
-    MEDICAL_STUDENTS("Medical Students"),
     OLDER_ADULTS("Older Adults"),
     MID_AGED_ADULTS("Mid-aged Adults"),
     EVERYONE("Everyone")

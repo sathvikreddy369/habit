@@ -121,6 +121,14 @@ interface DailyGoalDao {
     @Query("DELETE FROM daily_goals WHERE target_date < :beforeDate AND is_completed = 1")
     suspend fun deleteCompletedGoalsBeforeDate(beforeDate: String): Int
 
+    /**
+     * Purges incomplete daily goals older than 7 calendar days before today (target_date <= cutoffDate).
+     * Completed goals are NEVER removed (permanent personal history).
+     * Subtasks of deleted goals cascade delete automatically via Room foreign key.
+     */
+    @Query("DELETE FROM daily_goals WHERE target_date <= :cutoffDate AND is_completed = 0")
+    suspend fun deleteIncompleteGoalsOlderThan(cutoffDate: String): Int
+
     @Query("SELECT DISTINCT target_date FROM daily_goals WHERE target_date < :beforeDate AND is_completed = 1")
     suspend fun getDatesWithCompletedGoalsBeforeDate(beforeDate: String): List<String>
 

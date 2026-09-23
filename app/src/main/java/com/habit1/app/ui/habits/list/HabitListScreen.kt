@@ -376,39 +376,14 @@ private fun HabitManagementCard(
                         // Edit
                         OutlinedButton(
                             onClick = onEdit,
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
                             modifier = Modifier.height(32.dp)
                         ) {
                             Text("Edit", style = MaterialTheme.typography.labelSmall)
                         }
-
-                        Spacer(modifier = Modifier.width(6.dp))
-
-                        // Archive
-                        OutlinedButton(
-                            onClick = onToggleArchive,
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
-                            modifier = Modifier.height(32.dp)
-                        ) {
-                            Text("Archive", style = MaterialTheme.typography.labelSmall)
-                        }
-
-                        Spacer(modifier = Modifier.width(4.dp))
-
-                        // Delete
-                        IconButton(
-                            onClick = onDelete,
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Delete,
-                                contentDescription = "Delete",
-                                tint = MaterialTheme.colorScheme.error
-                            )
-                        }
                     }
                 } else {
-                    // Archived actions: History, Restore & Delete
+                    // Archived actions: History, Restore & Edit
                     Spacer(modifier = Modifier.weight(1f))
                     OutlinedButton(
                         onClick = onInspect,
@@ -428,17 +403,14 @@ private fun HabitManagementCard(
                         Text("Restore to Active", style = MaterialTheme.typography.labelSmall)
                     }
 
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
 
-                    IconButton(
-                        onClick = onDelete,
-                        modifier = Modifier.size(32.dp)
+                    OutlinedButton(
+                        onClick = onEdit,
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                        modifier = Modifier.height(32.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = "Delete",
-                            tint = MaterialTheme.colorScheme.error
-                        )
+                        Text("Edit", style = MaterialTheme.typography.labelSmall)
                     }
                 }
             }

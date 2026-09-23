@@ -81,7 +81,7 @@ object HabitTemplatesProvider {
             id = "template_eng_dsa",
             title = "DSA Practice",
             description = "Data structures and algorithm practice",
-            category = HabitTemplateCategory.ENGINEERING_STUDENTS,
+            category = HabitTemplateCategory.STUDENTS,
             measurementType = "COUNT",
             targetValue = 2.0,
             unit = "problems"
@@ -90,7 +90,7 @@ object HabitTemplatesProvider {
             id = "template_eng_coding",
             title = "Coding Practice",
             description = "Hands-on coding or open-source contribution",
-            category = HabitTemplateCategory.ENGINEERING_STUDENTS,
+            category = HabitTemplateCategory.STUDENTS,
             measurementType = "DURATION",
             targetValue = 60.0,
             unit = "min"
@@ -99,7 +99,7 @@ object HabitTemplatesProvider {
             id = "template_eng_leetcode",
             title = "LeetCode / Problem Solving",
             description = "Competitive and interview problem solving",
-            category = HabitTemplateCategory.ENGINEERING_STUDENTS,
+            category = HabitTemplateCategory.STUDENTS,
             measurementType = "COUNT",
             targetValue = 3.0,
             unit = "problems"
@@ -108,7 +108,7 @@ object HabitTemplatesProvider {
             id = "template_eng_cs_fundamentals",
             title = "CS Fundamentals Revision",
             description = "OS, DBMS, Computer Networks, or OOP review",
-            category = HabitTemplateCategory.ENGINEERING_STUDENTS,
+            category = HabitTemplateCategory.STUDENTS,
             measurementType = "DURATION",
             targetValue = 30.0,
             unit = "min"
@@ -117,7 +117,7 @@ object HabitTemplatesProvider {
             id = "template_eng_project_work",
             title = "Project Work",
             description = "Building personal or capstone software project",
-            category = HabitTemplateCategory.ENGINEERING_STUDENTS,
+            category = HabitTemplateCategory.STUDENTS,
             measurementType = "DURATION",
             targetValue = 45.0,
             unit = "min"
@@ -126,7 +126,7 @@ object HabitTemplatesProvider {
             id = "template_eng_tech_reading",
             title = "Technical Reading",
             description = "Articles, documentation, or architecture whitepapers",
-            category = HabitTemplateCategory.ENGINEERING_STUDENTS,
+            category = HabitTemplateCategory.STUDENTS,
             measurementType = "COUNT",
             targetValue = 1.0,
             unit = "articles"
@@ -193,7 +193,7 @@ object HabitTemplatesProvider {
             id = "template_med_study",
             title = "Study",
             description = "Anatomy, physiology, pathology, or pharmacology study",
-            category = HabitTemplateCategory.MEDICAL_STUDENTS,
+            category = HabitTemplateCategory.STUDENTS,
             measurementType = "DURATION",
             targetValue = 90.0,
             unit = "min"
@@ -202,7 +202,7 @@ object HabitTemplatesProvider {
             id = "template_med_flashcards",
             title = "Flashcard Revision",
             description = "Spaced repetition flashcards (Anki/quiz)",
-            category = HabitTemplateCategory.MEDICAL_STUDENTS,
+            category = HabitTemplateCategory.STUDENTS,
             measurementType = "COUNT",
             targetValue = 50.0,
             unit = "cards"
@@ -211,7 +211,7 @@ object HabitTemplatesProvider {
             id = "template_med_clinical_reading",
             title = "Clinical Reading",
             description = "Medical journals, guidelines, or case reports",
-            category = HabitTemplateCategory.MEDICAL_STUDENTS,
+            category = HabitTemplateCategory.STUDENTS,
             measurementType = "COUNT",
             targetValue = 1.0,
             unit = "cases"
@@ -220,7 +220,7 @@ object HabitTemplatesProvider {
             id = "template_med_hydration",
             title = "Hydration",
             description = "Stay hydrated during rounds and hospital shifts",
-            category = HabitTemplateCategory.MEDICAL_STUDENTS,
+            category = HabitTemplateCategory.STUDENTS,
             measurementType = "QUANTITY",
             targetValue = 2.5,
             unit = "L"
@@ -229,7 +229,7 @@ object HabitTemplatesProvider {
             id = "template_med_sleep",
             title = "Sleep Routine",
             description = "Ensure adequate restorative rest",
-            category = HabitTemplateCategory.MEDICAL_STUDENTS,
+            category = HabitTemplateCategory.STUDENTS,
             measurementType = "BOOLEAN",
             targetValue = 1.0
         ),

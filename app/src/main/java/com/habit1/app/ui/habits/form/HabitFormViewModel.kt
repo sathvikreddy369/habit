@@ -232,6 +232,33 @@ class HabitFormViewModel(
             is HabitFormUiEvent.ResetSaveState -> {
                 _uiState.update { it.copy(isSaved = false) }
             }
+            is HabitFormUiEvent.ArchiveHabit -> {
+                val id = _uiState.value.habitId ?: return
+                viewModelScope.launch {
+                    habitRepository.archiveHabit(id, isArchived = true)
+                    reminderCoordinator?.onHabitArchived(id)
+                    _uiState.update { it.copy(isSaved = true) }
+                }
+            }
+            is HabitFormUiEvent.UnarchiveHabit -> {
+                val id = _uiState.value.habitId ?: return
+                viewModelScope.launch {
+                    habitRepository.archiveHabit(id, isArchived = false)
+                    val updated = habitRepository.getHabitById(id)
+                    if (updated != null) {
+                        reminderCoordinator?.onHabitCreated(updated.toDomain())
+                    }
+                    _uiState.update { it.copy(isSaved = true) }
+                }
+            }
+            is HabitFormUiEvent.DeleteHabit -> {
+                val id = _uiState.value.habitId ?: return
+                viewModelScope.launch {
+                    habitRepository.deleteHabit(id)
+                    reminderCoordinator?.onHabitDeleted(id)
+                    _uiState.update { it.copy(isSaved = true) }
+                }
+            }
         }
     }
 

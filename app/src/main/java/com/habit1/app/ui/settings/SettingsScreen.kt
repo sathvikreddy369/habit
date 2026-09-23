@@ -325,7 +325,53 @@ fun SettingsScreen(
                     }
                 }
 
-                // 4. ABOUT SECTION
+                // 4. DATA & HISTORY RULES SECTION
+                SettingsSectionHeader(title = "Data & History Rules")
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "Historical Truth",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "• Recorded completions and progress are permanent, immutable facts.\n" +
+                                   "• Editing a habit applies from today onward; past records never change.\n" +
+                                   "• Archive pauses a habit and hides it while preserving all historical records (reversible).\n" +
+                                   "• Delete permanently removes a habit and all of its historical records (irreversible).\n" +
+                                   "• Completed Daily Goals remain permanent personal history.\n" +
+                                   "• Incomplete Daily Goals older than 7 calendar days are automatically cleaned up.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                // 5. STORAGE INFO SECTION
+                SettingsSectionHeader(title = "Storage Information")
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        val dbFile = context.getDatabasePath("habit1.db")
+                        val dbSizeKb = if (dbFile != null && dbFile.exists()) dbFile.length() / 1024 else 0
+                        Text(
+                            text = "Local Storage Usage",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "• Database File: $dbSizeKb KB\n" +
+                                   "• Location: Device-only encrypted app sandbox\n" +
+                                   "• Network Sync: None (Local-first & Offline)",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                // 6. ABOUT SECTION
                 SettingsSectionHeader(title = "About")
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
@@ -412,7 +458,7 @@ private fun RestorePreviewDialog(
             title = { Text("Confirm Replace All") },
             text = {
                 Text(
-                    "This action will permanently delete all existing habits, records, goals, and reviews currently on this device and replace them with the backup.\n\nAre you sure you wish to proceed?"
+                    "Existing data will be replaced by the selected backup.\n\nThis action will permanently delete all existing habits, records, goals, and reviews currently on this device and replace them with the backup.\n\nAre you sure you wish to proceed?"
                 )
             },
             confirmButton = {

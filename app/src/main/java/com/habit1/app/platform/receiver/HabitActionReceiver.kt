@@ -92,9 +92,9 @@ class HabitActionReceiver : BroadcastReceiver() {
                     else -> Result.failure(IllegalArgumentException("Unsupported action: $action"))
                 }
 
-                if (result.isSuccess) {
-                    notificationHelper.cancelNotification(notificationId)
-                }
+                // Immediately dismiss the notification once the user has interacted with it,
+                // regardless of whether progress was recorded or habit was stale/deleted/paused.
+                notificationHelper.cancelNotification(notificationId)
             } catch (t: Throwable) {
                 t.printStackTrace()
             } finally {
