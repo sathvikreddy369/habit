@@ -19,7 +19,8 @@ data class TodayHabitItem(
     val isCompleted: Boolean,
     val progressRatio: Float,
     val formattedProgress: String,
-    val streakResult: StreakResult
+    val streakResult: StreakResult,
+    val colorHex: String? = null
 )
 
 /**

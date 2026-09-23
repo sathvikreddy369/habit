@@ -24,16 +24,19 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun StreakBadge(
     streakCount: Int,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    accentColor: androidx.compose.ui.graphics.Color? = null
 ) {
     if (streakCount <= 0) return
 
     val label = if (streakCount == 1) "1 day" else "$streakCount days"
+    val containerColor = accentColor?.copy(alpha = 0.15f) ?: MaterialTheme.colorScheme.secondaryContainer
+    val contentColor = accentColor ?: MaterialTheme.colorScheme.onSecondaryContainer
 
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.secondaryContainer)
+            .background(containerColor)
             .padding(horizontal = 8.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -41,13 +44,13 @@ fun StreakBadge(
             imageVector = Icons.Default.Star,
             contentDescription = null,
             modifier = Modifier.size(14.dp),
-            tint = MaterialTheme.colorScheme.onSecondaryContainer
+            tint = contentColor
         )
         Spacer(modifier = Modifier.width(4.dp))
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSecondaryContainer
+            color = contentColor
         )
     }
 }

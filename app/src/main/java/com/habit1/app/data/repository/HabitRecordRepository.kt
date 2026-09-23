@@ -11,6 +11,7 @@ interface HabitRecordRepository {
     fun observeRecordsForDateRange(startDate: String, endDate: String): Flow<List<HabitRecordEntity>>
     suspend fun getRecordsForDateRange(startDate: String, endDate: String): List<HabitRecordEntity>
     suspend fun getRecordsForHabit(habitId: String): List<HabitRecordEntity>
+    fun observeRecordsForHabit(habitId: String): Flow<List<HabitRecordEntity>>
     suspend fun getRecordsForHabits(habitIds: List<String>): List<HabitRecordEntity>
     fun observeRecordsForHabitInRange(habitId: String, startDate: String, endDate: String): Flow<List<HabitRecordEntity>>
     suspend fun getRecordsForHabitInRange(habitId: String, startDate: String, endDate: String): List<HabitRecordEntity>

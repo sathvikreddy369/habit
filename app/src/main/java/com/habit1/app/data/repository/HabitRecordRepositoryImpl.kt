@@ -41,6 +41,9 @@ class HabitRecordRepositoryImpl(
             habitRecordDao.getRecordsForHabit(habitId)
         }
 
+    override fun observeRecordsForHabit(habitId: String): Flow<List<HabitRecordEntity>> =
+        habitRecordDao.observeRecordsForHabit(habitId).flowOn(ioDispatcher)
+
     override suspend fun getRecordsForHabits(habitIds: List<String>): List<HabitRecordEntity> =
         withContext(ioDispatcher) {
             if (habitIds.isEmpty()) emptyList()

@@ -31,6 +31,21 @@ import com.habit1.app.ui.theme.HabitTheme
 import com.habit1.app.ui.today.TodayScreen
 import com.habit1.app.ui.today.TodayViewModel
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.Assessment
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material3.Icon
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import com.habit1.app.ui.analytics.GlobalAnalyticsScreen
+import com.habit1.app.ui.analytics.GlobalAnalyticsViewModel
+
 class MainActivity : ComponentActivity() {
 
     private val pendingDestination = mutableStateOf<Screen?>(null)
@@ -103,143 +118,255 @@ class MainActivity : ComponentActivity() {
                         backstack.removeAt(backstack.size - 1)
                     }
 
-                    when (currentScreen) {
-                        is Screen.Today -> {
-                            TodayScreen(
-                                viewModel = todayViewModel,
-                                onNavigateToHabits = {
-                                    backstack.add(Screen.HabitList)
-                                },
-                                onNavigateToHistory = {
-                                    backstack.add(Screen.History)
-                                },
-                                onNavigateToSettings = {
-                                    backstack.add(Screen.Settings)
+                    val isRootDestination = currentScreen is Screen.Today ||
+                            currentScreen is Screen.HabitList ||
+                            currentScreen is Screen.Analytics ||
+                            currentScreen is Screen.History
+
+                    Scaffold(
+                        modifier = Modifier.fillMaxSize(),
+                        bottomBar = {
+                            if (isRootDestination) {
+                                NavigationBar {
+                                    NavigationBarItem(
+                                        selected = currentScreen is Screen.Today,
+                                        onClick = {
+                                            if (currentScreen !is Screen.Today) {
+                                                backstack.clear()
+                                                backstack.add(Screen.Today)
+                                            }
+                                        },
+                                        icon = {
+                                            Icon(
+                                                imageVector = Icons.Default.CheckCircle,
+                                                contentDescription = "Today"
+                                            )
+                                        },
+                                        label = { Text("Today") }
+                                    )
+                                    NavigationBarItem(
+                                        selected = currentScreen is Screen.HabitList,
+                                        onClick = {
+                                            if (currentScreen !is Screen.HabitList) {
+                                                backstack.clear()
+                                                backstack.add(Screen.Today)
+                                                backstack.add(Screen.HabitList)
+                                            }
+                                        },
+                                        icon = {
+                                            Icon(
+                                                imageVector = Icons.AutoMirrored.Filled.List,
+                                                contentDescription = "Habits"
+                                            )
+                                        },
+                                        label = { Text("Habits") }
+                                    )
+                                    NavigationBarItem(
+                                        selected = currentScreen is Screen.Analytics,
+                                        onClick = {
+                                            if (currentScreen !is Screen.Analytics) {
+                                                backstack.clear()
+                                                backstack.add(Screen.Today)
+                                                backstack.add(Screen.Analytics)
+                                            }
+                                        },
+                                        icon = {
+                                            Icon(
+                                                imageVector = Icons.Default.Assessment,
+                                                contentDescription = "Analytics"
+                                            )
+                                        },
+                                        label = { Text("Analytics") }
+                                    )
+                                    NavigationBarItem(
+                                        selected = currentScreen is Screen.History,
+                                        onClick = {
+                                            if (currentScreen !is Screen.History) {
+                                                backstack.clear()
+                                                backstack.add(Screen.Today)
+                                                backstack.add(Screen.History)
+                                            }
+                                        },
+                                        icon = {
+                                            Icon(
+                                                imageVector = Icons.Default.DateRange,
+                                                contentDescription = "History"
+                                            )
+                                        },
+                                        label = { Text("History") }
+                                    )
                                 }
-                            )
+                            }
                         }
-
-                        is Screen.HabitList -> {
-                            val habitListViewModel: HabitListViewModel = viewModel(
-                                factory = HabitListViewModel.Factory(
-                                    habitRepository = app.container.habitRepository,
-                                    reminderCoordinator = app.container.reminderCoordinator
-                                )
-                            )
-                            HabitListScreen(
-                                viewModel = habitListViewModel,
-                                onCreateHabit = {
-                                    backstack.add(Screen.HabitForm(null))
-                                },
-                                onEditHabit = { habitId ->
-                                    backstack.add(Screen.HabitForm(habitId))
-                                },
-                                onInspectHabit = { habitId ->
-                                    backstack.add(Screen.HabitHistory(habitId))
-                                },
-                                onNavigateToTemplates = {
-                                    backstack.add(Screen.HabitTemplates)
-                                },
-                                onNavigateBack = {
-                                    if (backstack.size > 1) {
-                                        backstack.removeAt(backstack.size - 1)
-                                    }
+                    ) { scaffoldPadding ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(bottom = scaffoldPadding.calculateBottomPadding())
+                        ) {
+                            when (currentScreen) {
+                                is Screen.Today -> {
+                                    TodayScreen(
+                                        viewModel = todayViewModel,
+                                        onCreateHabit = {
+                                            backstack.add(Screen.HabitForm(null))
+                                        },
+                                        onInspectHabit = { habitId ->
+                                            backstack.add(Screen.HabitHistory(habitId))
+                                        },
+                                        onNavigateToHabits = {
+                                            backstack.clear()
+                                            backstack.add(Screen.Today)
+                                            backstack.add(Screen.HabitList)
+                                        },
+                                        onNavigateToHistory = {
+                                            backstack.clear()
+                                            backstack.add(Screen.Today)
+                                            backstack.add(Screen.History)
+                                        },
+                                        onNavigateToSettings = {
+                                            backstack.add(Screen.Settings)
+                                        }
+                                    )
                                 }
-                            )
-                        }
 
-                        is Screen.HabitTemplates -> {
-                            com.habit1.app.ui.habits.templates.HabitTemplatesScreen(
-                                onSelectTemplate = { templateId ->
-                                    backstack.add(Screen.HabitForm(habitId = null, templateId = templateId))
-                                },
-                                onNavigateBack = {
-                                    if (backstack.size > 1) {
-                                        backstack.removeAt(backstack.size - 1)
-                                    }
+                                is Screen.HabitList -> {
+                                    val habitListViewModel: HabitListViewModel = viewModel(
+                                        factory = HabitListViewModel.Factory(
+                                            habitRepository = app.container.habitRepository,
+                                            reminderCoordinator = app.container.reminderCoordinator
+                                        )
+                                    )
+                                    HabitListScreen(
+                                        viewModel = habitListViewModel,
+                                        onCreateHabit = {
+                                            backstack.add(Screen.HabitForm(null))
+                                        },
+                                        onEditHabit = { habitId ->
+                                            backstack.add(Screen.HabitForm(habitId))
+                                        },
+                                        onInspectHabit = { habitId ->
+                                            backstack.add(Screen.HabitHistory(habitId))
+                                        },
+                                        onNavigateToTemplates = {
+                                            backstack.add(Screen.HabitTemplates)
+                                        },
+                                        onNavigateBack = null
+                                    )
                                 }
-                            )
-                        }
 
-                        is Screen.HabitForm -> {
-                            val formKey = currentScreen.habitId ?: ("new_habit_" + (currentScreen.templateId ?: "empty"))
-                            val habitFormViewModel: HabitFormViewModel = viewModel(
-                                key = formKey,
-                                factory = HabitFormViewModel.Factory(
-                                    habitRepository = app.container.habitRepository,
-                                    reminderCoordinator = app.container.reminderCoordinator,
-                                    habitId = currentScreen.habitId,
-                                    templateId = currentScreen.templateId
-                                )
-                            )
-                            HabitFormScreen(
-                                viewModel = habitFormViewModel,
-                                onNavigateBack = {
-                                    if (backstack.size > 1) {
-                                        backstack.removeAt(backstack.size - 1)
-                                    }
+                                is Screen.HabitTemplates -> {
+                                    com.habit1.app.ui.habits.templates.HabitTemplatesScreen(
+                                        onSelectTemplate = { templateId ->
+                                            backstack.add(Screen.HabitForm(habitId = null, templateId = templateId))
+                                        },
+                                        onNavigateBack = {
+                                            if (backstack.size > 1) {
+                                                backstack.removeAt(backstack.size - 1)
+                                            }
+                                        }
+                                    )
                                 }
-                            )
-                        }
 
-                        is Screen.History -> {
-                            val historyViewModel: com.habit1.app.ui.history.HistoryViewModel = viewModel(
-                                factory = com.habit1.app.ui.history.HistoryViewModel.Factory(
-                                    habitRepository = app.container.habitRepository,
-                                    habitRecordRepository = app.container.habitRecordRepository,
-                                    dailyGoalRepository = app.container.dailyGoalRepository,
-                                    dailyReviewRepository = app.container.dailyReviewRepository
-                                )
-                            )
-
-                            com.habit1.app.ui.history.HistoryScreen(
-                                viewModel = historyViewModel,
-                                onNavigateBack = {
-                                    if (backstack.size > 1) {
-                                        backstack.removeAt(backstack.size - 1)
-                                    }
-                                },
-                                onInspectHabit = { habitId ->
-                                    backstack.add(Screen.HabitHistory(habitId))
+                                is Screen.HabitForm -> {
+                                    val formKey = currentScreen.habitId ?: ("new_habit_" + (currentScreen.templateId ?: "empty"))
+                                    val habitFormViewModel: HabitFormViewModel = viewModel(
+                                        key = formKey,
+                                        factory = HabitFormViewModel.Factory(
+                                            habitRepository = app.container.habitRepository,
+                                            reminderCoordinator = app.container.reminderCoordinator,
+                                            habitId = currentScreen.habitId,
+                                            templateId = currentScreen.templateId
+                                        )
+                                    )
+                                    HabitFormScreen(
+                                        viewModel = habitFormViewModel,
+                                        onNavigateBack = {
+                                            if (backstack.size > 1) {
+                                                backstack.removeAt(backstack.size - 1)
+                                            }
+                                        }
+                                    )
                                 }
-                            )
-                        }
 
-                        is Screen.HabitHistory -> {
-                            val habitHistoryViewModel: com.habit1.app.ui.history.HabitHistoryViewModel = viewModel(
-                                key = "habit_history_${currentScreen.habitId}",
-                                factory = com.habit1.app.ui.history.HabitHistoryViewModel.Factory(
-                                    habitId = currentScreen.habitId,
-                                    habitRepository = app.container.habitRepository,
-                                    habitRecordRepository = app.container.habitRecordRepository,
-                                    computeHabitAnalytics = app.container.computeHabitAnalyticsUseCase
-                                )
-                            )
-                            com.habit1.app.ui.history.HabitHistoryScreen(
-                                viewModel = habitHistoryViewModel,
-                                onNavigateBack = {
-                                    if (backstack.size > 1) {
-                                        backstack.removeAt(backstack.size - 1)
-                                    }
+                                is Screen.Analytics -> {
+                                    val analyticsViewModel: GlobalAnalyticsViewModel = viewModel(
+                                        factory = GlobalAnalyticsViewModel.Factory(
+                                            habitRepository = app.container.habitRepository,
+                                            habitRecordRepository = app.container.habitRecordRepository,
+                                            computeGlobalAnalyticsUseCase = app.container.computeGlobalAnalyticsUseCase
+                                        )
+                                    )
+                                    GlobalAnalyticsScreen(
+                                        viewModel = analyticsViewModel,
+                                        onInspectHabit = { habitId ->
+                                            backstack.add(Screen.HabitHistory(habitId))
+                                        },
+                                        onNavigateToSettings = {
+                                            backstack.add(Screen.Settings)
+                                        }
+                                    )
                                 }
-                            )
-                        }
 
-                        is Screen.Settings -> {
-                            val settingsViewModel: com.habit1.app.ui.settings.SettingsViewModel = viewModel(
-                                factory = com.habit1.app.ui.settings.SettingsViewModel.Factory(
-                                    backupRepository = app.container.backupRepository,
-                                    userPreferences = app.container.userPreferences
-                                )
-                            )
-                            com.habit1.app.ui.settings.SettingsScreen(
-                                viewModel = settingsViewModel,
-                                onNavigateBack = {
-                                    if (backstack.size > 1) {
-                                        backstack.removeAt(backstack.size - 1)
-                                    }
+                                is Screen.History -> {
+                                    val historyViewModel: com.habit1.app.ui.history.HistoryViewModel = viewModel(
+                                        factory = com.habit1.app.ui.history.HistoryViewModel.Factory(
+                                            habitRepository = app.container.habitRepository,
+                                            habitRecordRepository = app.container.habitRecordRepository,
+                                            dailyGoalRepository = app.container.dailyGoalRepository,
+                                            dailyReviewRepository = app.container.dailyReviewRepository
+                                        )
+                                    )
+
+                                    com.habit1.app.ui.history.HistoryScreen(
+                                        viewModel = historyViewModel,
+                                        onNavigateBack = null,
+                                        onInspectHabit = { habitId ->
+                                            backstack.add(Screen.HabitHistory(habitId))
+                                        }
+                                    )
                                 }
-                            )
+
+                                is Screen.HabitHistory -> {
+                                    val habitHistoryViewModel: com.habit1.app.ui.history.HabitHistoryViewModel = viewModel(
+                                        key = "habit_history_${currentScreen.habitId}",
+                                        factory = com.habit1.app.ui.history.HabitHistoryViewModel.Factory(
+                                            habitId = currentScreen.habitId,
+                                            habitRepository = app.container.habitRepository,
+                                            habitRecordRepository = app.container.habitRecordRepository,
+                                            computeHabitAnalytics = app.container.computeHabitAnalyticsUseCase
+                                        )
+                                    )
+                                    com.habit1.app.ui.history.HabitHistoryScreen(
+                                        viewModel = habitHistoryViewModel,
+                                        onNavigateBack = {
+                                            if (backstack.size > 1) {
+                                                backstack.removeAt(backstack.size - 1)
+                                            }
+                                        },
+                                        onEditHabit = { habitId ->
+                                            backstack.add(Screen.HabitForm(habitId))
+                                        }
+                                    )
+                                }
+
+                                is Screen.Settings -> {
+                                    val settingsViewModel: com.habit1.app.ui.settings.SettingsViewModel = viewModel(
+                                        factory = com.habit1.app.ui.settings.SettingsViewModel.Factory(
+                                            backupRepository = app.container.backupRepository,
+                                            userPreferences = app.container.userPreferences
+                                        )
+                                    )
+                                    com.habit1.app.ui.settings.SettingsScreen(
+                                        viewModel = settingsViewModel,
+                                        onNavigateBack = {
+                                            if (backstack.size > 1) {
+                                                backstack.removeAt(backstack.size - 1)
+                                            }
+                                        }
+                                    )
+                                }
+                            }
                         }
                     }
                 }

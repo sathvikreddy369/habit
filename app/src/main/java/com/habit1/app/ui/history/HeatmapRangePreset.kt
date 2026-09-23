@@ -6,6 +6,6 @@ package com.habit1.app.ui.history
  */
 enum class HeatmapRangePreset(val label: String) {
     THIS_WEEK("This Week"),
-    MONTHLY("Monthly"),
-    YEARLY("Yearly");
+    THIS_MONTH("This Month"),
+    THIS_YEAR("This Year");
 }

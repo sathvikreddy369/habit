@@ -1,6 +1,7 @@
 package com.habit1.app.ui.habits.form
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -12,10 +13,15 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import com.habit1.app.ui.components.ColorPickerDialog
+import com.habit1.app.ui.theme.HabitColors
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -23,6 +29,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -77,6 +84,7 @@ fun HabitFormScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val nameFocusRequester = remember { FocusRequester() }
     var showTimePickerDialog by remember { mutableStateOf(false) }
+    var showColorPickerDialog by remember { mutableStateOf(false) }
     var showArchiveDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
 
@@ -99,8 +107,9 @@ fun HabitFormScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = if (uiState.isEditMode) "Edit Habit" else "New Habit",
-                        style = MaterialTheme.typography.titleLarge
+                        text = if (uiState.isEditMode) "Edit habit" else "New habit",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold
                     )
                 },
                 navigationIcon = {
@@ -112,12 +121,21 @@ fun HabitFormScreen(
                     }
                 },
                 actions = {
-                    Button(
+                    OutlinedButton(
                         onClick = { viewModel.onEvent(HabitFormUiEvent.SaveHabit) },
                         enabled = !uiState.isSaving && uiState.name.isNotBlank(),
-                        modifier = Modifier.padding(end = 8.dp)
+                        shape = RoundedCornerShape(8.dp),
+                        border = BorderStroke(
+                            1.dp,
+                            if (!uiState.isSaving && uiState.name.isNotBlank()) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.surfaceVariant
+                        ),
+                        modifier = Modifier.padding(end = 12.dp)
                     ) {
-                        Text(if (uiState.isEditMode) "Save" else "Create")
+                        Text(
+                            text = "SAVE",
+                            fontWeight = FontWeight.Bold,
+                            color = if (!uiState.isSaving && uiState.name.isNotBlank()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline
+                        )
                     }
                 }
             )
@@ -162,42 +180,83 @@ fun HabitFormScreen(
                 }
             }
 
-            // Habit Name
-            val nameError = uiState.errors.firstOrNull { it is HabitValidationError.NameBlank || it is HabitValidationError.NameTooLong }
-            OutlinedTextField(
-                value = uiState.name,
-                onValueChange = { viewModel.onEvent(HabitFormUiEvent.UpdateName(it)) },
-                label = { Text("Habit name") },
-                keyboardOptions = KeyboardOptions(
-                    capitalization = KeyboardCapitalization.Sentences,
-                    imeAction = ImeAction.Next
-                ),
-                singleLine = true,
-                isError = nameError != null,
-                supportingText = {
-                    when (nameError) {
-                        is HabitValidationError.NameBlank -> Text("Name cannot be empty")
-                        is HabitValidationError.NameTooLong -> Text("Name must be ${nameError.maxLength} characters or less")
-                        else -> null
+            // First Row: Name and Color swatch
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Top
+            ) {
+                val nameError = uiState.errors.firstOrNull { it is HabitValidationError.NameBlank || it is HabitValidationError.NameTooLong }
+                OutlinedTextField(
+                    value = uiState.name,
+                    onValueChange = { viewModel.onEvent(HabitFormUiEvent.UpdateName(it)) },
+                    label = { Text("Name") },
+                    keyboardOptions = KeyboardOptions(
+                        capitalization = KeyboardCapitalization.Sentences,
+                        imeAction = ImeAction.Next
+                    ),
+                    singleLine = true,
+                    isError = nameError != null,
+                    supportingText = {
+                        when (nameError) {
+                            is HabitValidationError.NameBlank -> Text("Name cannot be empty")
+                            is HabitValidationError.NameTooLong -> Text("Name must be ${nameError.maxLength} characters or less")
+                            else -> null
+                        }
+                    },
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .focusRequester(nameFocusRequester)
+                )
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                // Color Swatch Box
+                OutlinedCard(
+                    onClick = { showColorPickerDialog = true },
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    modifier = Modifier
+                        .width(88.dp)
+                        .height(64.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "Color",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(26.dp)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(HabitColors.parseColor(uiState.colorHex))
+                        )
                     }
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .focusRequester(nameFocusRequester)
-            )
+                }
+            }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
-            // Description
+            // Question (description prompt)
             OutlinedTextField(
                 value = uiState.description,
                 onValueChange = { viewModel.onEvent(HabitFormUiEvent.UpdateDescription(it)) },
-                label = { Text("Description (optional)") },
+                label = { Text("Question") },
+                placeholder = { Text("e.g. Did you study today?") },
                 keyboardOptions = KeyboardOptions(
                     capitalization = KeyboardCapitalization.Sentences,
                     imeAction = ImeAction.Next
                 ),
                 singleLine = true,
+                shape = RoundedCornerShape(10.dp),
                 modifier = Modifier.fillMaxWidth()
             )
 
@@ -486,7 +545,12 @@ fun HabitFormScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(text = "🔔", style = MaterialTheme.typography.titleMedium)
+                            Icon(
+                                imageVector = Icons.Default.Notifications,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
                             Spacer(modifier = Modifier.width(12.dp))
                             Column {
                                 Text(
@@ -687,6 +751,14 @@ fun HabitFormScreen(
                     Text("Cancel")
                 }
             }
+        )
+    }
+
+    if (showColorPickerDialog) {
+        ColorPickerDialog(
+            selectedColorHex = uiState.colorHex,
+            onColorSelected = { viewModel.onEvent(HabitFormUiEvent.UpdateColor(it)) },
+            onDismiss = { showColorPickerDialog = false }
         )
     }
 }

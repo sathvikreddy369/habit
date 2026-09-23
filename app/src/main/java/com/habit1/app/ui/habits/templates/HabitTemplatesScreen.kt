@@ -276,7 +276,7 @@ private fun HabitTemplateCard(
                     if (template.suggestedReminderTime != null) {
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "🔔 Suggested reminder: ${DateTimeUtils.format12HourTime(template.suggestedReminderTime)}",
+                            text = "Suggested reminder: ${DateTimeUtils.format12HourTime(template.suggestedReminderTime)}",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.outline
                         )

@@ -16,6 +16,7 @@ data class Habit(
     val displayOrder: Int = 0,
     val isPaused: Boolean = false,
     val isArchived: Boolean = false,
+    val colorHex: String? = null,
     val createdAt: Instant,
     val updatedAt: Instant
 )

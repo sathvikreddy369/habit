@@ -9,4 +9,5 @@ sealed interface HabitHistoryUiEvent {
     data object ResetToToday : HabitHistoryUiEvent
     data class SelectDay(val day: HabitHistoryDay) : HabitHistoryUiEvent
     data object DismissDayDetail : HabitHistoryUiEvent
+    data object DeleteHabit : HabitHistoryUiEvent
 }

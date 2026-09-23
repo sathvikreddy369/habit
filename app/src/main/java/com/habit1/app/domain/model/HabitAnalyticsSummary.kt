@@ -16,6 +16,7 @@ data class HabitAnalyticsSummary(
 
     // Schedule & Completion Aggregates within range
     val scheduledDays: Int,
+    val eligibleScheduledDays: Int = scheduledDays,
     val completedDays: Int,
     val recordedIncompleteDays: Int,
     val missedDays: Int,

@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -43,14 +44,12 @@ class HabitHistoryViewModel(
     private val anchorEndDateFlow = MutableStateFlow(today)
     private val selectedDayDetailFlow = MutableStateFlow<HabitHistoryDay?>(null)
 
-    private val rangeFormatter = DateTimeFormatter.ofPattern("MMM d", Locale.getDefault())
-    private val yearFormatter = DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.getDefault())
-
     private val rangeQueryFlow = combine(selectedPresetFlow, anchorEndDateFlow) { preset, anchor ->
         val range = resolveRange(preset, anchor)
-        val canNavigateNext = anchor.isBefore(today)
-        val isCurrent = anchor == today
-        val formattedRange = formatRange(range)
+        val todayCurrentRange = resolveRange(preset, today)
+        val canNavigateNext = range.startDate.isBefore(todayCurrentRange.startDate)
+        val isCurrent = (range.startDate == todayCurrentRange.startDate && range.endDate == todayCurrentRange.endDate)
+        val formattedRange = formatRange(preset, range)
         RangeConfig(
             preset = preset,
             range = range,
@@ -63,18 +62,22 @@ class HabitHistoryViewModel(
     val uiState: StateFlow<HabitHistoryUiState> = rangeQueryFlow.flatMapLatest { config ->
         combine(
             habitRepository.observeHabitById(habitId),
-            habitRecordRepository.observeRecordsForHabitInRange(habitId, config.range),
+            habitRecordRepository.observeRecordsForHabit(habitId),
             selectedDayDetailFlow
-        ) { habitEntity, recordEntities, selectedDayDetail ->
+        ) { habitEntity, allRecordEntities, selectedDayDetail ->
             if (habitEntity == null) {
                 HabitHistoryUiState(isLoading = false)
             } else {
                 val domainHabit = habitEntity.toDomain()
-                val domainRecords = recordEntities.map { it.toDomain() }
+                val allDomainRecords = allRecordEntities.map { it.toDomain() }
+                val recordsInRange = allRecordEntities.filter {
+                    val d = LocalDate.parse(it.date)
+                    !d.isBefore(config.range.startDate) && !d.isAfter(config.range.endDate)
+                }
 
                 val analyticsSummary = computeHabitAnalytics.execute(
                     habit = domainHabit,
-                    records = domainRecords,
+                    records = allDomainRecords,
                     range = config.range,
                     todayDate = today,
                     zoneId = zoneId
@@ -83,7 +86,7 @@ class HabitHistoryViewModel(
                 // Preserved for backward compatibility with existing tests
                 val summary = evaluateHabitHistory.execute(
                     habit = domainHabit,
-                    records = domainRecords,
+                    records = allDomainRecords,
                     startDate = config.range.startDate,
                     endDate = config.range.endDate,
                     todayDate = today,
@@ -94,7 +97,7 @@ class HabitHistoryViewModel(
                     habit = domainHabit,
                     summary = summary,
                     analyticsSummary = analyticsSummary,
-                    records = recordEntities.sortedByDescending { it.date },
+                    records = recordsInRange.sortedByDescending { it.date },
                     selectedPreset = config.preset,
                     currentRange = config.range,
                     formattedRange = config.formattedRange,
@@ -124,9 +127,9 @@ class HabitHistoryViewModel(
                     val preset = selectedPresetFlow.value
                     val currentAnchor = anchorEndDateFlow.value
                     val newAnchor = when (preset) {
-                        HeatmapRangePreset.THIS_WEEK -> currentAnchor.minusDays(7)
-                        HeatmapRangePreset.MONTHLY -> currentAnchor.minusMonths(1)
-                        HeatmapRangePreset.YEARLY -> currentAnchor.minusYears(1)
+                        HeatmapRangePreset.THIS_WEEK -> currentAnchor.minusWeeks(1)
+                        HeatmapRangePreset.THIS_MONTH -> currentAnchor.minusMonths(1)
+                        HeatmapRangePreset.THIS_YEAR -> currentAnchor.minusYears(1)
                     }
                     anchorEndDateFlow.value = newAnchor
                 }
@@ -135,11 +138,13 @@ class HabitHistoryViewModel(
                     val preset = selectedPresetFlow.value
                     val currentAnchor = anchorEndDateFlow.value
                     val shifted = when (preset) {
-                        HeatmapRangePreset.THIS_WEEK -> currentAnchor.plusDays(7)
-                        HeatmapRangePreset.MONTHLY -> currentAnchor.plusMonths(1)
-                        HeatmapRangePreset.YEARLY -> currentAnchor.plusYears(1)
+                        HeatmapRangePreset.THIS_WEEK -> currentAnchor.plusWeeks(1)
+                        HeatmapRangePreset.THIS_MONTH -> currentAnchor.plusMonths(1)
+                        HeatmapRangePreset.THIS_YEAR -> currentAnchor.plusYears(1)
                     }
-                    anchorEndDateFlow.value = if (shifted.isAfter(today)) today else shifted
+                    val todayRange = resolveRange(preset, today)
+                    val shiftedRange = resolveRange(preset, shifted)
+                    anchorEndDateFlow.value = if (shiftedRange.startDate.isAfter(todayRange.startDate)) today else shifted
                 }
 
                 is HabitHistoryUiEvent.ResetToToday -> {
@@ -153,19 +158,27 @@ class HabitHistoryViewModel(
                 is HabitHistoryUiEvent.DismissDayDetail -> {
                     selectedDayDetailFlow.value = null
                 }
+
+                is HabitHistoryUiEvent.DeleteHabit -> {
+                    habitRepository.deleteHabit(habitId)
+                }
             }
         }
     }
 
     private fun resolveRange(preset: HeatmapRangePreset, anchorEndDate: LocalDate): AnalyticsRange {
         return when (preset) {
-            HeatmapRangePreset.THIS_WEEK -> AnalyticsRange.ofDaysEndingAt(anchorEndDate, 7)
-            HeatmapRangePreset.MONTHLY -> {
+            HeatmapRangePreset.THIS_WEEK -> {
+                val monday = anchorEndDate.with(DayOfWeek.MONDAY)
+                val sunday = anchorEndDate.with(DayOfWeek.SUNDAY)
+                AnalyticsRange(monday, sunday)
+            }
+            HeatmapRangePreset.THIS_MONTH -> {
                 val start = anchorEndDate.withDayOfMonth(1)
                 val end = anchorEndDate.withDayOfMonth(anchorEndDate.lengthOfMonth())
                 AnalyticsRange(start, end)
             }
-            HeatmapRangePreset.YEARLY -> {
+            HeatmapRangePreset.THIS_YEAR -> {
                 val start = anchorEndDate.withDayOfYear(1)
                 val end = anchorEndDate.withDayOfYear(anchorEndDate.lengthOfYear())
                 AnalyticsRange(start, end)
@@ -173,17 +186,30 @@ class HabitHistoryViewModel(
         }
     }
 
-    private fun formatRange(range: AnalyticsRange): String {
-        return if (range.startDate.year == range.endDate.year) {
-            if (range.startDate.month == range.endDate.month && range.startDate.dayOfMonth == 1 && range.endDate.dayOfMonth == range.endDate.lengthOfMonth()) {
-                range.startDate.format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale.getDefault()))
-            } else if (range.startDate.dayOfYear == 1 && range.endDate.dayOfYear == range.endDate.lengthOfYear()) {
-                range.startDate.format(DateTimeFormatter.ofPattern("yyyy", Locale.getDefault()))
-            } else {
-                "${range.startDate.format(rangeFormatter)} — ${range.endDate.format(yearFormatter)}"
+    private fun formatRange(preset: HeatmapRangePreset, range: AnalyticsRange): String {
+        return when (preset) {
+            HeatmapRangePreset.THIS_WEEK -> {
+                if (range.startDate.year == range.endDate.year) {
+                    if (range.startDate.month == range.endDate.month) {
+                        val month = range.startDate.format(DateTimeFormatter.ofPattern("MMM", Locale.getDefault()))
+                        "$month ${range.startDate.dayOfMonth} – ${range.endDate.dayOfMonth}, ${range.endDate.year}"
+                    } else {
+                        val m1 = range.startDate.format(DateTimeFormatter.ofPattern("MMM d", Locale.getDefault()))
+                        val m2 = range.endDate.format(DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.getDefault()))
+                        "$m1 – $m2"
+                    }
+                } else {
+                    val m1 = range.startDate.format(DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.getDefault()))
+                    val m2 = range.endDate.format(DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.getDefault()))
+                    "$m1 – $m2"
+                }
             }
-        } else {
-            "${range.startDate.format(yearFormatter)} — ${range.endDate.format(yearFormatter)}"
+            HeatmapRangePreset.THIS_MONTH -> {
+                range.startDate.format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale.getDefault()))
+            }
+            HeatmapRangePreset.THIS_YEAR -> {
+                range.startDate.format(DateTimeFormatter.ofPattern("yyyy", Locale.getDefault()))
+            }
         }
     }
 

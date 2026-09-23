@@ -19,6 +19,7 @@ sealed interface HabitFormUiEvent {
     data class UpdateIntervalDays(val days: String) : HabitFormUiEvent
     data class UpdateAnchorDate(val date: LocalDate) : HabitFormUiEvent
     data class UpdateReminderTime(val reminderTime: String) : HabitFormUiEvent
+    data class UpdateColor(val colorHex: String) : HabitFormUiEvent
     data object SaveHabit : HabitFormUiEvent
     data object ResetSaveState : HabitFormUiEvent
     data object ArchiveHabit : HabitFormUiEvent

@@ -131,7 +131,7 @@ class HabitListViewModel(
             }
 
             val reminderSummary = domain.reminderTime?.let {
-                "🔔 " + com.habit1.app.core.util.DateTimeUtils.format12HourTime(it)
+                "Reminder: " + com.habit1.app.core.util.DateTimeUtils.format12HourTime(it)
             }
 
             HabitListItem(
@@ -145,7 +145,8 @@ class HabitListViewModel(
                 displayOrder = domain.displayOrder,
                 canMoveUp = index > 0,
                 canMoveDown = index < size - 1,
-                reminderSummary = reminderSummary
+                reminderSummary = reminderSummary,
+                colorHex = domain.colorHex
             )
         }
     }

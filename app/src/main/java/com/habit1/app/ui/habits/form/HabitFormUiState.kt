@@ -28,6 +28,7 @@ data class HabitFormUiState(
     val intervalDaysInput: String = "2",
     val anchorDate: LocalDate = LocalDate.now(),
     val reminderTimeInput: String = "",
+    val colorHex: String = com.habit1.app.ui.theme.HabitColors.DEFAULT_COLOR_HEX,
     val errors: Set<HabitValidationError> = emptySet(),
     val isSaving: Boolean = false,
     val isSaved: Boolean = false,

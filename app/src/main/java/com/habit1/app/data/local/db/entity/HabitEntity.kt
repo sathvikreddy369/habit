@@ -71,6 +71,9 @@ data class HabitEntity(
     @ColumnInfo(name = "is_archived")
     val isArchived: Boolean = false,
 
+    @ColumnInfo(name = "color_hex", defaultValue = "NULL")
+    val colorHex: String? = null,
+
     @ColumnInfo(name = "created_at")
     val createdAt: Long,
 

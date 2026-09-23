@@ -215,9 +215,9 @@ class HabitHistoryViewModelTest {
             assertTrue(state.analyticsSummary!!.dailyBreakdown.isNotEmpty())
 
             // Switch to Monthly preset
-            viewModel.onEvent(HabitHistoryUiEvent.SelectPreset(HeatmapRangePreset.MONTHLY))
+            viewModel.onEvent(HabitHistoryUiEvent.SelectPreset(HeatmapRangePreset.THIS_MONTH))
             state = awaitItem()
-            assertEquals(HeatmapRangePreset.MONTHLY, state.selectedPreset)
+            assertEquals(HeatmapRangePreset.THIS_MONTH, state.selectedPreset)
 
             // Navigate previous range
             viewModel.onEvent(HabitHistoryUiEvent.PreviousRange)

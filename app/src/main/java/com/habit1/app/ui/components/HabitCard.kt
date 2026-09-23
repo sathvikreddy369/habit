@@ -2,7 +2,9 @@ package com.habit1.app.ui.components
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -53,13 +55,15 @@ fun HabitCard(
     onIncrement: () -> Unit,
     onDecrement: () -> Unit,
     onSetValue: ((Double) -> Unit)? = null,
+    onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var showValueDialog by remember { mutableStateOf(false) }
+    val habitColor = com.habit1.app.ui.theme.HabitColors.parseColor(habitItem.colorHex)
 
     val checkColor by animateColorAsState(
         targetValue = if (habitItem.isCompleted) {
-            MaterialTheme.colorScheme.primary
+            habitColor
         } else {
             MaterialTheme.colorScheme.surfaceVariant
         },
@@ -68,7 +72,7 @@ fun HabitCard(
 
     val iconTint by animateColorAsState(
         targetValue = if (habitItem.isCompleted) {
-            MaterialTheme.colorScheme.onPrimary
+            androidx.compose.ui.graphics.Color.White
         } else {
             MaterialTheme.colorScheme.outline
         },
@@ -91,7 +95,15 @@ fun HabitCard(
     }
 
     Card(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .then(
+                if (onClick != null) {
+                    Modifier.clickable { onClick() }
+                } else {
+                    Modifier
+                }
+            ),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
@@ -102,14 +114,24 @@ fun HabitCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            verticalAlignment = Alignment.CenterVertically
         ) {
+            // Left color accent bar
+            Box(
+                modifier = Modifier
+                    .width(4.dp)
+                    .height(38.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(habitColor)
+            )
+
+            Spacer(modifier = Modifier.width(12.dp))
+
             // Left content: Name, details, streak
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(end = 12.dp)
+                    .padding(end = 8.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
@@ -123,7 +145,10 @@ fun HabitCard(
 
                     if (habitItem.streakResult.currentStreak > 0) {
                         Spacer(modifier = Modifier.width(8.dp))
-                        StreakBadge(streakCount = habitItem.streakResult.currentStreak)
+                        StreakBadge(
+                            streakCount = habitItem.streakResult.currentStreak,
+                            accentColor = habitColor
+                        )
                     }
                 }
 
@@ -143,7 +168,7 @@ fun HabitCard(
                     text = habitItem.formattedProgress,
                     style = MaterialTheme.typography.labelSmall,
                     color = if (habitItem.isCompleted) {
-                        MaterialTheme.colorScheme.primary
+                        habitColor
                     } else {
                         MaterialTheme.colorScheme.outline
                     },

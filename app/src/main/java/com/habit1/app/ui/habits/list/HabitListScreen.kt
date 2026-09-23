@@ -1,8 +1,10 @@
 package com.habit1.app.ui.habits.list
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -56,7 +58,7 @@ fun HabitListScreen(
     viewModel: HabitListViewModel,
     onCreateHabit: () -> Unit,
     onEditHabit: (habitId: String) -> Unit,
-    onNavigateBack: () -> Unit,
+    onNavigateBack: (() -> Unit)? = null,
     onInspectHabit: (habitId: String) -> Unit = {},
     onNavigateToTemplates: () -> Unit = {},
     modifier: Modifier = Modifier
@@ -67,13 +69,15 @@ fun HabitListScreen(
         modifier = modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
-                title = { Text("Habits & Reminders", style = MaterialTheme.typography.titleLarge) },
+                title = { Text("Habits", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back"
-                        )
+                    if (onNavigateBack != null) {
+                        IconButton(onClick = onNavigateBack) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back"
+                            )
+                        }
                     }
                 },
                 actions = {
@@ -234,6 +238,8 @@ private fun HabitManagementCard(
     onDelete: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val habitColor = com.habit1.app.ui.theme.HabitColors.parseColor(habit.colorHex)
+
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -242,24 +248,39 @@ private fun HabitManagementCard(
         ),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
     ) {
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            // Habit color bar
+            Box(
+                modifier = Modifier
+                    .width(4.dp)
+                    .height(44.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(habitColor)
+            )
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column(
+                modifier = Modifier.weight(1f)
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = habit.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = habit.name,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
 
                     if (!habit.description.isNullOrBlank()) {
                         Spacer(modifier = Modifier.height(2.dp))
@@ -308,7 +329,7 @@ private fun HabitManagementCard(
                 )
 
                 Text(
-                    text = habit.reminderSummary ?: "🔔 Off",
+                    text = habit.reminderSummary ?: "Reminder: Off",
                     style = MaterialTheme.typography.bodySmall,
                     color = if (habit.reminderSummary != null) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outline
                 )
@@ -411,6 +432,7 @@ private fun HabitManagementCard(
                         modifier = Modifier.height(32.dp)
                     ) {
                         Text("Edit", style = MaterialTheme.typography.labelSmall)
+                    }
                     }
                 }
             }

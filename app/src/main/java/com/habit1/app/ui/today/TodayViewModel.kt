@@ -173,7 +173,8 @@ class TodayViewModel(
                     isCompleted = isCompleted,
                     progressRatio = progressRatio,
                     formattedProgress = formattedProgress,
-                    streakResult = streak
+                    streakResult = streak,
+                    colorHex = habit.colorHex
                 )
             }
 

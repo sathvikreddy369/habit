@@ -14,7 +14,8 @@ data class HabitListItem(
     val displayOrder: Int,
     val canMoveUp: Boolean = false,
     val canMoveDown: Boolean = false,
-    val reminderSummary: String? = null
+    val reminderSummary: String? = null,
+    val colorHex: String? = null
 )
 
 /**

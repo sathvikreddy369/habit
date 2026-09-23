@@ -147,6 +147,7 @@ class HabitFormViewModel(
                         intervalDaysInput = intervalDays,
                         anchorDate = anchorDate,
                         reminderTimeInput = entity.reminderTime ?: "",
+                        colorHex = entity.colorHex ?: com.habit1.app.ui.theme.HabitColors.DEFAULT_COLOR_HEX,
                         originalCreatedAt = entity.createdAt,
                         originalDisplayOrder = entity.displayOrder,
                         originalIsPaused = entity.isPaused,
@@ -227,6 +228,9 @@ class HabitFormViewModel(
             }
             is HabitFormUiEvent.UpdateReminderTime -> {
                 _uiState.update { it.copy(reminderTimeInput = event.reminderTime) }
+            }
+            is HabitFormUiEvent.UpdateColor -> {
+                _uiState.update { it.copy(colorHex = event.colorHex) }
             }
             is HabitFormUiEvent.SaveHabit -> saveHabit()
             is HabitFormUiEvent.ResetSaveState -> {
@@ -350,6 +354,7 @@ class HabitFormViewModel(
                         displayOrder = currentCount,
                         isPaused = false,
                         isArchived = false,
+                        colorHex = state.colorHex,
                         createdAt = now,
                         updatedAt = now
                     )
@@ -370,6 +375,7 @@ class HabitFormViewModel(
                         displayOrder = state.originalDisplayOrder,
                         isPaused = state.originalIsPaused,
                         isArchived = state.originalIsArchived,
+                        colorHex = state.colorHex,
                         createdAt = state.originalCreatedAt ?: now,
                         updatedAt = now
                     )

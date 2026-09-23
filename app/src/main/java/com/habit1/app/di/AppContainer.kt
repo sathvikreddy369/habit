@@ -38,6 +38,7 @@ interface AppContainer {
     val backupRepository: com.habit1.app.data.repository.BackupRepository
     val recordHabitProgressUseCase: com.habit1.app.domain.usecase.RecordHabitProgressUseCase
     val computeHabitAnalyticsUseCase: com.habit1.app.domain.usecase.ComputeHabitAnalyticsUseCase
+    val computeGlobalAnalyticsUseCase: com.habit1.app.domain.usecase.ComputeGlobalAnalyticsUseCase
 }
 
 /**
@@ -117,5 +118,9 @@ class DefaultAppContainer(
 
     override val computeHabitAnalyticsUseCase: com.habit1.app.domain.usecase.ComputeHabitAnalyticsUseCase by lazy {
         com.habit1.app.domain.usecase.ComputeHabitAnalyticsUseCase()
+    }
+
+    override val computeGlobalAnalyticsUseCase: com.habit1.app.domain.usecase.ComputeGlobalAnalyticsUseCase by lazy {
+        com.habit1.app.domain.usecase.ComputeGlobalAnalyticsUseCase(computeHabitAnalyticsUseCase)
     }
 }

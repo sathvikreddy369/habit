@@ -2,6 +2,7 @@ package com.habit1.app.ui.history
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -10,13 +11,25 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -24,25 +37,42 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.habit1.app.core.util.DateTimeUtils
+import com.habit1.app.domain.model.HabitSchedule
 import com.habit1.app.domain.model.MeasurementType
 import com.habit1.app.ui.components.CompletionTrendGraph
+import com.habit1.app.ui.components.HabitFrequencyCard
 import com.habit1.app.ui.components.HabitHeatmap
+import com.habit1.app.ui.components.HabitHistoryBarChart
+import com.habit1.app.ui.components.HabitOverviewCard
+import com.habit1.app.ui.components.HabitStreaksCard
 import com.habit1.app.ui.components.HeatmapDayDetailDialog
 import com.habit1.app.ui.components.QuantitativePerformanceCard
+import com.habit1.app.ui.theme.HabitColors
 
+/**
+ * Habit Details & Analytics History Screen matching Loop Habit Tracker visual depth.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HabitHistoryScreen(
     viewModel: HabitHistoryViewModel,
     onNavigateBack: () -> Unit,
+    onEditHabit: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -50,17 +80,74 @@ fun HabitHistoryScreen(
     val summary = uiState.summary
     val analyticsSummary = uiState.analyticsSummary
 
+    val habitColor = HabitColors.parseColor(habit?.colorHex)
+    var showOverflowMenu by remember { mutableStateOf(false) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
+
     Scaffold(
         modifier = modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
-                title = { Text(habit?.name ?: "Habit History") },
+                title = {
+                    Text(
+                        text = habit?.name ?: "Habit Details",
+                        fontWeight = FontWeight.Bold
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back"
                         )
+                    }
+                },
+                actions = {
+                    if (habit != null) {
+                        IconButton(
+                            onClick = { onEditHabit(habit.id) },
+                            modifier = Modifier.semantics {
+                                contentDescription = "Edit habit ${habit.name}"
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = "Edit"
+                            )
+                        }
+
+                        Box {
+                            IconButton(onClick = { showOverflowMenu = true }) {
+                                Icon(
+                                    imageVector = Icons.Default.MoreVert,
+                                    contentDescription = "More options"
+                                )
+                            }
+
+                            DropdownMenu(
+                                expanded = showOverflowMenu,
+                                onDismissRequest = { showOverflowMenu = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Export") },
+                                    onClick = {
+                                        showOverflowMenu = false
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            text = "Delete",
+                                            color = MaterialTheme.colorScheme.error
+                                        )
+                                    },
+                                    onClick = {
+                                        showOverflowMenu = false
+                                        showDeleteDialog = true
+                                    }
+                                )
+                            }
+                        }
                     }
                 }
             )
@@ -88,87 +175,185 @@ fun HabitHistoryScreen(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // 1. Calendar Heatmap
-                if (analyticsSummary != null) {
-                    item(key = "heatmap") {
-                        HabitHeatmap(
-                            summary = analyticsSummary,
-                            selectedPreset = uiState.selectedPreset,
-                            formattedRange = uiState.formattedRange,
-                            canNavigateNext = uiState.canNavigateNext,
-                            isCurrentRange = uiState.isCurrentRange,
-                            onSelectPreset = { viewModel.onEvent(HabitHistoryUiEvent.SelectPreset(it)) },
-                            onPreviousRange = { viewModel.onEvent(HabitHistoryUiEvent.PreviousRange) },
-                            onNextRange = { viewModel.onEvent(HabitHistoryUiEvent.NextRange) },
-                            onResetToToday = { viewModel.onEvent(HabitHistoryUiEvent.ResetToToday) },
-                            onDayClick = { viewModel.onEvent(HabitHistoryUiEvent.SelectDay(it)) }
-                        )
-                    }
-
-                    // 2. Completion Trend Graph
-                    item(key = "completion_trend") {
-                        CompletionTrendGraph(
-                            summary = analyticsSummary,
-                            selectedPreset = uiState.selectedPreset,
-                            onDayClick = { viewModel.onEvent(HabitHistoryUiEvent.SelectDay(it)) }
-                        )
-                    }
-                }
-
-                // 3. Streak Cards Row
-                item(key = "streaks") {
-                    val currentStreak = analyticsSummary?.currentStreak ?: summary?.streakResult?.currentStreak ?: 0
-                    val longestStreak = analyticsSummary?.longestStreak ?: summary?.streakResult?.longestStreak ?: 0
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                // Habit Metadata Header (Question, Frequency, Reminder)
+                item(key = "habit_metadata_header") {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 4.dp, vertical = 2.dp)
                     ) {
-                        Card(
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-                        ) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Text(
-                                    text = "Current Streak",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = "$currentStreak days",
-                                    style = MaterialTheme.typography.headlineMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                                )
-                            }
+                        if (!habit.description.isNullOrBlank()) {
+                            Text(
+                                text = habit.description,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
                         }
 
-                        Card(
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Text(
-                                    text = "Longest Streak",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                            val scheduleText = when (val s = habit.schedule) {
+                                is HabitSchedule.Daily -> "Every day"
+                                is HabitSchedule.SpecificDays -> "${s.days.size} days a week"
+                                is HabitSchedule.Interval -> "Every ${s.everyNDays} days"
+                            }
+                            Icon(
+                                imageVector = Icons.Default.DateRange,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = scheduleText,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+
+                            if (habit.reminderTime != null) {
+                                Spacer(modifier = Modifier.width(16.dp))
+                                Icon(
+                                    imageVector = Icons.Default.Notifications,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(16.dp)
                                 )
-                                Spacer(modifier = Modifier.height(4.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = "$longestStreak days",
-                                    style = MaterialTheme.typography.headlineMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                                    text = DateTimeUtils.formatTime(habit.reminderTime),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
                     }
                 }
 
-                // 3. Consistency Summary Card
+                // 1. Overview Section (Circular Donut Ring & High-Density Stats)
+                item(key = "overview_section") {
+                    val scorePercent = analyticsSummary?.completionRate?.toInt()
+                        ?: summary?.streakResult?.completionRate?.toInt() ?: 0
+                    val dailyDays = analyticsSummary?.dailyBreakdown ?: summary?.historyDays ?: emptyList()
+                    val last30 = dailyDays.takeLast(30)
+                    val monthCompleted = last30.count { it.status is com.habit1.app.domain.model.CalendarDayStatus.Completed }
+                    val monthDelta = if (last30.isNotEmpty()) (monthCompleted * 100) / last30.size else null
+                    val totalCompletions = analyticsSummary?.completedDays ?: summary?.completedDaysCount ?: 0
+
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            text = "Overview",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = habitColor
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        HabitOverviewCard(
+                            scorePercent = scorePercent,
+                            monthDelta = monthDelta,
+                            yearPercent = scorePercent,
+                            totalCompletions = totalCompletions,
+                            accentColor = habitColor
+                        )
+                    }
+                }
+
+                // 2. Score Trend Section
+                if (analyticsSummary != null) {
+                    item(key = "score_trend_section") {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                text = "Score",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = habitColor
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            CompletionTrendGraph(
+                                summary = analyticsSummary,
+                                selectedPreset = uiState.selectedPreset,
+                                onDayClick = { viewModel.onEvent(HabitHistoryUiEvent.SelectDay(it)) },
+                                accentColor = habitColor
+                            )
+                        }
+                    }
+                }
+
+                // 3. History Bar Chart Section
+                if (analyticsSummary != null) {
+                    item(key = "history_barchart_section") {
+                        HabitHistoryBarChart(
+                            days = analyticsSummary.dailyBreakdown,
+                            accentColor = habitColor
+                        )
+                    }
+                }
+
+                // 4. Calendar Heatmap Matrix Section
+                if (analyticsSummary != null) {
+                    item(key = "calendar_section") {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                text = "Calendar",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = habitColor
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            HabitHeatmap(
+                                summary = analyticsSummary,
+                                selectedPreset = uiState.selectedPreset,
+                                formattedRange = uiState.formattedRange,
+                                canNavigateNext = uiState.canNavigateNext,
+                                isCurrentRange = uiState.isCurrentRange,
+                                onSelectPreset = { viewModel.onEvent(HabitHistoryUiEvent.SelectPreset(it)) },
+                                onPreviousRange = { viewModel.onEvent(HabitHistoryUiEvent.PreviousRange) },
+                                onNextRange = { viewModel.onEvent(HabitHistoryUiEvent.NextRange) },
+                                onResetToToday = { viewModel.onEvent(HabitHistoryUiEvent.ResetToToday) },
+                                onDayClick = { viewModel.onEvent(HabitHistoryUiEvent.SelectDay(it)) },
+                                accentColor = habitColor
+                            )
+                        }
+                    }
+                }
+
+                // 5. Best Streaks Section (Horizontal Timeline Bars)
+                if (analyticsSummary != null) {
+                    item(key = "best_streaks_section") {
+                        HabitStreaksCard(
+                            currentStreak = analyticsSummary.currentStreak,
+                            longestStreak = analyticsSummary.longestStreak,
+                            historyDays = analyticsSummary.dailyBreakdown,
+                            accentColor = habitColor
+                        )
+                    }
+                }
+
+                // 6. Weekday Frequency Section (Dot Density)
+                if (analyticsSummary != null) {
+                    item(key = "frequency_section") {
+                        HabitFrequencyCard(
+                            historyDays = analyticsSummary.dailyBreakdown,
+                            accentColor = habitColor
+                        )
+                    }
+                }
+
+                // 7. Quantitative Performance Section (if applicable)
+                if (habit.measurement !is MeasurementType.BooleanChoice && analyticsSummary != null) {
+                    item(key = "quantitative_performance") {
+                        QuantitativePerformanceCard(
+                            habit = habit,
+                            summary = analyticsSummary,
+                            selectedPreset = uiState.selectedPreset
+                        )
+                    }
+                }
+
+                // 8. Consistency Breakdown Details
                 item(key = "consistency_summary") {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -203,18 +388,7 @@ fun HabitHistoryScreen(
                     }
                 }
 
-                // 4. Quantitative Performance Section (if applicable)
-                if (habit.measurement !is MeasurementType.BooleanChoice && analyticsSummary != null) {
-                    item(key = "quantitative_performance") {
-                        QuantitativePerformanceCard(
-                            habit = habit,
-                            summary = analyticsSummary,
-                            selectedPreset = uiState.selectedPreset
-                        )
-                    }
-                }
-
-                // 5. Chronological Recorded History Header
+                // 9. Chronological Recorded History Header
                 item(key = "records_header") {
                     Text(
                         text = "Historical Activity Log (${uiState.records.size} in range)",
@@ -224,7 +398,7 @@ fun HabitHistoryScreen(
                     )
                 }
 
-                // 6. Historical Record Items
+                // 10. Historical Record Items
                 if (uiState.records.isEmpty()) {
                     item(key = "empty_records") {
                         Card(
@@ -255,7 +429,7 @@ fun HabitHistoryScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Column {
+                                Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         text = record.date,
                                         style = MaterialTheme.typography.bodyLarge,
@@ -278,12 +452,12 @@ fun HabitHistoryScreen(
 
                                 Surface(
                                     shape = RoundedCornerShape(8.dp),
-                                    color = if (record.isCompleted) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.errorContainer
+                                    color = if (record.isCompleted) habitColor.copy(alpha = 0.2f) else MaterialTheme.colorScheme.errorContainer
                                 ) {
                                     Text(
                                         text = if (record.isCompleted) "Completed" else "Incomplete",
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = if (record.isCompleted) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onErrorContainer,
+                                        color = if (record.isCompleted) habitColor else MaterialTheme.colorScheme.onErrorContainer,
                                         fontWeight = FontWeight.Bold,
                                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                     )
@@ -293,7 +467,7 @@ fun HabitHistoryScreen(
                     }
                 }
 
-                // 7. Explanatory Note
+                // 11. Explanatory Note
                 item(key = "schedule_limitation_note") {
                     Text(
                         text = "Note: Schedule expectations for unrecorded past dates are projected based on the habit's current schedule. Recorded historical completions and snapshots are immutable truth.",
@@ -312,6 +486,53 @@ fun HabitHistoryScreen(
             day = day,
             habitName = habit?.name ?: "Habit",
             onDismiss = { viewModel.onEvent(HabitHistoryUiEvent.DismissDayDetail) }
+        )
+    }
+
+    // Delete Confirmation Dialog
+    if (showDeleteDialog && habit != null) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error
+                )
+            },
+            title = {
+                Text(
+                    text = "Delete Habit?",
+                    style = MaterialTheme.typography.titleLarge
+                )
+            },
+            text = {
+                Text(
+                    text = "Delete '${habit.name}'?\n\nThis permanently removes the habit and all of its recorded history. This action cannot be undone.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showDeleteDialog = false
+                        viewModel.onEvent(HabitHistoryUiEvent.DeleteHabit)
+                        onNavigateBack()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError
+                    )
+                ) {
+                    Text("Delete Permanently")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) {
+                    Text("Cancel")
+                }
+            }
         )
     }
 }

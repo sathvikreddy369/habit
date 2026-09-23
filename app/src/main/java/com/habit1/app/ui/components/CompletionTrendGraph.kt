@@ -196,7 +196,8 @@ fun CompletionTrendGraph(
     summary: HabitAnalyticsSummary,
     selectedPreset: HeatmapRangePreset,
     onDayClick: (HabitHistoryDay) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    accentColor: Color = MaterialTheme.colorScheme.primary
 ) {
     val isQuantitative = summary.habit.measurement !is MeasurementType.BooleanChoice
     val points = remember(summary) { extractTrendPoints(summary) }
@@ -250,7 +251,7 @@ fun CompletionTrendGraph(
                     text = "${summary.completionRate.toInt()}%",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
+                    color = accentColor
                 )
             }
 
@@ -302,7 +303,7 @@ fun CompletionTrendGraph(
                     }
                 }
             } else {
-                val primaryColor = MaterialTheme.colorScheme.primary
+                val primaryColor = accentColor
                 val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
                 val outlineColor = MaterialTheme.colorScheme.outlineVariant
                 val warningColor = MaterialTheme.colorScheme.tertiary
@@ -317,15 +318,18 @@ fun CompletionTrendGraph(
 
                 val density = LocalDensity.current
 
+                val isLandscape = androidx.compose.ui.platform.LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+                val chartHeight = if (isLandscape) 280.dp else 200.dp
+
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(200.dp)
+                        .height(chartHeight)
                 ) {
                     Canvas(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(200.dp)
+                            .height(chartHeight)
                             .pointerInput(points, summary) {
                                 detectTapGestures { offset ->
                                     val leftPad = with(density) { 36.dp.toPx() }
@@ -423,14 +427,14 @@ fun CompletionTrendGraph(
                         // 3. Draw X-Axis Labels (Date markers)
                         val xLabelCount = when (selectedPreset) {
                             HeatmapRangePreset.THIS_WEEK -> 4
-                            HeatmapRangePreset.MONTHLY -> 4
-                            HeatmapRangePreset.YEARLY -> 6
+                            HeatmapRangePreset.THIS_MONTH -> 4
+                            HeatmapRangePreset.THIS_YEAR -> 6
                         }
 
                         val xFormatter = when (selectedPreset) {
                             HeatmapRangePreset.THIS_WEEK -> DateTimeFormatter.ofPattern("EEE d", Locale.getDefault())
-                            HeatmapRangePreset.MONTHLY -> DateTimeFormatter.ofPattern("MMM d", Locale.getDefault())
-                            HeatmapRangePreset.YEARLY -> DateTimeFormatter.ofPattern("MMM", Locale.getDefault())
+                            HeatmapRangePreset.THIS_MONTH -> DateTimeFormatter.ofPattern("MMM d", Locale.getDefault())
+                            HeatmapRangePreset.THIS_YEAR -> DateTimeFormatter.ofPattern("MMM", Locale.getDefault())
                         }
 
                         val step = (totalDays - 1).toFloat() / (xLabelCount - 1).coerceAtLeast(1)
@@ -566,7 +570,7 @@ fun CompletionTrendGraph(
             Spacer(modifier = Modifier.height(12.dp))
 
             // 3. Compact Legend
-            TrendGraphLegend(isQuantitative = isQuantitative)
+            TrendGraphLegend(isQuantitative = isQuantitative, accentColor = accentColor)
         }
     }
 }
@@ -577,6 +581,7 @@ fun CompletionTrendGraph(
 @Composable
 private fun TrendGraphLegend(
     isQuantitative: Boolean,
+    accentColor: Color = MaterialTheme.colorScheme.primary,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -592,7 +597,7 @@ private fun TrendGraphLegend(
             Surface(
                 modifier = Modifier.size(8.dp),
                 shape = CircleShape,
-                color = MaterialTheme.colorScheme.primary
+                color = accentColor
             ) {}
             Text(
                 text = if (isQuantitative) "Achieved" else "Completed",

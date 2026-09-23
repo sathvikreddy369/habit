@@ -59,6 +59,7 @@ object EntityMappers {
             displayOrder = displayOrder,
             isPaused = isPaused,
             isArchived = isArchived,
+            colorHex = colorHex,
             createdAt = createdInstant,
             updatedAt = Instant.ofEpochMilli(updatedAt)
         )
@@ -86,6 +87,7 @@ object EntityMappers {
             displayOrder = displayOrder,
             isPaused = isPaused,
             isArchived = isArchived,
+            colorHex = colorHex,
             createdAt = createdAt.toEpochMilli(),
             updatedAt = updatedAt.toEpochMilli()
         )

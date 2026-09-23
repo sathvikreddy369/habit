@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <full-backup-content>
-    <!-- Exclude all local databases and preferences from automatic cloud backups -->
-    <exclude domain="root" path="." />
-    <exclude domain="database" path="." />
-    <exclude domain="sharedpref" path="." />
+    <!-- Include all local databases and preferences for automatic restore upon reinstallation -->
+    <include domain="database" path="." />
+    <include domain="sharedpref" path="." />
+    <include domain="root" path="." />
 </full-backup-content>

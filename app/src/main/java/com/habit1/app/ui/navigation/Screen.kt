@@ -8,6 +8,7 @@ sealed interface Screen {
     data object HabitList : Screen
     data class HabitForm(val habitId: String? = null, val templateId: String? = null) : Screen
     data object HabitTemplates : Screen
+    data object Analytics : Screen
     data object History : Screen
     data class HabitHistory(val habitId: String) : Screen
     data object Settings : Screen

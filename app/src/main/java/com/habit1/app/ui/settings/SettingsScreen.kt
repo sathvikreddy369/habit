@@ -154,8 +154,8 @@ fun SettingsScreen(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // 1. APPEARANCE SECTION
-                SettingsSectionHeader(title = "Appearance")
+                // 1. INTERFACE SECTION
+                SettingsSectionHeader(title = "Interface")
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
@@ -189,8 +189,8 @@ fun SettingsScreen(
                     }
                 }
 
-                // 2. NOTIFICATIONS SECTION
-                SettingsSectionHeader(title = "Notifications")
+                // 2. REMINDER SECTION
+                SettingsSectionHeader(title = "Reminder")
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
@@ -233,8 +233,8 @@ fun SettingsScreen(
                     }
                 }
 
-                // 3. DATA & PRIVACY SECTION
-                SettingsSectionHeader(title = "Data & Privacy")
+                // 3. DATABASE SECTION
+                SettingsSectionHeader(title = "Database")
 
                 // 3a. Sovereignty Card
                 Card(
@@ -325,12 +325,33 @@ fun SettingsScreen(
                     }
                 }
 
-                // 4. DATA & HISTORY RULES SECTION
-                SettingsSectionHeader(title = "Data & History Rules")
+                // 3d. Storage info
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        val dbFile = context.getDatabasePath("habit1.db")
+                        val dbSizeKb = if (dbFile != null && dbFile.exists()) dbFile.length() / 1024 else 0
+                        Text(
+                            text = "Local Storage Usage",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "• Database File: $dbSizeKb KB\n" +
+                                   "• Location: Device-only sandbox (Room SQLite)\n" +
+                                   "• Network Sync: None (Local-first & Offline)",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                // 4. TROUBLESHOOTING SECTION
+                SettingsSectionHeader(title = "Troubleshooting")
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            text = "Historical Truth",
+                            text = "Historical Truth Rules",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
@@ -349,30 +370,8 @@ fun SettingsScreen(
                     }
                 }
 
-                // 5. STORAGE INFO SECTION
-                SettingsSectionHeader(title = "Storage Information")
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        val dbFile = context.getDatabasePath("habit1.db")
-                        val dbSizeKb = if (dbFile != null && dbFile.exists()) dbFile.length() / 1024 else 0
-                        Text(
-                            text = "Local Storage Usage",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "• Database File: $dbSizeKb KB\n" +
-                                   "• Location: Device-only encrypted app sandbox\n" +
-                                   "• Network Sync: None (Local-first & Offline)",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-
-                // 6. ABOUT SECTION
-                SettingsSectionHeader(title = "About")
+                // 5. ABOUT & LINKS SECTION
+                SettingsSectionHeader(title = "About & Links")
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(

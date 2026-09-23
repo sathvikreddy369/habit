@@ -58,6 +58,7 @@ data class HabitBackupDto(
     val displayOrder: Int,
     val isPaused: Boolean,
     val isArchived: Boolean,
+    val colorHex: String? = null,
     val createdAt: Long,
     val updatedAt: Long
 )
@@ -122,6 +123,7 @@ fun HabitEntity.toBackupDto(): HabitBackupDto = HabitBackupDto(
     displayOrder = displayOrder,
     isPaused = isPaused,
     isArchived = isArchived,
+    colorHex = colorHex,
     createdAt = createdAt,
     updatedAt = updatedAt
 )
@@ -139,6 +141,7 @@ fun HabitBackupDto.toEntity(): HabitEntity = HabitEntity(
     displayOrder = displayOrder,
     isPaused = isPaused,
     isArchived = isArchived,
+    colorHex = colorHex,
     createdAt = createdAt,
     updatedAt = updatedAt
 )

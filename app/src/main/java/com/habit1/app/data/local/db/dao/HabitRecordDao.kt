@@ -40,6 +40,9 @@ interface HabitRecordDao {
     @Query("SELECT * FROM habit_records WHERE habit_id = :habitId ORDER BY date ASC")
     suspend fun getRecordsForHabit(habitId: String): List<HabitRecordEntity>
 
+    @Query("SELECT * FROM habit_records WHERE habit_id = :habitId ORDER BY date ASC")
+    fun observeRecordsForHabit(habitId: String): Flow<List<HabitRecordEntity>>
+
     @Query("SELECT * FROM habit_records WHERE habit_id IN (:habitIds) ORDER BY date ASC")
     suspend fun getRecordsForHabits(habitIds: List<String>): List<HabitRecordEntity>
 

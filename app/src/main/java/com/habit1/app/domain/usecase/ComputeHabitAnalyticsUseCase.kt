@@ -128,14 +128,14 @@ class ComputeHabitAnalyticsUseCase(
             0.0f
         }
 
-        // 4. Calculate Streaks using authoritative use case
+        // 4. Calculate Streaks using authoritative use case (evaluates full history up to effective end date)
         val streakResult = calculateStreaks.execute(
             habit = habit,
             records = records,
             todayDate = todayDate,
             zoneId = zoneId,
-            startDate = range.startDate,
-            endDate = range.endDate
+            startDate = null,
+            endDate = if (range.endDate.isBefore(todayDate)) range.endDate else todayDate
         )
 
         // 5. Quantitative Analytics
@@ -174,6 +174,7 @@ class ComputeHabitAnalyticsUseCase(
             habit = habit,
             range = range,
             scheduledDays = scheduledDates.size,
+            eligibleScheduledDays = eligibleScheduledDays,
             completedDays = completedDaysCount,
             recordedIncompleteDays = recordedIncompleteCount,
             missedDays = missedDaysCount,

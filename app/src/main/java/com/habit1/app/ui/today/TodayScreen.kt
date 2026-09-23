@@ -12,21 +12,27 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -44,6 +50,12 @@ import com.habit1.app.ui.components.GoalEditorDialog
 import com.habit1.app.ui.components.HabitCard
 import com.habit1.app.ui.components.TodayHeader
 
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+
 /**
  * Primary Today screen composable that renders habits, goals, and daily progress.
  */
@@ -52,6 +64,8 @@ import com.habit1.app.ui.components.TodayHeader
 fun TodayScreen(
     viewModel: TodayViewModel,
     modifier: Modifier = Modifier,
+    onCreateHabit: () -> Unit = {},
+    onInspectHabit: (String) -> Unit = {},
     onNavigateToHabits: () -> Unit = {},
     onNavigateToHistory: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {}
@@ -59,6 +73,7 @@ fun TodayScreen(
 
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    var showCreateSheet by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState.userMessage) {
         uiState.userMessage?.let { message ->
@@ -71,24 +86,23 @@ fun TodayScreen(
         modifier = modifier.fillMaxSize(),
         topBar = {
             androidx.compose.material3.TopAppBar(
-                title = {},
+                title = {
+                    Text(
+                        text = "Today",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
                 actions = {
-                    TextButton(onClick = onNavigateToHistory) {
-                        Text(
-                            text = "History",
-                            style = MaterialTheme.typography.labelLarge
-                        )
-                    }
-                    TextButton(onClick = onNavigateToHabits) {
-                        Text(
-                            text = "Habits & Reminders",
-                            style = MaterialTheme.typography.labelLarge
-                        )
-                    }
-                    TextButton(onClick = onNavigateToSettings) {
-                        Text(
-                            text = "Settings",
-                            style = MaterialTheme.typography.labelLarge
+                    IconButton(
+                        onClick = onNavigateToSettings,
+                        modifier = Modifier.semantics {
+                            contentDescription = "Settings and Data"
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "Settings"
                         )
                     }
                 }
@@ -97,13 +111,13 @@ fun TodayScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { viewModel.onEvent(TodayUiEvent.OpenAddGoalDialog) },
+                onClick = { showCreateSheet = true },
                 containerColor = MaterialTheme.colorScheme.primaryContainer,
                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer
             ) {
                 Icon(
                     imageVector = Icons.Default.Add,
-                    contentDescription = "Add Daily Goal"
+                    contentDescription = "Create Habit or Daily Goal"
                 )
             }
         }
@@ -147,6 +161,7 @@ fun TodayScreen(
                         onIncrement = { viewModel.onEvent(TodayUiEvent.IncrementHabit(habitItem.id)) },
                         onDecrement = { viewModel.onEvent(TodayUiEvent.DecrementHabit(habitItem.id)) },
                         onSetValue = { value -> viewModel.onEvent(TodayUiEvent.SetHabitValue(habitItem.id, value)) },
+                        onClick = { onInspectHabit(habitItem.id) },
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
                     )
                 }
@@ -278,6 +293,103 @@ fun TodayScreen(
                     onDeleteClick = { viewModel.onEvent(TodayUiEvent.DeleteReview) },
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
                 )
+            }
+        }
+    }
+
+    // Create Bottom Sheet (Replaces dropdown for clean modern UX)
+    if (showCreateSheet) {
+        val sheetState = rememberModalBottomSheetState()
+        ModalBottomSheet(
+            onDismissRequest = { showCreateSheet = false },
+            sheetState = sheetState
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 8.dp)
+                    .padding(bottom = 28.dp)
+            ) {
+                Text(
+                    text = "Create",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(bottom = 14.dp)
+                )
+
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            showCreateSheet = false
+                            onCreateHabit()
+                        }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column {
+                            Text(
+                                text = "New Habit",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = "Track daily, weekly, or specific days consistency",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            showCreateSheet = false
+                            viewModel.onEvent(TodayUiEvent.OpenAddGoalDialog)
+                        }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CheckCircle,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column {
+                            Text(
+                                text = "Daily Goal",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = "A one-day target strictly for today",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
             }
         }
     }
