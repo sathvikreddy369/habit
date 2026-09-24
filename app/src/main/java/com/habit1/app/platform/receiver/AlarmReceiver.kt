@@ -28,9 +28,37 @@ class AlarmReceiver : BroadcastReceiver() {
     companion object {
         const val ACTION_HABIT_REMINDER = "com.habit1.app.ACTION_HABIT_REMINDER"
         const val EXTRA_HABIT_ID = "extra_habit_id"
+
+        const val ACTION_GOAL_REMINDER = "com.habit1.app.ACTION_GOAL_REMINDER"
+        const val EXTRA_GOAL_ID = "extra_goal_id"
+        const val EXTRA_GOAL_TITLE = "extra_goal_title"
+        const val EXTRA_GOAL_NOTES = "extra_goal_notes"
     }
 
     override fun onReceive(context: Context, intent: Intent) {
+        if (intent.action == ACTION_GOAL_REMINDER) {
+            val goalId = intent.getStringExtra(EXTRA_GOAL_ID) ?: return
+            val goalTitle = intent.getStringExtra(EXTRA_GOAL_TITLE) ?: "Daily Goal"
+            val goalNotes = intent.getStringExtra(EXTRA_GOAL_NOTES)
+            val pendingResult = goAsync()
+            val app = context.applicationContext as? HabitApplication
+            if (app == null) {
+                pendingResult?.finish()
+                return
+            }
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    val goal = app.container.database.dailyGoalDao().getGoalById(goalId)
+                    if (goal != null && !goal.isCompleted) {
+                        app.container.notificationHelper.showGoalReminderNotification(goalTitle, goalId, goalNotes)
+                    }
+                } finally {
+                    pendingResult?.finish()
+                }
+            }
+            return
+        }
+
         if (intent.action != ACTION_HABIT_REMINDER) {
             return
         }

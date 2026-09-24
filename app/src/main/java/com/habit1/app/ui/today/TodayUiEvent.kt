@@ -20,12 +20,17 @@ sealed interface TodayUiEvent {
     // Goal Management Dialogs & Actions
     data object OpenAddGoalDialog : TodayUiEvent
     data object DismissGoalDialog : TodayUiEvent
-    data class SaveNewGoal(val title: String, val notes: String?, val targetDate: java.time.LocalDate? = null) : TodayUiEvent
+    data class SaveNewGoal(val title: String, val notes: String?, val targetDate: java.time.LocalDate? = null, val reminderTime: java.time.LocalTime? = null) : TodayUiEvent
     data class RequestEditGoal(val goal: TodayGoalItem) : TodayUiEvent
-    data class SaveEditedGoal(val goalId: String, val title: String, val notes: String?) : TodayUiEvent
+    data class SaveEditedGoal(val goalId: String, val title: String, val notes: String?, val reminderTime: java.time.LocalTime? = null) : TodayUiEvent
+    data class SetGoalReminder(val goalId: String, val reminderTime: java.time.LocalTime?) : TodayUiEvent
     data class RequestDeleteGoal(val goal: TodayGoalItem) : TodayUiEvent
     data object ConfirmDeleteGoal : TodayUiEvent
     data object CancelDeleteGoal : TodayUiEvent
+    data class RequestMoveGoalTomorrow(val goal: TodayGoalItem) : TodayUiEvent
+    data object ConfirmMoveGoalTomorrow : TodayUiEvent
+    data object CancelMoveGoalTomorrow : TodayUiEvent
+    data object UndoLastMovedGoal : TodayUiEvent
     data class MoveGoalDate(val goalId: String, val newDate: java.time.LocalDate) : TodayUiEvent
     data class MoveGoalUp(val goalId: String) : TodayUiEvent
     data class MoveGoalDown(val goalId: String) : TodayUiEvent

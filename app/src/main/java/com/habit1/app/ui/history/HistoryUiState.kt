@@ -79,5 +79,6 @@ data class HistoryUiState(
     val selectedDateBreakdown: SelectedDateBreakdown? = null,
     val monthSummary: MonthSummary? = null,
     val yearlyOverview: List<YearMonthSummaryItem> = emptyList(),
-    val isLoading: Boolean = false
+    val isLoading: Boolean = false,
+    val userMessage: String? = null
 )

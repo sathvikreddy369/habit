@@ -83,6 +83,7 @@ data class DailyGoalBackupDto(
     val targetDate: String, // Civil date: YYYY-MM-DD
     val title: String,
     val notes: String? = null,
+    val reminderTime: String? = null,
     val isCompleted: Boolean,
     val displayOrder: Int,
     val createdAt: Long,
@@ -177,6 +178,7 @@ fun DailyGoalEntity.toBackupDto(): DailyGoalBackupDto = DailyGoalBackupDto(
     targetDate = targetDate,
     title = title,
     notes = notes,
+    reminderTime = reminderTime,
     isCompleted = isCompleted,
     displayOrder = displayOrder,
     createdAt = createdAt,
@@ -188,6 +190,7 @@ fun DailyGoalBackupDto.toEntity(): DailyGoalEntity = DailyGoalEntity(
     targetDate = targetDate,
     title = title,
     notes = notes,
+    reminderTime = reminderTime,
     isCompleted = isCompleted,
     displayOrder = displayOrder,
     createdAt = createdAt,

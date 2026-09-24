@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -61,6 +62,7 @@ fun HabitListScreen(
     onNavigateBack: (() -> Unit)? = null,
     onInspectHabit: (habitId: String) -> Unit = {},
     onNavigateToTemplates: () -> Unit = {},
+    onNavigateToSettings: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -87,6 +89,11 @@ fun HabitListScreen(
                     }
                     IconButton(onClick = onCreateHabit) {
                         Icon(imageVector = Icons.Default.Add, contentDescription = "Add Habit")
+                    }
+                    if (onNavigateToSettings != null) {
+                        IconButton(onClick = onNavigateToSettings) {
+                            Icon(imageVector = androidx.compose.material.icons.Icons.Default.Settings, contentDescription = "Settings")
+                        }
                     }
                 }
             )
@@ -241,19 +248,19 @@ private fun HabitManagementCard(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Habit color bar
             Box(
                 modifier = Modifier
                     .width(4.dp)
-                    .height(44.dp)
+                    .height(38.dp)
                     .clip(RoundedCornerShape(2.dp))
                     .background(habitColor)
             )
@@ -272,148 +279,151 @@ private fun HabitManagementCard(
                         Text(
                             text = habit.name,
                             style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
 
-                    if (!habit.description.isNullOrBlank()) {
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = habit.description,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (habit.isPaused) {
-                        SuggestionChip(
-                            onClick = {},
-                            label = { Text("Paused", style = MaterialTheme.typography.labelSmall) },
-                            colors = SuggestionChipDefaults.suggestionChipColors(
-                                containerColor = MaterialTheme.colorScheme.errorContainer,
-                                labelColor = MaterialTheme.colorScheme.onErrorContainer
-                            )
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                    }
-                    if (habit.isArchived) {
-                        SuggestionChip(
-                            onClick = {},
-                            label = { Text("Archived", style = MaterialTheme.typography.labelSmall) }
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "${habit.measurementSummary} • ${habit.scheduleSummary}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary
-                )
-
-                Text(
-                    text = habit.reminderSummary ?: "Reminder: Off",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (habit.reminderSummary != null) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outline
-                )
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Action row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (!isArchivedView) {
-                    // Reordering controls
-                    Row {
-                        IconButton(
-                            onClick = onMoveUp,
-                            enabled = habit.canMoveUp,
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.KeyboardArrowUp,
-                                contentDescription = "Move Up"
-                            )
-                        }
-                        IconButton(
-                            onClick = onMoveDown,
-                            enabled = habit.canMoveDown,
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.KeyboardArrowDown,
-                                contentDescription = "Move Down"
+                        if (!habit.description.isNullOrBlank()) {
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = habit.description,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     }
 
-                    Row {
-                        // History
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (habit.isPaused) {
+                            SuggestionChip(
+                                onClick = {},
+                                label = { Text("Paused", style = MaterialTheme.typography.labelSmall) },
+                                colors = SuggestionChipDefaults.suggestionChipColors(
+                                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                                    labelColor = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                        }
+                        if (habit.isArchived) {
+                            SuggestionChip(
+                                onClick = {},
+                                label = { Text("Archived", style = MaterialTheme.typography.labelSmall) }
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "${habit.measurementSummary} • ${habit.scheduleSummary}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+
+                    Text(
+                        text = habit.reminderSummary ?: "Reminder: Off",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (habit.reminderSummary != null) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outline
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Action row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (!isArchivedView) {
+                        // Reordering controls
+                        Row {
+                            IconButton(
+                                onClick = onMoveUp,
+                                enabled = habit.canMoveUp,
+                                modifier = Modifier.size(30.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.KeyboardArrowUp,
+                                    contentDescription = "Move Up",
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                            IconButton(
+                                onClick = onMoveDown,
+                                enabled = habit.canMoveDown,
+                                modifier = Modifier.size(30.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.KeyboardArrowDown,
+                                    contentDescription = "Move Down",
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+
+                        Row {
+                            // History
+                            OutlinedButton(
+                                onClick = onInspect,
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                                modifier = Modifier.height(30.dp)
+                            ) {
+                                Text("History", style = MaterialTheme.typography.labelSmall)
+                            }
+
+                            Spacer(modifier = Modifier.width(6.dp))
+
+                            // Edit
+                            OutlinedButton(
+                                onClick = onEdit,
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                                modifier = Modifier.height(30.dp)
+                            ) {
+                                Text("Edit", style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
+                    } else {
+                        // Archived actions: History, Restore & Edit
+                        Spacer(modifier = Modifier.weight(1f))
                         OutlinedButton(
                             onClick = onInspect,
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
-                            modifier = Modifier.height(32.dp)
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                            modifier = Modifier.height(30.dp)
                         ) {
                             Text("History", style = MaterialTheme.typography.labelSmall)
                         }
 
                         Spacer(modifier = Modifier.width(6.dp))
 
-                        // Edit
+                        OutlinedButton(
+                            onClick = onToggleArchive,
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                            modifier = Modifier.height(30.dp)
+                        ) {
+                            Text("Restore", style = MaterialTheme.typography.labelSmall)
+                        }
+
+                        Spacer(modifier = Modifier.width(6.dp))
+
                         OutlinedButton(
                             onClick = onEdit,
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
-                            modifier = Modifier.height(32.dp)
+                            modifier = Modifier.height(30.dp)
                         ) {
                             Text("Edit", style = MaterialTheme.typography.labelSmall)
                         }
-                    }
-                } else {
-                    // Archived actions: History, Restore & Edit
-                    Spacer(modifier = Modifier.weight(1f))
-                    OutlinedButton(
-                        onClick = onInspect,
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
-                        modifier = Modifier.height(32.dp)
-                    ) {
-                        Text("History", style = MaterialTheme.typography.labelSmall)
-                    }
-
-                    Spacer(modifier = Modifier.width(6.dp))
-
-                    OutlinedButton(
-                        onClick = onToggleArchive,
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
-                        modifier = Modifier.height(32.dp)
-                    ) {
-                        Text("Restore to Active", style = MaterialTheme.typography.labelSmall)
-                    }
-
-                    Spacer(modifier = Modifier.width(6.dp))
-
-                    OutlinedButton(
-                        onClick = onEdit,
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
-                        modifier = Modifier.height(32.dp)
-                    ) {
-                        Text("Edit", style = MaterialTheme.typography.labelSmall)
-                    }
                     }
                 }
             }

@@ -1,5 +1,6 @@
 package com.habit1.app.ui.today
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,7 +20,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -77,7 +81,15 @@ fun TodayScreen(
 
     LaunchedEffect(uiState.userMessage) {
         uiState.userMessage?.let { message ->
-            snackbarHostState.showSnackbar(message)
+            val canUndo = uiState.lastMovedGoalId != null
+            val result = snackbarHostState.showSnackbar(
+                message = message,
+                actionLabel = if (canUndo) "Undo" else null,
+                duration = androidx.compose.material3.SnackbarDuration.Short
+            )
+            if (result == androidx.compose.material3.SnackbarResult.ActionPerformed && canUndo) {
+                viewModel.onEvent(TodayUiEvent.UndoLastMovedGoal)
+            }
             viewModel.onEvent(TodayUiEvent.DismissMessage)
         }
     }
@@ -138,13 +150,13 @@ fun TodayScreen(
                     completedGoalsCount = uiState.completedGoalsCount,
                     totalGoalsCount = uiState.totalGoalsCount,
                     goalProgress = uiState.goalProgress,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                    modifier = Modifier.padding(vertical = 2.dp)
                 )
             }
 
             // 1. Daily Goals Section (Prioritized at top)
             item(key = "goals_header") {
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(6.dp))
                 SectionHeader(
                     title = "Daily Goals",
                     countText = "${uiState.completedGoalsCount}/${uiState.totalGoalsCount}",
@@ -167,16 +179,19 @@ fun TodayScreen(
                         onEditGoal = { viewModel.onEvent(TodayUiEvent.RequestEditGoal(goalItem)) },
                         onDeleteGoal = { viewModel.onEvent(TodayUiEvent.RequestDeleteGoal(goalItem)) },
                         onMoveGoalTomorrow = {
-                            viewModel.onEvent(TodayUiEvent.MoveGoalDate(goalItem.id, uiState.currentDate.plusDays(1)))
+                            viewModel.onEvent(TodayUiEvent.RequestMoveGoalTomorrow(goalItem))
                         },
                         onMoveGoalUp = { viewModel.onEvent(TodayUiEvent.MoveGoalUp(goalItem.id)) },
                         onMoveGoalDown = { viewModel.onEvent(TodayUiEvent.MoveGoalDown(goalItem.id)) },
+                        onSetReminder = { reminderTime ->
+                            viewModel.onEvent(TodayUiEvent.SetGoalReminder(goalItem.id, reminderTime))
+                        },
                         onAddSubtask = { title -> viewModel.onEvent(TodayUiEvent.AddSubtask(goalItem.id, title)) },
                         onEditSubtask = { subtask -> viewModel.onEvent(TodayUiEvent.RequestEditSubtask(goalItem.id, subtask)) },
                         onDeleteSubtask = { subtaskId -> viewModel.onEvent(TodayUiEvent.DeleteSubtask(goalItem.id, subtaskId)) },
                         onMoveSubtaskUp = { subtaskId -> viewModel.onEvent(TodayUiEvent.MoveSubtaskUp(goalItem.id, subtaskId)) },
                         onMoveSubtaskDown = { subtaskId -> viewModel.onEvent(TodayUiEvent.MoveSubtaskDown(goalItem.id, subtaskId)) },
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                        modifier = Modifier.padding(vertical = 4.dp)
                     )
                 }
             } else if (!uiState.isLoading) {
@@ -184,13 +199,12 @@ fun TodayScreen(
                     androidx.compose.material3.Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 4.dp)
-                            .clickable { viewModel.onEvent(TodayUiEvent.OpenAddGoalDialog) },
-                        shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
-                        colors = androidx.compose.material3.CardDefaults.cardColors(
+                            .padding(vertical = 4.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.surface
                         ),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                     ) {
                         Row(
                             modifier = Modifier
@@ -204,12 +218,17 @@ fun TodayScreen(
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                            Text(
-                                text = "Add Goal",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.primary,
-                                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold
-                            )
+                            TextButton(
+                                onClick = { viewModel.onEvent(TodayUiEvent.OpenAddGoalDialog) },
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                            ) {
+                                Text(
+                                    text = "Add Goal",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
                         }
                     }
                 }
@@ -236,7 +255,7 @@ fun TodayScreen(
                         onDecrement = { viewModel.onEvent(TodayUiEvent.DecrementHabit(habitItem.id)) },
                         onSetValue = { value -> viewModel.onEvent(TodayUiEvent.SetHabitValue(habitItem.id, value)) },
                         onClick = { onInspectHabit(habitItem.id) },
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                        modifier = Modifier.padding(vertical = 4.dp)
                     )
                 }
             } else if (!uiState.isLoading) {
@@ -244,17 +263,17 @@ fun TodayScreen(
                     androidx.compose.material3.Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 6.dp),
-                        shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
+                            .padding(vertical = 4.dp),
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
                         colors = androidx.compose.material3.CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.surface
                         ),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
+                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                     ) {
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(20.dp),
+                                .padding(16.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
@@ -268,7 +287,7 @@ fun TodayScreen(
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                            Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(10.dp))
                             androidx.compose.material3.OutlinedButton(
                                 onClick = onNavigateToHabits
                             ) {
@@ -286,13 +305,13 @@ fun TodayScreen(
                     title = "Daily Reflection",
                     countText = if (uiState.dailyReview != null) "Recorded" else "Optional"
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(2.dp))
                 DailyReviewCard(
                     review = uiState.dailyReview,
                     onAddClick = { viewModel.onEvent(TodayUiEvent.OpenReviewDialog) },
                     onEditClick = { viewModel.onEvent(TodayUiEvent.OpenReviewDialog) },
                     onDeleteClick = { viewModel.onEvent(TodayUiEvent.DeleteReview) },
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                    modifier = Modifier.padding(vertical = 2.dp)
                 )
             }
         }
@@ -402,10 +421,11 @@ fun TodayScreen(
             initialTitle = "",
             initialNotes = null,
             initialDate = uiState.currentDate,
+            initialReminderTime = null,
             isEditMode = false,
             onDismiss = { viewModel.onEvent(TodayUiEvent.DismissGoalDialog) },
-            onSave = { title, notes, targetDate ->
-                viewModel.onEvent(TodayUiEvent.SaveNewGoal(title, notes, targetDate))
+            onSave = { title, notes, targetDate, reminderTime ->
+                viewModel.onEvent(TodayUiEvent.SaveNewGoal(title, notes, targetDate, reminderTime))
             }
         )
     }
@@ -416,10 +436,11 @@ fun TodayScreen(
             initialTitle = goal.title,
             initialNotes = goal.notes,
             initialDate = uiState.currentDate,
+            initialReminderTime = goal.reminderTime,
             isEditMode = true,
             onDismiss = { viewModel.onEvent(TodayUiEvent.DismissGoalDialog) },
-            onSave = { title, notes, _ ->
-                viewModel.onEvent(TodayUiEvent.SaveEditedGoal(goal.id, title, notes))
+            onSave = { title, notes, _, reminderTime ->
+                viewModel.onEvent(TodayUiEvent.SaveEditedGoal(goal.id, title, notes, reminderTime))
             }
         )
     }
@@ -445,6 +466,50 @@ fun TodayScreen(
             dismissButton = {
                 TextButton(
                     onClick = { viewModel.onEvent(TodayUiEvent.CancelDeleteGoal) }
+                ) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // Move Goal to Tomorrow Confirmation Dialog
+    uiState.goalPendingMoveTomorrow?.let { goal ->
+        AlertDialog(
+            onDismissRequest = { viewModel.onEvent(TodayUiEvent.CancelMoveGoalTomorrow) },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.Schedule,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            },
+            title = {
+                Text(
+                    text = "Move Goal to Tomorrow?",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+            },
+            text = {
+                Text(
+                    text = "Are you sure you want to move \"${goal.title}\" to tomorrow?\n\n" +
+                        "• It will move off Today's list and be scheduled for tomorrow.\n" +
+                        "• You can view and manage it in the History page under tomorrow's date.\n" +
+                        "• If moved by mistake, you can easily move it back to today anytime.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = { viewModel.onEvent(TodayUiEvent.ConfirmMoveGoalTomorrow) }
+                ) {
+                    Text("Move to Tomorrow")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { viewModel.onEvent(TodayUiEvent.CancelMoveGoalTomorrow) }
                 ) {
                     Text("Cancel")
                 }
@@ -517,7 +582,7 @@ private fun SectionHeader(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp),
+            .padding(vertical = 4.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -525,6 +590,7 @@ private fun SectionHeader(
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onBackground
             )
             Spacer(modifier = Modifier.size(8.dp))
@@ -538,13 +604,13 @@ private fun SectionHeader(
         if (onAddAction != null) {
             IconButton(
                 onClick = onAddAction,
-                modifier = Modifier.size(44.dp)
+                modifier = Modifier.size(36.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.Add,
                     contentDescription = "Add $title",
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(20.dp)
                 )
             }
         }

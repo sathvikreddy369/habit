@@ -59,6 +59,12 @@ interface DailyGoalDao {
     @Query("UPDATE daily_goals SET title = :title, notes = :notes, updated_at = :updatedAt WHERE id = :id")
     suspend fun updateGoalContent(id: String, title: String, notes: String?, updatedAt: Long)
 
+    @Query("UPDATE daily_goals SET title = :title, notes = :notes, reminder_time = :reminderTime, updated_at = :updatedAt WHERE id = :id")
+    suspend fun updateGoalContentWithReminder(id: String, title: String, notes: String?, reminderTime: String?, updatedAt: Long)
+
+    @Query("UPDATE daily_goals SET reminder_time = :reminderTime, updated_at = :updatedAt WHERE id = :id")
+    suspend fun updateGoalReminder(id: String, reminderTime: String?, updatedAt: Long)
+
     @Query("UPDATE daily_goals SET is_completed = :isCompleted, updated_at = :updatedAt WHERE id = :id")
     suspend fun updateGoalCompletion(id: String, isCompleted: Boolean, updatedAt: Long)
 

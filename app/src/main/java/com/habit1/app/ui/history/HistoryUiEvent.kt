@@ -13,4 +13,6 @@ sealed interface HistoryUiEvent {
     data object JumpToCurrentYear : HistoryUiEvent
     data class ToggleViewMode(val mode: HistoryViewMode) : HistoryUiEvent
     data class SelectMonthFromYear(val yearMonth: java.time.YearMonth) : HistoryUiEvent
+    data class MoveGoalToToday(val goalId: String) : HistoryUiEvent
+    data object DismissMessage : HistoryUiEvent
 }

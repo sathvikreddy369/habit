@@ -481,5 +481,84 @@ class HistoryViewModelTest {
             cancelAndIgnoreRemainingEvents()
         }
     }
+
+    @Test
+    fun testSelectMonthFromYear_defaultsToTodayForCurrentMonth() = runTest(testDispatcher) {
+        viewModel.uiState.test {
+            awaitItem() // loading
+            val initial = awaitItem()
+            val today = initial.selectedDate
+
+            // Switch to YEAR view
+            viewModel.onEvent(HistoryUiEvent.ToggleViewMode(HistoryViewMode.YEAR))
+            awaitItem()
+
+            // Select current month from year
+            val currentYm = YearMonth.from(today)
+            viewModel.onEvent(HistoryUiEvent.SelectMonthFromYear(currentYm))
+            val currentMonthState = awaitItem()
+            assertEquals(currentYm, currentMonthState.selectedMonth)
+            assertEquals(today, currentMonthState.selectedDate)
+
+            // Select a past/other month from year
+            val pastYm = currentYm.minusMonths(2)
+            viewModel.onEvent(HistoryUiEvent.SelectMonthFromYear(pastYm))
+            val pastMonthState = awaitItem()
+            assertEquals(pastYm, pastMonthState.selectedMonth)
+            assertEquals(pastYm.atDay(1), pastMonthState.selectedDate)
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun testMoveGoalToToday_fromHistory() = runTest(testDispatcher) {
+        val today = LocalDate.now()
+        val tomorrow = today.plusDays(1)
+        val tomorrowStr = tomorrow.toString()
+        val now = System.currentTimeMillis()
+
+        // Create goal scheduled for tomorrow
+        val goal = DailyGoalEntity(
+            id = "g_tomorrow_test",
+            title = "Tomorrow Goal",
+            targetDate = tomorrowStr,
+            isCompleted = false,
+            displayOrder = 0,
+            createdAt = now,
+            updatedAt = now
+        )
+        dailyGoalRepository.createGoal(goal)
+        testScheduler.advanceUntilIdle()
+
+        viewModel.uiState.test {
+            awaitItem() // loading
+            awaitItem() // initial
+
+            // Select tomorrow in history
+            viewModel.onEvent(HistoryUiEvent.SelectDate(tomorrow))
+            val tomorrowState = awaitItem()
+            assertEquals(tomorrow, tomorrowState.selectedDate)
+            assertEquals(1, tomorrowState.selectedDateBreakdown?.goals?.size)
+            assertEquals("Tomorrow Goal", tomorrowState.selectedDateBreakdown?.goals?.get(0)?.title)
+
+            // Move goal back to today
+            viewModel.onEvent(HistoryUiEvent.MoveGoalToToday("g_tomorrow_test"))
+            testScheduler.advanceUntilIdle()
+
+            // After move, tomorrow has 0 goals
+            val afterMoveTomorrowState = awaitItem()
+            assertEquals(0, afterMoveTomorrowState.selectedDateBreakdown?.goals?.size)
+            assertEquals("Moved goal back to Today", afterMoveTomorrowState.userMessage)
+
+            // Select today and verify it is there
+            viewModel.onEvent(HistoryUiEvent.SelectDate(today))
+            val todayState = awaitItem()
+            assertEquals(1, todayState.selectedDateBreakdown?.goals?.size)
+            assertEquals("Tomorrow Goal", todayState.selectedDateBreakdown?.goals?.get(0)?.title)
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
 }
 

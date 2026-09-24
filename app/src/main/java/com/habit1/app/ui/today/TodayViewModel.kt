@@ -47,6 +47,7 @@ class TodayViewModel(
     private val habitRecordRepository: HabitRecordRepository,
     private val dailyGoalRepository: DailyGoalRepository,
     private val dailyReviewRepository: DailyReviewRepository? = null,
+    private val goalReminderScheduler: com.habit1.app.platform.reminder.GoalReminderScheduler? = null,
     private val evaluateSchedule: EvaluateScheduleUseCase = EvaluateScheduleUseCase(),
     private val calculateStreaks: CalculateStreaksUseCase = CalculateStreaksUseCase(),
     private val evaluateMeasurement: EvaluateMeasurementUseCase = EvaluateMeasurementUseCase(),
@@ -67,6 +68,8 @@ class TodayViewModel(
     private val isReviewDialogOpenFlow = MutableStateFlow(false)
     private val goalPendingEditFlow = MutableStateFlow<TodayGoalItem?>(null)
     private val goalPendingDeletionFlow = MutableStateFlow<TodayGoalItem?>(null)
+    private val goalPendingMoveTomorrowFlow = MutableStateFlow<TodayGoalItem?>(null)
+    private val lastMovedGoalFlow = MutableStateFlow<Pair<String, LocalDate>?>(null)
     private val subtaskPendingEditFlow = MutableStateFlow<Pair<String, TodaySubtaskItem>?>(null)
     private val collapsedGoalIdsFlow = MutableStateFlow<Set<String>>(emptySet())
 
@@ -94,6 +97,8 @@ class TodayViewModel(
             isReviewDialogOpenFlow,
             goalPendingEditFlow,
             goalPendingDeletionFlow,
+            goalPendingMoveTomorrowFlow,
+            lastMovedGoalFlow,
             subtaskPendingEditFlow,
             collapsedGoalIdsFlow
         ) { args: Array<Any?> ->
@@ -109,10 +114,13 @@ class TodayViewModel(
             val isReviewDialogOpen = args[6] as Boolean
             val goalPendingEdit = args[7] as TodayGoalItem?
             val goalPendingDeletion = args[8] as TodayGoalItem?
+            val goalPendingMoveTomorrow = args[9] as TodayGoalItem?
             @Suppress("UNCHECKED_CAST")
-            val subtaskPendingEdit = args[9] as Pair<String, TodaySubtaskItem>?
+            val lastMovedGoal = args[10] as Pair<String, LocalDate>?
             @Suppress("UNCHECKED_CAST")
-            val collapsedGoalIds = args[10] as Set<String>
+            val subtaskPendingEdit = args[11] as Pair<String, TodaySubtaskItem>?
+            @Suppress("UNCHECKED_CAST")
+            val collapsedGoalIds = args[12] as Set<String>
 
             val habits = activeEntities.map { it.toDomain() }
             val recordsMap = recordEntities.associateBy { it.habitId }
@@ -198,6 +206,7 @@ class TodayViewModel(
                         )
                     },
                     notes = domainGoal.notes,
+                    reminderTime = domainGoal.reminderTime,
                     displayOrder = domainGoal.displayOrder,
                     canMoveUp = index > 0,
                     canMoveDown = index < goalCount - 1,
@@ -249,6 +258,8 @@ class TodayViewModel(
                 isAddGoalDialogOpen = isAddGoalOpen,
                 goalPendingEdit = goalPendingEdit,
                 goalPendingDeletion = goalPendingDeletion,
+                goalPendingMoveTomorrow = goalPendingMoveTomorrow,
+                lastMovedGoalId = lastMovedGoal?.first,
                 subtaskPendingEdit = subtaskPendingEdit
             )
         }
@@ -269,12 +280,26 @@ class TodayViewModel(
                 is TodayUiEvent.IncrementHabit -> handleAdjustHabit(event.habitId, increment = true)
                 is TodayUiEvent.DecrementHabit -> handleAdjustHabit(event.habitId, increment = false)
                 is TodayUiEvent.SetHabitValue -> handleSetHabitValue(event.habitId, event.value)
-                is TodayUiEvent.ToggleGoal -> dailyGoalRepository.setGoalCompleted(
-                    event.goalId,
-                    !isGoalCompleted(event.goalId)
-                )
+                is TodayUiEvent.ToggleGoal -> {
+                    val willBeCompleted = !isGoalCompleted(event.goalId)
+                    dailyGoalRepository.setGoalCompleted(event.goalId, willBeCompleted)
+                    if (willBeCompleted) {
+                        goalReminderScheduler?.cancelGoalReminder(event.goalId)
+                    } else {
+                        val goal = uiState.value.goals.find { it.id == event.goalId }
+                        if (goal?.reminderTime != null) {
+                            goalReminderScheduler?.scheduleGoalReminder(
+                                goalId = goal.id,
+                                title = goal.title,
+                                notes = goal.notes,
+                                targetDate = currentDateFlow.value,
+                                reminderTime = goal.reminderTime
+                            )
+                        }
+                    }
+                }
                 is TodayUiEvent.ToggleSubtask -> handleToggleSubtask(event.goalId, event.subtaskId)
-                is TodayUiEvent.AddGoal -> handleAddGoal(event.title, notes = null, targetDate = null)
+                is TodayUiEvent.AddGoal -> handleAddGoal(event.title, notes = null, targetDate = null, reminderTime = null)
                 is TodayUiEvent.AddHabitQuick -> handleAddHabitQuick(event.name, event.measurementType)
                 is TodayUiEvent.RefreshDate -> currentDateFlow.value = DateTimeUtils.today(zoneId)
                 is TodayUiEvent.DismissMessage -> userMessageFlow.value = null
@@ -285,17 +310,37 @@ class TodayViewModel(
                     isAddGoalDialogOpenFlow.value = false
                     goalPendingEditFlow.value = null
                 }
-                is TodayUiEvent.SaveNewGoal -> handleAddGoal(event.title, event.notes, event.targetDate)
+                is TodayUiEvent.SaveNewGoal -> handleAddGoal(event.title, event.notes, event.targetDate, event.reminderTime)
                 is TodayUiEvent.RequestEditGoal -> goalPendingEditFlow.value = event.goal
-                is TodayUiEvent.SaveEditedGoal -> handleEditGoal(event.goalId, event.title, event.notes)
+                is TodayUiEvent.SaveEditedGoal -> handleEditGoal(event.goalId, event.title, event.notes, event.reminderTime)
+                is TodayUiEvent.SetGoalReminder -> handleSetGoalReminder(event.goalId, event.reminderTime)
                 is TodayUiEvent.RequestDeleteGoal -> goalPendingDeletionFlow.value = event.goal
                 is TodayUiEvent.ConfirmDeleteGoal -> {
                     goalPendingDeletionFlow.value?.let { goal ->
+                        goalReminderScheduler?.cancelGoalReminder(goal.id)
                         dailyGoalRepository.deleteGoal(goal.id)
                         goalPendingDeletionFlow.value = null
                     }
                 }
                 is TodayUiEvent.CancelDeleteGoal -> goalPendingDeletionFlow.value = null
+                is TodayUiEvent.RequestMoveGoalTomorrow -> goalPendingMoveTomorrowFlow.value = event.goal
+                is TodayUiEvent.CancelMoveGoalTomorrow -> goalPendingMoveTomorrowFlow.value = null
+                is TodayUiEvent.ConfirmMoveGoalTomorrow -> {
+                    goalPendingMoveTomorrowFlow.value?.let { goal ->
+                        val tomorrow = currentDateFlow.value.plusDays(1)
+                        handleMoveGoalDate(goal.id, tomorrow)
+                        lastMovedGoalFlow.value = goal.id to currentDateFlow.value
+                        goalPendingMoveTomorrowFlow.value = null
+                        userMessageFlow.value = "Moved \"${goal.title}\" to tomorrow. View in History."
+                    }
+                }
+                is TodayUiEvent.UndoLastMovedGoal -> {
+                    lastMovedGoalFlow.value?.let { (goalId, prevDate) ->
+                        handleMoveGoalDate(goalId, prevDate)
+                        lastMovedGoalFlow.value = null
+                        userMessageFlow.value = "Moved goal back to Today"
+                    }
+                }
                 is TodayUiEvent.MoveGoalDate -> handleMoveGoalDate(event.goalId, event.newDate)
                 is TodayUiEvent.MoveGoalUp -> handleReorderGoal(event.goalId, moveUp = true)
                 is TodayUiEvent.MoveGoalDown -> handleReorderGoal(event.goalId, moveUp = false)
@@ -342,7 +387,12 @@ class TodayViewModel(
         dailyGoalRepository.setSubtaskCompleted(subtaskId, !subtask.isCompleted)
     }
 
-    private suspend fun handleAddGoal(title: String, notes: String?, targetDate: LocalDate?) {
+    private suspend fun handleAddGoal(
+        title: String,
+        notes: String?,
+        targetDate: LocalDate?,
+        reminderTime: java.time.LocalTime? = null
+    ) {
         val dateToUse = targetDate ?: currentDateFlow.value
         val validationErrors = GoalValidator.validateGoal(title, notes, dateToUse)
         if (validationErrors.isNotEmpty()) {
@@ -353,30 +403,93 @@ class TodayViewModel(
         val dateString = DateTimeUtils.formatDate(dateToUse)
         val now = System.currentTimeMillis()
         val currentGoalsCount = dailyGoalRepository.getGoalsForDate(dateString).size
+        val goalId = UUID.randomUUID().toString()
 
         val newGoal = DailyGoalEntity(
-            id = UUID.randomUUID().toString(),
+            id = goalId,
             title = title.trim(),
             targetDate = dateString,
             isCompleted = false,
             displayOrder = currentGoalsCount,
             notes = notes?.trim()?.ifEmpty { null },
+            reminderTime = reminderTime?.let { DateTimeUtils.formatTime(it) },
             createdAt = now,
             updatedAt = now
         )
         dailyGoalRepository.createGoal(newGoal)
+
+        if (reminderTime != null) {
+            goalReminderScheduler?.scheduleGoalReminder(
+                goalId = goalId,
+                title = title.trim(),
+                notes = notes?.trim()?.ifEmpty { null },
+                targetDate = dateToUse,
+                reminderTime = reminderTime
+            )
+        }
+
         isAddGoalDialogOpenFlow.value = false
     }
 
-    private suspend fun handleEditGoal(goalId: String, title: String, notes: String?) {
+    private suspend fun handleEditGoal(
+        goalId: String,
+        title: String,
+        notes: String?,
+        reminderTime: java.time.LocalTime? = null
+    ) {
         val validationErrors = GoalValidator.validateGoal(title, notes, currentDateFlow.value)
         if (validationErrors.isNotEmpty()) {
             userMessageFlow.value = mapValidationError(validationErrors.first())
             return
         }
 
-        dailyGoalRepository.updateGoalContent(goalId, title.trim(), notes?.trim()?.ifEmpty { null })
+        val trimmedTitle = title.trim()
+        val trimmedNotes = notes?.trim()?.ifEmpty { null }
+        val reminderTimeStr = reminderTime?.let { DateTimeUtils.formatTime(it) }
+
+        dailyGoalRepository.updateGoalContentWithReminder(
+            id = goalId,
+            title = trimmedTitle,
+            notes = trimmedNotes,
+            reminderTime = reminderTimeStr
+        )
+
+        if (reminderTime != null) {
+            val isCompleted = isGoalCompleted(goalId)
+            if (!isCompleted) {
+                goalReminderScheduler?.scheduleGoalReminder(
+                    goalId = goalId,
+                    title = trimmedTitle,
+                    notes = trimmedNotes,
+                    targetDate = currentDateFlow.value,
+                    reminderTime = reminderTime
+                )
+            }
+        } else {
+            goalReminderScheduler?.cancelGoalReminder(goalId)
+        }
+
         goalPendingEditFlow.value = null
+    }
+
+    private suspend fun handleSetGoalReminder(goalId: String, reminderTime: java.time.LocalTime?) {
+        val reminderTimeStr = reminderTime?.let { DateTimeUtils.formatTime(it) }
+        dailyGoalRepository.updateGoalReminder(goalId, reminderTimeStr)
+
+        if (reminderTime != null) {
+            val goal = uiState.value.goals.find { it.id == goalId }
+            if (goal != null && !goal.isCompleted) {
+                goalReminderScheduler?.scheduleGoalReminder(
+                    goalId = goalId,
+                    title = goal.title,
+                    notes = goal.notes,
+                    targetDate = currentDateFlow.value,
+                    reminderTime = reminderTime
+                )
+            }
+        } else {
+            goalReminderScheduler?.cancelGoalReminder(goalId)
+        }
     }
 
     private suspend fun handleMoveGoalDate(goalId: String, newDate: LocalDate) {
@@ -514,7 +627,8 @@ class TodayViewModel(
         private val habitRepository: HabitRepository,
         private val habitRecordRepository: HabitRecordRepository,
         private val dailyGoalRepository: DailyGoalRepository,
-        private val dailyReviewRepository: DailyReviewRepository? = null
+        private val dailyReviewRepository: DailyReviewRepository? = null,
+        private val goalReminderScheduler: com.habit1.app.platform.reminder.GoalReminderScheduler? = null
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -523,7 +637,8 @@ class TodayViewModel(
                     habitRepository = habitRepository,
                     habitRecordRepository = habitRecordRepository,
                     dailyGoalRepository = dailyGoalRepository,
-                    dailyReviewRepository = dailyReviewRepository
+                    dailyReviewRepository = dailyReviewRepository,
+                    goalReminderScheduler = goalReminderScheduler
                 ) as T
             }
             throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")

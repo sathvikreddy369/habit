@@ -24,6 +24,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Today
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
@@ -36,12 +38,16 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -67,16 +73,26 @@ fun HistoryScreen(
     viewModel: HistoryViewModel,
     onNavigateBack: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
-    onInspectHabit: (habitId: String) -> Unit = {}
+    onInspectHabit: (habitId: String) -> Unit = {},
+    onNavigateToSettings: (() -> Unit)? = null
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val today = LocalDate.now()
     val isViewingCurrentMonth = uiState.selectedMonth == YearMonth.from(today)
     val isViewingToday = uiState.selectedDate == today
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(uiState.userMessage) {
+        uiState.userMessage?.let { msg ->
+            snackbarHostState.showSnackbar(msg)
+            viewModel.onEvent(HistoryUiEvent.DismissMessage)
+        }
+    }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
         contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("History", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) },
@@ -86,6 +102,16 @@ fun HistoryScreen(
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = "Back"
+                            )
+                        }
+                    }
+                },
+                actions = {
+                    if (onNavigateToSettings != null) {
+                        IconButton(onClick = onNavigateToSettings) {
+                            Icon(
+                                imageVector = androidx.compose.material.icons.Icons.Default.Settings,
+                                contentDescription = "Settings"
                             )
                         }
                     }
@@ -152,19 +178,32 @@ fun HistoryScreen(
                                     fontWeight = FontWeight.Bold
                                 )
 
-                                if (uiState.selectedYear != today.year) {
+                                if (uiState.selectedYear == today.year) {
                                     Surface(
                                         shape = RoundedCornerShape(8.dp),
-                                        color = MaterialTheme.colorScheme.primaryContainer,
-                                        modifier = Modifier.clickable {
-                                            viewModel.onEvent(HistoryUiEvent.JumpToCurrentYear)
-                                        }
+                                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
                                     ) {
                                         Text(
                                             text = "Current Year",
                                             style = MaterialTheme.typography.labelSmall,
                                             fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                        )
+                                    }
+                                } else {
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = MaterialTheme.colorScheme.surfaceVariant,
+                                        modifier = Modifier.clickable {
+                                            viewModel.onEvent(HistoryUiEvent.JumpToCurrentYear)
+                                        }
+                                    ) {
+                                        Text(
+                                            text = "Jump to ${today.year}",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                         )
                                     }
@@ -233,7 +272,20 @@ fun HistoryScreen(
                                 fontWeight = FontWeight.Bold
                             )
 
-                            if (!isViewingCurrentMonth || !isViewingToday) {
+                            if (isViewingCurrentMonth && isViewingToday) {
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
+                                ) {
+                                    Text(
+                                        text = "Current",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    )
+                                }
+                            } else {
                                 Surface(
                                     shape = RoundedCornerShape(8.dp),
                                     color = MaterialTheme.colorScheme.primaryContainer,
@@ -242,7 +294,7 @@ fun HistoryScreen(
                                     }
                                 ) {
                                     Text(
-                                        text = "Today",
+                                        text = "Jump to Today",
                                         style = MaterialTheme.typography.labelSmall,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -636,19 +688,45 @@ fun HistoryScreen(
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
                         ) {
                             Column(modifier = Modifier.padding(12.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Checkbox(
-                                        checked = goal.isCompleted,
-                                        onCheckedChange = null,
-                                        enabled = false,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = goal.title,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        textDecoration = if (goal.isCompleted) TextDecoration.LineThrough else TextDecoration.None
-                                    )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(
+                                        modifier = Modifier.weight(1f),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Checkbox(
+                                            checked = goal.isCompleted,
+                                            onCheckedChange = null,
+                                            enabled = false,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = goal.title,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            textDecoration = if (goal.isCompleted) TextDecoration.LineThrough else TextDecoration.None
+                                        )
+                                    }
+                                    if (uiState.selectedDate != today) {
+                                        TextButton(
+                                            onClick = { viewModel.onEvent(HistoryUiEvent.MoveGoalToToday(goal.id)) },
+                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Today,
+                                                contentDescription = "Move to Today",
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text(
+                                                text = "Move to Today",
+                                                style = MaterialTheme.typography.labelSmall
+                                            )
+                                        }
+                                    }
                                 }
                                 if (goal.subtasks.isNotEmpty()) {
                                     val completedSubs = goal.subtasks.count { it.isCompleted }
@@ -836,12 +914,15 @@ private fun CalendarDayCell(
             }
 
             // Goal dot
-            if (item.completedGoalsCount > 0) {
+            if (item.totalGoalsCount > 0) {
                 Box(
                     modifier = Modifier
                         .size(4.dp)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.secondary)
+                        .background(
+                            if (item.completedGoalsCount > 0) MaterialTheme.colorScheme.secondary
+                            else MaterialTheme.colorScheme.secondary.copy(alpha = 0.7f)
+                        )
                 )
             }
 

@@ -43,6 +43,8 @@ val SurfaceVariantDark = Color(0xFF41474D)
 val OnSurfaceVariantDark = Color(0xFFC1C7CE)
 
 val OutlineDark = Color(0xFF8B9198)
+val OutlineVariantDark = Color(0xFF282F36)
+val OutlineVariantLight = Color(0xFFE2E6EB)
 
 // Accent / Status Colors
 val SuccessColor = Color(0xFF3B7D4F)

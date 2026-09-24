@@ -56,7 +56,8 @@ class MainActivity : ComponentActivity() {
             habitRepository = app.container.habitRepository,
             habitRecordRepository = app.container.habitRecordRepository,
             dailyGoalRepository = app.container.dailyGoalRepository,
-            dailyReviewRepository = app.container.dailyReviewRepository
+            dailyReviewRepository = app.container.dailyReviewRepository,
+            goalReminderScheduler = app.container.goalReminderScheduler
         )
     }
 
@@ -234,6 +235,9 @@ class MainActivity : ComponentActivity() {
                                         onNavigateToTemplates = {
                                             backstack.add(Screen.HabitTemplates)
                                         },
+                                        onNavigateToSettings = {
+                                            backstack.add(Screen.Settings)
+                                        },
                                         onNavigateBack = null
                                     )
                                 }
@@ -306,6 +310,9 @@ class MainActivity : ComponentActivity() {
                                         onNavigateBack = null,
                                         onInspectHabit = { habitId ->
                                             backstack.add(Screen.HabitHistory(habitId))
+                                        },
+                                        onNavigateToSettings = {
+                                            backstack.add(Screen.Settings)
                                         }
                                     )
                                 }

@@ -13,7 +13,7 @@ In accordance with Habit1 Core Principles (*"Measure before optimizing"*, *"Do n
 | **Connected Hardware** | None detected at time of build (`adb devices -l` returned empty) |
 | **Physical Verification Status** | **PENDING PHYSICAL HARDWARE ATTACHMENT** |
 | **Build Artifact Verified** | `app-release-unsigned.apk` (1.4 MB, R8 minified, resource-shrunk) |
-| **Automated Verification Status** | 177/177 unit tests passing across Debug and Release |
+| **Automated Verification Status** | 325/325 unit tests passing across Debug and Release |
 | **Static Analysis Status** | `lintDebug` passed with 0 errors |
 
 When a physical Android device is connected via ADB, execute the test suites documented below and log actual measured values into the **Empirical Results Log** in Section 6.

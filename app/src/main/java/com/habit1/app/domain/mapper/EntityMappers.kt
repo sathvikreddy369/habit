@@ -154,6 +154,13 @@ object EntityMappers {
             displayOrder = goal.displayOrder,
             subtasks = subtasks.sortedWith(compareBy({ it.displayOrder }, { it.createdAt })).map { it.toDomain() },
             notes = goal.notes,
+            reminderTime = goal.reminderTime?.let {
+                try {
+                    com.habit1.app.core.util.DateTimeUtils.parseTime(it)
+                } catch (e: Exception) {
+                    null
+                }
+            },
             createdAt = Instant.ofEpochMilli(goal.createdAt),
             updatedAt = Instant.ofEpochMilli(goal.updatedAt)
         )
@@ -167,6 +174,7 @@ object EntityMappers {
             isCompleted = isCompleted,
             displayOrder = displayOrder,
             notes = notes,
+            reminderTime = reminderTime?.let { com.habit1.app.core.util.DateTimeUtils.formatTime(it) },
             createdAt = createdAt.toEpochMilli(),
             updatedAt = updatedAt.toEpochMilli()
         )

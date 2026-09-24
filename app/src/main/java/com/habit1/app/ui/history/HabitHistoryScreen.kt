@@ -242,11 +242,14 @@ fun HabitHistoryScreen(
                     }
                 }
 
-                // 1. Overview Section (Circular Donut Ring & High-Density Stats)
+                // 1. Overview Section (Primary Metrics: Completion Rate, Streaks, Totals)
                 item(key = "overview_section") {
                     val scorePercent = analyticsSummary?.completionRate?.toInt()
                         ?: summary?.streakResult?.completionRate?.toInt() ?: 0
                     val totalCompletions = analyticsSummary?.completedDays ?: summary?.completedDaysCount ?: 0
+                    val currentStreak = analyticsSummary?.currentStreak ?: summary?.streakResult?.currentStreak ?: 0
+                    val longestStreak = analyticsSummary?.longestStreak ?: summary?.streakResult?.longestStreak ?: 0
+                    val scheduledDays = analyticsSummary?.scheduledDays ?: summary?.streakResult?.totalScheduledDays ?: 0
 
                     Column(modifier = Modifier.fillMaxWidth()) {
                         Text(
@@ -258,6 +261,8 @@ fun HabitHistoryScreen(
                         Spacer(modifier = Modifier.height(8.dp))
                         HabitOverviewCard(
                             scorePercent = scorePercent,
+                            currentStreak = currentStreak,
+                            longestStreak = longestStreak,
                             weekCompleted = uiState.weekStat.completed,
                             weekTotal = uiState.weekStat.total,
                             monthCompleted = uiState.monthStat.completed,
@@ -265,17 +270,18 @@ fun HabitHistoryScreen(
                             yearCompleted = uiState.yearStat.completed,
                             yearTotal = uiState.yearStat.total,
                             totalCompletions = totalCompletions,
+                            scheduledDays = scheduledDays,
                             accentColor = habitColor
                         )
                     }
                 }
 
-                // 2. Score Trend Section
+                // 2. Trend Section (Score Trend & Distribution)
                 if (analyticsSummary != null) {
                     item(key = "score_trend_section") {
                         Column(modifier = Modifier.fillMaxWidth()) {
                             Text(
-                                text = "Score",
+                                text = "Completion Trend",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = habitColor
@@ -289,10 +295,7 @@ fun HabitHistoryScreen(
                             )
                         }
                     }
-                }
 
-                // 3. History Bar Chart Section
-                if (analyticsSummary != null) {
                     item(key = "history_barchart_section") {
                         HabitHistoryBarChart(
                             days = analyticsSummary.dailyBreakdown,
@@ -301,7 +304,7 @@ fun HabitHistoryScreen(
                     }
                 }
 
-                // 4. Calendar Heatmap Matrix Section
+                // 3. Calendar Section (Heatmap Matrix)
                 if (analyticsSummary != null) {
                     item(key = "calendar_section") {
                         Column(modifier = Modifier.fillMaxWidth()) {
@@ -329,7 +332,17 @@ fun HabitHistoryScreen(
                     }
                 }
 
-                // 5. Best Streaks Section (Horizontal Timeline Bars)
+                // 4. Patterns Section (Streaks, Frequency, Quantitative & Consistency Breakdown)
+                item(key = "patterns_header") {
+                    Text(
+                        text = "Patterns & Consistency",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = habitColor
+                    )
+                }
+
+                // Best Streaks Timeline
                 if (analyticsSummary != null) {
                     item(key = "best_streaks_section") {
                         HabitStreaksCard(
@@ -341,7 +354,7 @@ fun HabitHistoryScreen(
                     }
                 }
 
-                // 6. Weekday Frequency Section (Dot Density)
+                // Weekday Frequency
                 if (analyticsSummary != null) {
                     item(key = "frequency_section") {
                         HabitFrequencyCard(
@@ -351,7 +364,7 @@ fun HabitHistoryScreen(
                     }
                 }
 
-                // 7. Quantitative Performance Section (if applicable)
+                // Quantitative Performance (if applicable)
                 if (habit.measurement !is MeasurementType.BooleanChoice && analyticsSummary != null) {
                     item(key = "quantitative_performance") {
                         QuantitativePerformanceCard(
@@ -362,48 +375,64 @@ fun HabitHistoryScreen(
                     }
                 }
 
-                // 8. Consistency Breakdown Details
+                // Consistency Breakdown Details with Clear Hierarchy
                 item(key = "consistency_summary") {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
+                        shape = RoundedCornerShape(14.dp),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text(
                                 text = "Consistency Breakdown (${uiState.selectedPreset.label})",
-                                style = MaterialTheme.typography.titleMedium,
+                                style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold
                             )
-                            Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(10.dp))
 
+                            // Primary & Secondary user metrics
                             if (analyticsSummary != null) {
                                 StatRow(label = "Completion Rate", value = "${analyticsSummary.completionRate.toInt()}%")
                                 StatRow(label = "Completed Days", value = "${analyticsSummary.completedDays}")
                                 StatRow(label = "Scheduled Days", value = "${analyticsSummary.scheduledDays}")
-                                StatRow(label = "Recorded Incomplete", value = "${analyticsSummary.recordedIncompleteDays}")
-                                StatRow(label = "Projected Missed", value = "${analyticsSummary.missedDays}")
-                                StatRow(label = "Projected Rest", value = "${analyticsSummary.restDays}")
+
+                                Spacer(modifier = Modifier.height(8.dp))
+                                androidx.compose.material3.HorizontalDivider(
+                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                // Tertiary technical/projection breakdown
+                                StatRow(label = "Recorded Incomplete", value = "${analyticsSummary.recordedIncompleteDays}", isTertiary = true)
+                                StatRow(label = "Projected Missed", value = "${analyticsSummary.missedDays}", isTertiary = true)
+                                StatRow(label = "Projected Rest", value = "${analyticsSummary.restDays}", isTertiary = true)
                             } else if (summary != null) {
                                 StatRow(label = "Completion Rate", value = "${summary.streakResult.completionRate.toInt()}%")
                                 StatRow(label = "Completed Days", value = "${summary.completedDaysCount}")
                                 StatRow(label = "Scheduled Days", value = "${summary.streakResult.totalScheduledDays}")
-                                StatRow(label = "Recorded Incomplete", value = "${summary.recordedIncompleteDaysCount}")
-                                StatRow(label = "Projected Missed", value = "${summary.projectedMissedDaysCount}")
-                                StatRow(label = "Projected Rest", value = "${summary.projectedRestDaysCount}")
+
+                                Spacer(modifier = Modifier.height(8.dp))
+                                androidx.compose.material3.HorizontalDivider(
+                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                StatRow(label = "Recorded Incomplete", value = "${summary.recordedIncompleteDaysCount}", isTertiary = true)
+                                StatRow(label = "Projected Missed", value = "${summary.projectedMissedDaysCount}", isTertiary = true)
+                                StatRow(label = "Projected Rest", value = "${summary.projectedRestDaysCount}", isTertiary = true)
                             }
                         }
                     }
                 }
 
-                // 9. Chronological Recorded History Header
+                // 5. Chronological Recorded History Header
                 item(key = "records_header") {
                     Text(
                         text = "Historical Activity Log (${uiState.records.size} in range)",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground
+                        color = habitColor
                     )
                 }
 
@@ -550,17 +579,27 @@ fun HabitHistoryScreen(
 private fun StatRow(
     label: String,
     value: String,
+    isTertiary: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp),
+            .padding(vertical = if (isTertiary) 2.dp else 4.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(text = label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(text = value, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+        Text(
+            text = label,
+            style = if (isTertiary) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium,
+            color = if (isTertiary) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = value,
+            style = if (isTertiary) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge,
+            fontWeight = if (isTertiary) FontWeight.Normal else FontWeight.SemiBold,
+            color = if (isTertiary) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
+        )
     }
 }
 

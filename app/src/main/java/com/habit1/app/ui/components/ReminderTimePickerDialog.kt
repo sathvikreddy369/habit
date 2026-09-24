@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
@@ -40,19 +42,36 @@ import java.time.LocalTime
 @Composable
 fun ReminderTimePickerDialog(
     initialTime: LocalTime?,
+    minTime: LocalTime? = null,
     onConfirm: (LocalTime) -> Unit,
     onClear: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    val initialHour = initialTime?.hour ?: 8
-    val initialMinute = initialTime?.minute ?: 30
+    val (defaultHour, defaultMinute) = remember(initialTime, minTime) {
+        if (initialTime != null) {
+            initialTime.hour to initialTime.minute
+        } else if (minTime != null) {
+            val candidate = minTime.plusMinutes(15)
+            candidate.hour to ((candidate.minute / 5) * 5).coerceIn(0, 55)
+        } else {
+            8 to 30
+        }
+    }
 
     val timePickerState = rememberTimePickerState(
-        initialHour = initialHour,
-        initialMinute = initialMinute,
+        initialHour = defaultHour,
+        initialMinute = defaultMinute,
         is24Hour = false
     )
     var isKeyboardInputMode by remember { mutableStateOf(false) }
+
+    val selectedTime = try {
+        LocalTime.of(timePickerState.hour, timePickerState.minute)
+    } catch (e: Exception) {
+        null
+    }
+
+    val isPastTime = minTime != null && selectedTime != null && selectedTime.isBefore(minTime)
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -63,13 +82,16 @@ fun ReminderTimePickerDialog(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = if (isKeyboardInputMode) "Type reminder time" else "Set reminder time",
-                    style = MaterialTheme.typography.titleMedium
+                    text = "Reminder Time",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold
                 )
-                IconButton(onClick = { isKeyboardInputMode = !isKeyboardInputMode }) {
-                    Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = if (isKeyboardInputMode) "Switch to clock dial" else "Switch to keyboard input"
+                TextButton(
+                    onClick = { isKeyboardInputMode = !isKeyboardInputMode }
+                ) {
+                    Text(
+                        text = if (isKeyboardInputMode) "Use Clock" else "Type Time",
+                        style = MaterialTheme.typography.labelMedium
                     )
                 }
             }
@@ -84,14 +106,27 @@ fun ReminderTimePickerDialog(
                 } else {
                     TimePicker(state = timePickerState)
                 }
+
+                if (isPastTime && minTime != null) {
+                    androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Reminder cannot be set in the past for today (current time is ${com.habit1.app.core.util.DateTimeUtils.formatTime(minTime)})",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 8.dp)
+                    )
+                }
             }
         },
         confirmButton = {
             TextButton(
                 onClick = {
-                    val resolvedTime = LocalTime.of(timePickerState.hour, timePickerState.minute)
-                    onConfirm(resolvedTime)
-                }
+                    if (selectedTime != null && !isPastTime) {
+                        onConfirm(selectedTime)
+                    }
+                },
+                enabled = !isPastTime && selectedTime != null
             ) {
                 Text("Confirm")
             }

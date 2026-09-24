@@ -52,6 +52,16 @@ class DailyGoalRepositoryImpl(
             dailyGoalDao.updateGoalContent(id, title.trim(), notes?.trim(), System.currentTimeMillis())
         }
 
+    override suspend fun updateGoalContentWithReminder(id: String, title: String, notes: String?, reminderTime: String?) =
+        withContext(ioDispatcher) {
+            dailyGoalDao.updateGoalContentWithReminder(id, title.trim(), notes?.trim(), reminderTime?.trim(), System.currentTimeMillis())
+        }
+
+    override suspend fun updateGoalReminder(id: String, reminderTime: String?) =
+        withContext(ioDispatcher) {
+            dailyGoalDao.updateGoalReminder(id, reminderTime?.trim(), System.currentTimeMillis())
+        }
+
     override suspend fun deleteGoal(id: String) =
         withContext(ioDispatcher) {
             dailyGoalDao.deleteGoalById(id)

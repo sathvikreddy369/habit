@@ -52,6 +52,7 @@ class HistoryViewModel(
     private val selectedMonthFlow = MutableStateFlow(YearMonth.from(today))
     private val selectedDateFlow = MutableStateFlow(today)
     private val viewModeFlow = MutableStateFlow(HistoryViewMode.MONTH)
+    private val userMessageFlow = MutableStateFlow<String?>(null)
 
     private val monthFormatter = DateTimeFormatter.ofPattern("MMMM yyyy", Locale.getDefault())
     private val dateFormatter = DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy", Locale.getDefault())
@@ -85,8 +86,9 @@ class HistoryViewModel(
             yearDataFlow,
             selectedMonthFlow,
             selectedDateFlow,
-            viewModeFlow
-        ) { yearData, selectedMonth, selectedDate, viewMode ->
+            viewModeFlow,
+            userMessageFlow
+        ) { yearData, selectedMonth, selectedDate, viewMode, message ->
 
             val allHabitEntities = yearData.allHabitEntities
             val recordEntities = yearData.recordEntities
@@ -362,7 +364,8 @@ class HistoryViewModel(
                     daysInMonth = selectedMonth.lengthOfMonth()
                 ),
                 yearlyOverview = yearlyOverview,
-                isLoading = false
+                isLoading = false,
+                userMessage = message
             )
         }
     }.stateIn(
@@ -388,13 +391,13 @@ class HistoryViewModel(
                     val prev = selectedMonthFlow.value.minusMonths(1)
                     selectedMonthFlow.value = prev
                     selectedYearFlow.value = prev.year
-                    selectedDateFlow.value = prev.atDay(1)
+                    selectedDateFlow.value = if (prev == YearMonth.from(today)) today else prev.atDay(1)
                 }
                 is HistoryUiEvent.NextMonth -> {
                     val next = selectedMonthFlow.value.plusMonths(1)
                     selectedMonthFlow.value = next
                     selectedYearFlow.value = next.year
-                    selectedDateFlow.value = next.atDay(1)
+                    selectedDateFlow.value = if (next == YearMonth.from(today)) today else next.atDay(1)
                 }
                 is HistoryUiEvent.JumpToToday -> {
                     selectedYearFlow.value = today.year
@@ -405,33 +408,48 @@ class HistoryViewModel(
                 is HistoryUiEvent.PreviousYear -> {
                     val newYear = selectedYearFlow.value - 1
                     selectedYearFlow.value = newYear
-                    selectedMonthFlow.value = YearMonth.of(newYear, selectedMonthFlow.value.month)
-                    selectedDateFlow.value = selectedMonthFlow.value.atDay(1)
+                    val newYm = YearMonth.of(newYear, selectedMonthFlow.value.month)
+                    selectedMonthFlow.value = newYm
+                    selectedDateFlow.value = if (newYm == YearMonth.from(today)) today else newYm.atDay(1)
                 }
                 is HistoryUiEvent.NextYear -> {
                     val newYear = selectedYearFlow.value + 1
                     selectedYearFlow.value = newYear
-                    selectedMonthFlow.value = YearMonth.of(newYear, selectedMonthFlow.value.month)
-                    selectedDateFlow.value = selectedMonthFlow.value.atDay(1)
+                    val newYm = YearMonth.of(newYear, selectedMonthFlow.value.month)
+                    selectedMonthFlow.value = newYm
+                    selectedDateFlow.value = if (newYm == YearMonth.from(today)) today else newYm.atDay(1)
                 }
                 is HistoryUiEvent.SelectYear -> {
                     selectedYearFlow.value = event.year
-                    selectedMonthFlow.value = YearMonth.of(event.year, selectedMonthFlow.value.month)
-                    selectedDateFlow.value = selectedMonthFlow.value.atDay(1)
+                    val newYm = YearMonth.of(event.year, selectedMonthFlow.value.month)
+                    selectedMonthFlow.value = newYm
+                    selectedDateFlow.value = if (newYm == YearMonth.from(today)) today else newYm.atDay(1)
                 }
                 is HistoryUiEvent.JumpToCurrentYear -> {
                     selectedYearFlow.value = today.year
-                    selectedMonthFlow.value = YearMonth.of(today.year, selectedMonthFlow.value.month)
-                    selectedDateFlow.value = selectedMonthFlow.value.atDay(1)
+                    selectedMonthFlow.value = YearMonth.from(today)
+                    selectedDateFlow.value = today
                 }
                 is HistoryUiEvent.ToggleViewMode -> {
                     viewModeFlow.value = event.mode
+                    if (event.mode == HistoryViewMode.MONTH && selectedMonthFlow.value == YearMonth.from(today)) {
+                        selectedDateFlow.value = today
+                    }
                 }
                 is HistoryUiEvent.SelectMonthFromYear -> {
                     selectedYearFlow.value = event.yearMonth.year
                     selectedMonthFlow.value = event.yearMonth
-                    selectedDateFlow.value = event.yearMonth.atDay(1)
+                    selectedDateFlow.value = if (event.yearMonth == YearMonth.from(today)) today else event.yearMonth.atDay(1)
                     viewModeFlow.value = HistoryViewMode.MONTH
+                }
+                is HistoryUiEvent.MoveGoalToToday -> {
+                    val todayStr = DateTimeUtils.formatDate(today)
+                    val nextOrder = dailyGoalRepository.getGoalsForDate(todayStr).size
+                    dailyGoalRepository.moveGoalDate(event.goalId, todayStr, nextOrder)
+                    userMessageFlow.value = "Moved goal back to Today"
+                }
+                is HistoryUiEvent.DismissMessage -> {
+                    userMessageFlow.value = null
                 }
             }
         }

@@ -14,6 +14,8 @@ interface DailyGoalRepository {
     suspend fun createGoal(goal: DailyGoalEntity)
     suspend fun updateGoal(goal: DailyGoalEntity)
     suspend fun updateGoalContent(id: String, title: String, notes: String?)
+    suspend fun updateGoalContentWithReminder(id: String, title: String, notes: String?, reminderTime: String?)
+    suspend fun updateGoalReminder(id: String, reminderTime: String?)
     suspend fun deleteGoal(id: String)
     suspend fun setGoalCompleted(id: String, isCompleted: Boolean)
     suspend fun moveGoalDate(id: String, newDate: String, newOrder: Int)

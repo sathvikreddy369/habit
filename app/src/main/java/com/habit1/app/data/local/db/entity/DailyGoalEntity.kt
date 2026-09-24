@@ -42,5 +42,8 @@ data class DailyGoalEntity(
     val createdAt: Long,
 
     @ColumnInfo(name = "updated_at")
-    val updatedAt: Long
+    val updatedAt: Long,
+
+    @ColumnInfo(name = "reminder_time")
+    val reminderTime: String? = null
 )

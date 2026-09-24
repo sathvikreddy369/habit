@@ -455,6 +455,52 @@ class TodayViewModelTest {
     }
 
     @Test
+    fun moveGoalTomorrow_requestConfirmAndUndo() = runTest(testDispatcher) {
+        val today = DateTimeUtils.today(zoneId)
+        val todayStr = DateTimeUtils.formatDate(today)
+        val now = System.currentTimeMillis()
+        val goal = DailyGoalEntity(id = "g_move_confirm", title = "Important Task", targetDate = todayStr, isCompleted = false, displayOrder = 0, createdAt = now, updatedAt = now)
+        dailyGoalRepository.createGoal(goal)
+        advanceUntilIdle()
+
+        viewModel.uiState.test {
+            awaitItem() // loading
+            val initial = awaitItem()
+            assertEquals(1, initial.goals.size)
+            val goalItem = initial.goals[0]
+
+            // 1. Request move to tomorrow -> triggers confirmation dialog state
+            viewModel.onEvent(TodayUiEvent.RequestMoveGoalTomorrow(goalItem))
+            val pendingState = awaitItem()
+            assertNotNull(pendingState.goalPendingMoveTomorrow)
+            assertEquals("Important Task", pendingState.goalPendingMoveTomorrow?.title)
+
+            // 2. Cancel move -> clears pending state without moving
+            viewModel.onEvent(TodayUiEvent.CancelMoveGoalTomorrow)
+            val cancelledState = awaitItem()
+            assertNull(cancelledState.goalPendingMoveTomorrow)
+            assertEquals(1, cancelledState.goals.size)
+
+            // 3. Request again and Confirm move
+            viewModel.onEvent(TodayUiEvent.RequestMoveGoalTomorrow(goalItem))
+            awaitItem() // pending
+            viewModel.onEvent(TodayUiEvent.ConfirmMoveGoalTomorrow)
+            val movedState = awaitItem()
+            assertNull(movedState.goalPendingMoveTomorrow)
+            assertEquals(0, movedState.goals.size)
+            assertEquals("g_move_confirm", movedState.lastMovedGoalId)
+            assertTrue(movedState.userMessage?.contains("tomorrow") == true)
+
+            // 4. Undo -> restores goal back to today
+            viewModel.onEvent(TodayUiEvent.UndoLastMovedGoal)
+            val restoredState = awaitItem()
+            assertEquals(1, restoredState.goals.size)
+            assertEquals("Important Task", restoredState.goals[0].title)
+            assertNull(restoredState.lastMovedGoalId)
+        }
+    }
+
+    @Test
     fun reorderGoals_moveUpAndDown() = runTest(testDispatcher) {
         val todayStr = DateTimeUtils.formatDate(DateTimeUtils.today(zoneId))
         val now = System.currentTimeMillis()
@@ -726,6 +772,96 @@ class TodayViewModelTest {
             assertEquals(75.0, overTargetState.habits[0].actualValue, 0.001)
             assertTrue(overTargetState.habits[0].isCompleted)
         }
+    }
+
+    @Test
+    fun testGoalReminders_scheduleCancelAndReschedule() = runTest(testDispatcher) {
+        val fakeScheduler = FakeGoalReminderScheduler()
+        val reminderViewModel = TodayViewModel(
+            habitRepository = habitRepository,
+            habitRecordRepository = habitRecordRepository,
+            dailyGoalRepository = dailyGoalRepository,
+            dailyReviewRepository = dailyReviewRepository,
+            goalReminderScheduler = fakeScheduler,
+            zoneId = zoneId
+        )
+
+        reminderViewModel.uiState.test {
+            awaitItem() // loading
+            val emptyState = awaitItem()
+
+            val reminderTime = java.time.LocalTime.of(14, 30)
+
+            // 1. Save new goal with reminder
+            reminderViewModel.onEvent(
+                TodayUiEvent.SaveNewGoal(
+                    title = "Finish report",
+                    notes = "Include summary",
+                    targetDate = emptyState.currentDate,
+                    reminderTime = reminderTime
+                )
+            )
+
+            val withGoalState = awaitItem()
+            assertEquals(1, withGoalState.goals.size)
+            val goal = withGoalState.goals[0]
+            assertEquals("Finish report", goal.title)
+            assertEquals(reminderTime, goal.reminderTime)
+            assertEquals(goal.id, fakeScheduler.scheduledGoalId)
+            assertEquals(reminderTime, fakeScheduler.scheduledReminderTime)
+
+            // 2. Complete goal -> cancels reminder
+            reminderViewModel.onEvent(TodayUiEvent.ToggleGoal(goal.id))
+            val completedState = awaitItem()
+            assertTrue(completedState.goals[0].isCompleted)
+            assertEquals(goal.id, fakeScheduler.cancelledGoalId)
+
+            // 3. Uncomplete goal -> reschedules reminder
+            reminderViewModel.onEvent(TodayUiEvent.ToggleGoal(goal.id))
+            val uncompletedState = awaitItem()
+            assertFalse(uncompletedState.goals[0].isCompleted)
+            assertEquals(goal.id, fakeScheduler.scheduledGoalId)
+
+            // 4. Update reminder to different time
+            val newTime = java.time.LocalTime.of(16, 0)
+            reminderViewModel.onEvent(TodayUiEvent.SetGoalReminder(goal.id, newTime))
+            val updatedReminderState = awaitItem()
+            assertEquals(newTime, updatedReminderState.goals[0].reminderTime)
+            assertEquals(newTime, fakeScheduler.scheduledReminderTime)
+
+            // 5. Delete goal -> cancels reminder
+            reminderViewModel.onEvent(TodayUiEvent.RequestDeleteGoal(updatedReminderState.goals[0]))
+            reminderViewModel.onEvent(TodayUiEvent.ConfirmDeleteGoal)
+            awaitItem() // goalPendingDeletion set
+            val afterDeleteState = awaitItem()
+            assertEquals(0, afterDeleteState.goals.size)
+            assertEquals(goal.id, fakeScheduler.cancelledGoalId)
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+}
+
+private class FakeGoalReminderScheduler : com.habit1.app.platform.reminder.GoalReminderScheduler {
+    var scheduledGoalId: String? = null
+    var scheduledTitle: String? = null
+    var scheduledReminderTime: java.time.LocalTime? = null
+    var cancelledGoalId: String? = null
+
+    override fun scheduleGoalReminder(
+        goalId: String,
+        title: String,
+        notes: String?,
+        targetDate: java.time.LocalDate,
+        reminderTime: java.time.LocalTime
+    ) {
+        scheduledGoalId = goalId
+        scheduledTitle = title
+        scheduledReminderTime = reminderTime
+    }
+
+    override fun cancelGoalReminder(goalId: String) {
+        cancelledGoalId = goalId
     }
 }
 

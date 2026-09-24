@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -65,7 +66,7 @@ fun HabitCard(
         targetValue = if (habitItem.isCompleted) {
             habitColor
         } else {
-            MaterialTheme.colorScheme.surfaceVariant
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
         },
         label = "check_color"
     )
@@ -74,7 +75,7 @@ fun HabitCard(
         targetValue = if (habitItem.isCompleted) {
             androidx.compose.ui.graphics.Color.White
         } else {
-            MaterialTheme.colorScheme.outline
+            MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)
         },
         label = "icon_tint"
     )
@@ -108,7 +109,7 @@ fun HabitCard(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Row(
             modifier = Modifier
@@ -183,20 +184,24 @@ fun HabitCard(
             // Right content: Interaction controls
             when (habitItem.measurementType) {
                 is MeasurementType.BooleanChoice -> {
-                    FilledIconButton(
+                    Surface(
                         onClick = onToggle,
-                        modifier = Modifier.size(48.dp),
+                        modifier = Modifier
+                            .size(46.dp)
+                            .semantics {
+                                contentDescription = if (habitItem.isCompleted) "Mark ${habitItem.name} not completed" else "Mark ${habitItem.name} completed"
+                            },
                         shape = CircleShape,
-                        colors = IconButtonDefaults.filledIconButtonColors(
-                            containerColor = checkColor,
-                            contentColor = iconTint
-                        )
+                        color = checkColor
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Check,
-                            contentDescription = if (habitItem.isCompleted) "Mark ${habitItem.name} not completed" else "Mark ${habitItem.name} completed",
-                            modifier = Modifier.size(24.dp)
-                        )
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = null,
+                                tint = iconTint,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
                     }
                 }
 
@@ -207,7 +212,7 @@ fun HabitCard(
                         OutlinedIconButton(
                             onClick = onDecrement,
                             modifier = Modifier
-                                .size(44.dp)
+                                .size(36.dp)
                                 .semantics {
                                     contentDescription = "Decrease ${habitItem.name}"
                                 },
@@ -233,14 +238,15 @@ fun HabitCard(
                             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
                             modifier = Modifier
                                 .padding(horizontal = 2.dp)
-                                .heightIn(min = 44.dp)
+                                .height(36.dp)
+                                .widthIn(min = 36.dp)
                                 .semantics {
                                     contentDescription = "Set ${habitItem.name} value directly, current value $formattedActualValue"
                                 }
                         ) {
                             Box(
                                 contentAlignment = Alignment.Center,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                modifier = Modifier.padding(horizontal = 8.dp)
                             ) {
                                 Text(
                                     text = formattedActualValue,
@@ -255,7 +261,7 @@ fun HabitCard(
                         OutlinedIconButton(
                             onClick = onIncrement,
                             modifier = Modifier
-                                .size(44.dp)
+                                .size(36.dp)
                                 .semantics {
                                     contentDescription = "Increase ${habitItem.name}"
                                 },
@@ -270,20 +276,24 @@ fun HabitCard(
 
                         Spacer(modifier = Modifier.width(8.dp))
 
-                        FilledIconButton(
+                        Surface(
                             onClick = onToggle,
-                            modifier = Modifier.size(44.dp),
+                            modifier = Modifier
+                                .size(44.dp)
+                                .semantics {
+                                    contentDescription = if (habitItem.isCompleted) "Mark ${habitItem.name} incomplete" else "Mark ${habitItem.name} complete"
+                                },
                             shape = CircleShape,
-                            colors = IconButtonDefaults.filledIconButtonColors(
-                                containerColor = checkColor,
-                                contentColor = iconTint
-                            )
+                            color = checkColor
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Check,
-                                contentDescription = if (habitItem.isCompleted) "Mark ${habitItem.name} incomplete" else "Mark ${habitItem.name} complete",
-                                modifier = Modifier.size(20.dp)
-                            )
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = null,
+                                    tint = iconTint,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
                         }
                     }
                 }

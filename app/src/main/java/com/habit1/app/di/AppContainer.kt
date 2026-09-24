@@ -34,6 +34,7 @@ interface AppContainer {
 
     val notificationHelper: com.habit1.app.platform.notification.NotificationHelper
     val reminderScheduler: com.habit1.app.platform.reminder.HabitReminderScheduler
+    val goalReminderScheduler: com.habit1.app.platform.reminder.GoalReminderScheduler
     val reminderCoordinator: com.habit1.app.domain.reminder.HabitReminderCoordinator
     val backupRepository: com.habit1.app.data.repository.BackupRepository
     val recordHabitProgressUseCase: com.habit1.app.domain.usecase.RecordHabitProgressUseCase
@@ -82,6 +83,10 @@ class DefaultAppContainer(
 
     override val reminderScheduler: com.habit1.app.platform.reminder.HabitReminderScheduler by lazy {
         com.habit1.app.platform.reminder.AlarmManagerHabitReminderScheduler(context)
+    }
+
+    override val goalReminderScheduler: com.habit1.app.platform.reminder.GoalReminderScheduler by lazy {
+        com.habit1.app.platform.reminder.AlarmManagerGoalReminderScheduler(context)
     }
 
     override val reminderCoordinator: com.habit1.app.domain.reminder.HabitReminderCoordinator by lazy {

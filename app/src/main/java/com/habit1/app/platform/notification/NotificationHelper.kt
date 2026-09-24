@@ -256,4 +256,37 @@ open class NotificationHelper(
     open fun cancelNotification(habitId: String) {
         notificationManager.cancel(habitId.hashCode())
     }
+
+    /**
+     * Shows a reminder notification for a daily goal.
+     */
+    open fun showGoalReminderNotification(goalTitle: String, goalId: String, notes: String? = null) {
+        if (!areNotificationsEnabled()) return
+        createNotificationChannel()
+        val notificationId = ("goal_$goalId").hashCode()
+        val openAppIntent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            data = Uri.parse("habit1://goal_open/$goalId")
+        }
+        val contentPendingIntent = PendingIntent.getActivity(
+            context,
+            Objects.hash("goal", goalId),
+            openAppIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val builder = NotificationCompat.Builder(context, CHANNEL_ID_REMINDERS)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle("Daily Goal: $goalTitle")
+            .setContentText(notes ?: "Reminder for today's goal")
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setAutoCancel(true)
+            .setContentIntent(contentPendingIntent)
+
+        notificationManager.notify(notificationId, builder.build())
+    }
+
+    open fun cancelGoalNotification(goalId: String) {
+        notificationManager.cancel(("goal_$goalId").hashCode())
+    }
 }

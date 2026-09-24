@@ -2,6 +2,7 @@ package com.habit1.app.domain.model
 
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalTime
 
 /**
  * An individual subtask under a DailyGoal.
@@ -26,6 +27,7 @@ data class DailyGoal(
     val displayOrder: Int = 0,
     val subtasks: List<GoalSubtask> = emptyList(),
     val notes: String? = null,
+    val reminderTime: LocalTime? = null,
     val createdAt: Instant,
     val updatedAt: Instant
 )

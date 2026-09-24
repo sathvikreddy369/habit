@@ -44,6 +44,7 @@ data class TodayGoalItem(
     val isCompleted: Boolean,
     val subtasks: List<TodaySubtaskItem> = emptyList(),
     val notes: String? = null,
+    val reminderTime: java.time.LocalTime? = null,
     val displayOrder: Int = 0,
     val canMoveUp: Boolean = false,
     val canMoveDown: Boolean = false,
@@ -72,6 +73,8 @@ data class TodayUiState(
     val isAddGoalDialogOpen: Boolean = false,
     val goalPendingEdit: TodayGoalItem? = null,
     val goalPendingDeletion: TodayGoalItem? = null,
+    val goalPendingMoveTomorrow: TodayGoalItem? = null,
+    val lastMovedGoalId: String? = null,
     val subtaskPendingEdit: Pair<String, TodaySubtaskItem>? = null
 )
 

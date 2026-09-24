@@ -34,6 +34,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -48,6 +49,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.habit1.app.ui.today.TodayGoalItem
 import com.habit1.app.ui.today.TodaySubtaskItem
+
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Notifications
+import java.time.LocalTime
 
 /**
  * Reusable card displaying a daily goal and its subtasks on the Today screen.
@@ -64,6 +69,7 @@ fun GoalCard(
     onMoveGoalTomorrow: () -> Unit = {},
     onMoveGoalUp: () -> Unit = {},
     onMoveGoalDown: () -> Unit = {},
+    onSetReminder: ((LocalTime?) -> Unit)? = null,
     onAddSubtask: (title: String) -> Unit = {},
     onEditSubtask: (subtask: TodaySubtaskItem) -> Unit = {},
     onDeleteSubtask: (subtaskId: String) -> Unit = {},
@@ -72,6 +78,7 @@ fun GoalCard(
     modifier: Modifier = Modifier
 ) {
     var goalMenuExpanded by remember { mutableStateOf(false) }
+    var showReminderPicker by remember { mutableStateOf(false) }
     var isAddingSubtask by remember { mutableStateOf(false) }
     var newSubtaskTitle by remember { mutableStateOf("") }
 
@@ -84,7 +91,7 @@ fun GoalCard(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             // Main Goal Header Row: [Accent Bar] [Title + Subtask stats] [Menu] [Check Circle]
@@ -155,6 +162,47 @@ fun GoalCard(
                             )
                         }
                     }
+
+                    if (goalItem.reminderTime != null) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.clickable { showReminderPicker = true }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Notifications,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = com.habit1.app.core.util.DateTimeUtils.formatTime(goalItem.reminderTime),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = androidx.compose.ui.text.font.FontWeight.Medium
+                            )
+                        }
+                    } else if (!goalItem.isCompleted && onSetReminder != null) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.clickable { showReminderPicker = true }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Notifications,
+                                contentDescription = "Add reminder",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                modifier = Modifier.size(13.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Add reminder",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                            )
+                        }
+                    }
                 }
 
                 // Goal Overflow Menu
@@ -183,6 +231,26 @@ fun GoalCard(
                             },
                             leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) }
                         )
+                        if (onSetReminder != null) {
+                            DropdownMenuItem(
+                                text = { Text(if (goalItem.reminderTime != null) "Change Reminder" else "Add Reminder") },
+                                onClick = {
+                                    goalMenuExpanded = false
+                                    showReminderPicker = true
+                                },
+                                leadingIcon = { Icon(Icons.Default.Notifications, contentDescription = null) }
+                            )
+                            if (goalItem.reminderTime != null) {
+                                DropdownMenuItem(
+                                    text = { Text("Remove Reminder") },
+                                    onClick = {
+                                        goalMenuExpanded = false
+                                        onSetReminder(null)
+                                    },
+                                    leadingIcon = { Icon(Icons.Default.Close, contentDescription = null) }
+                                )
+                            }
+                        }
                         DropdownMenuItem(
                             text = { Text("Move to Tomorrow") },
                             onClick = {
@@ -226,38 +294,20 @@ fun GoalCard(
 
                 Spacer(modifier = Modifier.width(4.dp))
 
-                // Round Check Toggle Button (44dp, matching HabitCard)
-                val checkColor by androidx.compose.animation.animateColorAsState(
-                    targetValue = if (goalItem.isCompleted) {
-                        MaterialTheme.colorScheme.secondary
-                    } else {
-                        MaterialTheme.colorScheme.surfaceVariant
-                    },
-                    label = "goal_check_color"
-                )
-                val iconTint by androidx.compose.animation.animateColorAsState(
-                    targetValue = if (goalItem.isCompleted) {
-                        androidx.compose.ui.graphics.Color.White
-                    } else {
-                        MaterialTheme.colorScheme.outline
-                    },
-                    label = "goal_icon_tint"
-                )
-
-                androidx.compose.material3.Surface(
+                // Round Check Toggle Button (46dp, matching HabitCard)
+                Surface(
                     shape = androidx.compose.foundation.shape.CircleShape,
-                    color = checkColor,
+                    color = if (goalItem.isCompleted) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                     modifier = Modifier
-                        .size(44.dp)
-                        .clickable { onToggle() },
-                    border = if (!goalItem.isCompleted) BorderStroke(1.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)) else null
+                        .size(46.dp)
+                        .clickable { onToggle() }
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = Icons.Default.Check,
-                            contentDescription = if (goalItem.isCompleted) "Completed" else "Mark complete",
-                            tint = iconTint,
-                            modifier = Modifier.size(22.dp)
+                            contentDescription = if (goalItem.isCompleted) "Completed" else "Mark goal completed",
+                            tint = if (goalItem.isCompleted) androidx.compose.ui.graphics.Color.White else MaterialTheme.colorScheme.outline.copy(alpha = 0.6f),
+                            modifier = Modifier.size(24.dp)
                         )
                     }
                 }
@@ -356,6 +406,22 @@ fun GoalCard(
                 }
             }
         }
+    }
+
+    if (showReminderPicker && onSetReminder != null) {
+        ReminderTimePickerDialog(
+            initialTime = goalItem.reminderTime,
+            minTime = LocalTime.now(),
+            onConfirm = { time ->
+                onSetReminder(time)
+                showReminderPicker = false
+            },
+            onClear = {
+                onSetReminder(null)
+                showReminderPicker = false
+            },
+            onDismiss = { showReminderPicker = false }
+        )
     }
 }
 
