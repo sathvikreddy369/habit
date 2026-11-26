@@ -88,21 +88,6 @@ Habit1 separates long-term behavioral consistency from daily task completion:
 ---
 
 ## 2. Screenshot Showcase
-
-All screenshots below represent the application running on physical Android hardware (Samsung SM-E546B).
-
-| Today Screen | Habits Overview | History (Month Heatmap) |
-| :---: | :---: | :---: |
-| <img src="docs/screenshots/today.png" width="260" alt="Today Screen" /> | <img src="docs/screenshots/habits.png" width="260" alt="Habits Screen" /> | <img src="docs/screenshots/history-month.png" width="260" alt="History Screen (Month)" /> |
-
-| Habit Deep Dive & Trend Flow | Edit Habit & Schedule | RGB Color Wheel Picker |
-| :---: | :---: | :---: |
-| <img src="docs/screenshots/habit-detail.png" width="260" alt="Habit Detail Screen" /> | <img src="docs/screenshots/edit-habit.png" width="260" alt="Edit Habit Screen" /> | <img src="docs/screenshots/color-picker.png" width="260" alt="RGB Color Wheel Picker" /> |
-
-| Global Analytics Dashboard | Settings & AMOLED Black | Storage Breakdown & Backup |
-| :---: | :---: | :---: |
-| <img src="docs/screenshots/analytics.png" width="260" alt="Global Analytics Screen" /> | <img src="docs/screenshots/settings.png" width="260" alt="Settings Screen" /> | <img src="docs/screenshots/settings-storage.png" width="260" alt="Storage Breakdown & Backup" /> |
-
 ---
 
 ## 3. Key Features
