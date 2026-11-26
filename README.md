@@ -7,8 +7,9 @@
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.0.20-7F52FF?logo=kotlin&logoColor=white)
 ![Jetpack Compose](https://img.shields.io/badge/UI-Jetpack%20Compose%20(BOM%202024.09.02)-4285F4?logo=jetpackcompose&logoColor=white)
 ![Room Database](https://img.shields.io/badge/Persistence-Room%202.6.1%20(WAL)-FFA000?logo=sqlite&logoColor=white)
-![Tests](https://img.shields.io/badge/Tests-325%20Passed%20%7C%200%20Failed-success)
+![Tests](https://img.shields.io/badge/Tests-717%20Passed%20%7C%200%20Failed-success)
 ![Network](https://img.shields.io/badge/Network-Zero%20Permissions%20(Offline%20Only)-red)
+![Version](https://img.shields.io/badge/Version-2.0-blue)
 ![License](https://img.shields.io/badge/License-Not%20Formally%20Specified-lightgrey)
 
 ---
@@ -20,14 +21,14 @@
 git clone https://github.com/sathvikreddy369/habit.git
 cd habit
 
-# 2. Run automated test suite (325 verified unit tests)
+# 2. Run automated test suite (717 verified unit tests)
 ./gradlew testDebugUnitTest
 
-# 3. Build release APK (1.71 MB, R8 minified)
+# 3. Build release APK (2.58 MB, R8 minified)
 ./gradlew assembleRelease
 
 # 4. Install onto a connected Android device (API 26+)
-adb install -r apks/Habit1-latest-release.apk
+adb install -r apks/Habit1-v2.0.apk
 ```
 
 ---
@@ -88,19 +89,19 @@ Habit1 separates long-term behavioral consistency from daily task completion:
 
 ## 2. Screenshot Showcase
 
-All screenshots below represent the application running on physical Android hardware.
+All screenshots below represent the application running on physical Android hardware (Samsung SM-E546B).
 
 | Today Screen | Habits Overview | History (Month Heatmap) |
 | :---: | :---: | :---: |
 | <img src="docs/screenshots/today.png" width="260" alt="Today Screen" /> | <img src="docs/screenshots/habits.png" width="260" alt="Habits Screen" /> | <img src="docs/screenshots/history-month.png" width="260" alt="History Screen (Month)" /> |
 
-| Habit Deep Dive | Edit Habit & Schedule | History (Year Matrix) |
+| Habit Deep Dive & Trend Flow | Edit Habit & Schedule | RGB Color Wheel Picker |
 | :---: | :---: | :---: |
-| <img src="docs/screenshots/habit-detail.png" width="260" alt="Habit Detail Screen" /> | <img src="docs/screenshots/edit-habit.png" width="260" alt="Edit Habit Screen" /> | <img src="docs/screenshots/history-year.png" width="260" alt="History Screen (Year)" /> |
+| <img src="docs/screenshots/habit-detail.png" width="260" alt="Habit Detail Screen" /> | <img src="docs/screenshots/edit-habit.png" width="260" alt="Edit Habit Screen" /> | <img src="docs/screenshots/color-picker.png" width="260" alt="RGB Color Wheel Picker" /> |
 
-| Global Analytics | Settings & Data Management |
-| :---: | :---: |
-| <img src="docs/screenshots/analytics.png" width="260" alt="Global Analytics Screen" /> | <img src="docs/screenshots/settings.png" width="260" alt="Settings Screen" /> |
+| Global Analytics Dashboard | Settings & AMOLED Black | Storage Breakdown & Backup |
+| :---: | :---: | :---: |
+| <img src="docs/screenshots/analytics.png" width="260" alt="Global Analytics Screen" /> | <img src="docs/screenshots/settings.png" width="260" alt="Settings Screen" /> | <img src="docs/screenshots/settings-storage.png" width="260" alt="Storage Breakdown & Backup" /> |
 
 ---
 
@@ -117,26 +118,30 @@ All screenshots below represent the application running on physical Android hard
   * **Specific Days**: Select days of the week (e.g., Monday, Wednesday, Friday).
   * **Intervals**: Repeated every $N$ days, anchored to an explicit calendar date.
 * **Habit Customization & State Control**:
-  * Custom accent color palette with contrast-checked indicators.
+  * Dual-mode color selection: curated preset palettes alongside an interactive **RGB Color Wheel** with HSV gesture sweep, brightness adjustment, individual RGB numeric sliders (0–255), and hex code sync.
+  * Measurement quantity examples (e.g., *2.5 L Water*, *5 km Run*, *10,000 Steps*, *500 kcal*) for immediate guidance.
   * **Pause**: Temporarily halts future scheduling without breaking historical streak continuity.
   * **Archive**: Hides inactive habits from active tracking while fully preserving historical logs.
   * **Delete**: Removes habit and cascades deletion to associated records.
-  * **Reorder**: Drag-and-drop or explicit display ordering.
-  * **Habit Templates**: Pre-configured habit templates for rapid setup.
+  * **Reorder & Filter**: Drag-and-drop or explicit display ordering; unified sleek filter dropdown (*All*, *Active*, *Paused*, *Archived*) with thin real-time search.
 
 ### Daily Tracking (Today Dashboard)
 * **Unified Workspace**: Habits, daily goals, subtasks, and optional daily reflection on a single view.
-* **Action-First Check Buttons**: Circular action controls with visual distinction between completed and uncompleted states.
+* **Mutually Exclusive Action Controls**: Interactive checkmark (Done) and crossmark (Missed) with inline status tags beneath habit titles.
+* **Habit Action Sheet**: Quick access to record skips, add progress notes, pause, archive, or edit habits without screen clutter.
 * **Independent Subtask Completion**: Subtasks can be checked independently without automatically marking the parent goal complete, and vice-versa.
-* **Daily Goal Reminders**: Optional time-of-day reminders scheduled per goal.
+* **Daily Goal Reminders**: Optional time-of-day reminders scheduled per goal with clear "Get notified" indicators.
 * **Date Shifting with Undo**: Move daily goals to tomorrow with an instant snackbar undo action; goals on tomorrow can be moved back to today from History.
 * **Midnight Date Rollover**: Automatically updates to the next calendar day when left open across midnight without background battery polling.
 
-### History, Heatmaps & Calendar
-* **Month View Heatmap**: Visual completion density across the calendar month.
-* **Year View Matrix**: High-level annual overview of consistent patterns.
+### History & Habit Deep Dive
+* **Reorganized Habit History Flow**:
+  1. **Completion Trend**: Daily score trend and distribution graphs over selected presets.
+  2. **Calendar (Activity Heatmap)**: Range presets (7D, 30D, 90D, Year, All) with accessible 5-state grammar.
+  3. **Quantitative Performance**: Daily values vs cumulative running total, total volume, active day average, and target distribution.
+  4. **Patterns & Consistency**: Best streaks timeline, day-of-week adherence, and consistency breakdown.
+* **Strict Calendar Boundaries**: Week view constrained to Monday–Sunday; Month view strictly constrained to 1st through end-of-month (zero inter-month date bleeding).
 * **Day Inspection Drill-down**: Tap any calendar day to inspect exactly what was completed on that date, including completed habits, daily goals, and daily reflection notes.
-* **Per-Habit Historical Breakdown**: Individual bar charts, frequency distributions, and heatmaps for each habit.
 
 ### Transparent Analytics Pipeline
 * **Zero Gamified Synthetic Scores**: No opaque algorithms, arbitrary levels, or fabricated productivity scores.
@@ -150,10 +155,15 @@ All screenshots below represent the application running on physical Android hard
 * **Reboot Recovery**: Automatically reschedules active alarms after device restart via an explicit `BootReceiver`.
 * **Reminders are Notifications, Not Records**: Notifications never modify streaks, complete habits, or alter user statistics upon firing or dismissal.
 
+### Security, App Lock & AMOLED Black
+* **AMOLED Pure Black Theme**: True `#000000` dark theme for maximum power efficiency on OLED screens.
+* **Biometric & Device Credential App Lock**: Hardware-backed biometric authentication (fingerprint / face) and device passcode fallback with configurable auto-lock timeout intervals.
+* **Accurate Physical Storage Audit**: Direct file-level accounting of Room database (`habit_app.db`, WAL journal, SHM), DataStore preferences, and cache usage.
+
 ### Local Data Ownership & Backup
 * **Storage Access Framework (SAF)**: Export and import backups using native Android file pickers (`CreateDocument` / `OpenDocument`).
-* **Canonical JSON Format**: Human-readable JSON envelope containing all habits, records, goals, subtasks, reviews, and aggregates.
-* **SHA-256 Payload Checksum**: Deterministic integrity verification to detect file corruption or truncation prior to database operations.
+* **Canonical JSON Format**: Human-readable JSON envelope containing all habits, records, goals, subtasks, reviews, and aggregates with SHA-256 integrity verification.
+* **Standalone CSV / JSON Exports**: Export filtered or full habit history for external spreadsheet or analytical consumption.
 * **Two Restore Modes**:
   * **Merge**: Non-destructive restore preserving existing local history and resolving definition conflicts.
   * **Replace All**: Atomic full-database replacement executed within a single Room transaction, synchronizing platform alarms upon commit.
@@ -261,10 +271,11 @@ Habit1 follows a strict Unidirectional Data Flow (UDF) layered architecture:
 ```
 habit1/
 ├── apks/                                   # Pre-built release binaries
+│   ├── Habit1-v2.0.apk                     # Version 2.0 release APK (2.58 MB)
 │   ├── Habit1-latest-release.apk           # Latest verified production release APK
-│   └── app-release.apk                     # Canonical release artifact (1.71 MB)
+│   └── app-release.apk                     # Canonical release artifact
 ├── app/
-│   ├── schemas/                            # Exported Room database schemas (versions 1..4)
+│   ├── schemas/                            # Exported Room database schemas (versions 1..5)
 │   ├── src/
 │   │   ├── main/
 │   │   │   ├── AndroidManifest.xml         # Zero INTERNET permission, non-exported receivers
@@ -404,14 +415,25 @@ sequenceDiagram
 
 ## 8. Data Model & Database Schema
 
-The database is built on SQLite via AndroidX Room with Schema Version `4`. WAL mode is enabled for non-blocking concurrent reads and writes, and foreign key constraints are explicitly enforced on database open (`PRAGMA foreign_keys = ON;`).
+The database is built on SQLite via AndroidX Room with Schema Version `5`. WAL mode is enabled for non-blocking concurrent reads and writes, and foreign key constraints are explicitly enforced on database open (`PRAGMA foreign_keys = ON;`).
 
 ### Database Entity Relationship Diagram
 
 ```mermaid
 erDiagram
+    categories ||--o{ habits : "categorizes (optional)"
     habits ||--o{ habit_records : "has historical logs (CASCADE)"
+    habits ||--o{ habit_pauses : "pause periods (CASCADE)"
+    habits ||--o{ habit_schedules : "versioned schedules (CASCADE)"
     daily_goals ||--o{ goal_subtasks : "contains subtasks (CASCADE)"
+    categories {
+        string id PK
+        string name
+        string color_hex
+        string icon
+        int display_order
+        long created_at
+    }
     daily_reviews {
         string date PK
         string notes
@@ -438,8 +460,27 @@ erDiagram
         boolean is_paused
         boolean is_archived
         string color_hex
+        string start_date
+        string category_id FK
+        boolean is_currently_paused
+        long archived_at
         long created_at
         long updated_at
+    }
+    habit_pauses {
+        string id PK
+        string habit_id FK
+        string start_date
+        string end_date
+        string reason
+    }
+    habit_schedules {
+        string id PK
+        string habit_id FK
+        string schedule_type
+        string schedule_config
+        string effective_from
+        string effective_to
     }
     habit_records {
         string id PK
@@ -450,6 +491,7 @@ erDiagram
         string measurement_type
         string unit
         boolean is_completed
+        string status
         string notes
         long recorded_at
     }
@@ -476,12 +518,15 @@ erDiagram
 
 ### Table Definitions & Invariants
 
-1. **`habits`**: Authoritative habit definitions. Indexed on `[is_archived, display_order]` and `[created_at]`.
-2. **`habit_records`**: Authoritative daily records. Enforces a composite unique index on `[habit_id, date]`, preventing duplicate entries on the same civil date. `target_value`, `measurement_type`, and `unit` are recorded as **immutable historical snapshots** at write time. Foreign key references `habits(id)` with `ON DELETE CASCADE`.
-3. **`daily_goals`**: Outcomes planned for a specific civil date (`target_date`), with optional `reminder_time`. Indexed on `[target_date, display_order]` and `[created_at]`.
-4. **`goal_subtasks`**: Granular tasks attached to a goal. Foreign key references `daily_goals(id)` with `ON DELETE CASCADE`. Indexed on `[goal_id, display_order]`.
-5. **`daily_reviews`**: Subjective daily reflection and mood tag keyed by primary key `date` (`YYYY-MM-DD`).
-6. **`daily_goal_history_aggregates`**: Preserves daily goal historical completion metrics (`completed_count` / `total_count`) keyed by `date`. Enforces domain invariants (`0 <= completed_count <= total_count`). Automatically updated during cleanup transactions (`cleanupCompletedGoalsBeforeDate`) so historical completion ratios remain accessible forever even when old individual goal rows are cleaned up.
+1. **`categories`**: Optional user-defined habit categories with custom colors and icon keys. Indexed on `[display_order]`.
+2. **`habits`**: Authoritative habit definitions including tracking start date (`start_date`), optional category foreign key (`category_id`), current pause flag (`is_currently_paused`), and archive timestamp (`archived_at`). Indexed on `[is_archived, display_order]`, `[created_at]`, and `[category_id]`.
+3. **`habit_schedules`**: Versioned historical schedule configurations (`Daily`, `SpecificDays`, `Interval`) effective across date spans (`effective_from` $\to$ `effective_to`). Foreign key references `habits(id)` with `ON DELETE CASCADE`. Indexed on `[habit_id, effective_from]`.
+4. **`habit_pauses`**: Explicit pause intervals (`start_date` $\to$ `end_date`) ensuring paused spans are never penalized as missed in historical analytics. Foreign key references `habits(id)` with `ON DELETE CASCADE`. Indexed on `[habit_id, start_date]`.
+5. **`habit_records`**: Authoritative daily records with explicit completion state (`status`: `DONE`, `PARTIAL`, `MISSED`, `SKIPPED`). Enforces a composite unique index on `[habit_id, date]`, preventing duplicate entries on the same civil date. `target_value`, `measurement_type`, and `unit` are recorded as **immutable historical snapshots** at write time. Foreign key references `habits(id)` with `ON DELETE CASCADE`. Indexed on `[habit_id, status]`.
+6. **`daily_goals`**: Outcomes planned for a specific civil date (`target_date`), with optional `reminder_time`. Indexed on `[target_date, display_order]` and `[created_at]`.
+7. **`goal_subtasks`**: Granular tasks attached to a goal. Foreign key references `daily_goals(id)` with `ON DELETE CASCADE`. Indexed on `[goal_id, display_order]`.
+8. **`daily_reviews`**: Subjective daily reflection and mood tag keyed by primary key `date` (`YYYY-MM-DD`).
+9. **`daily_goal_history_aggregates`**: Preserves daily goal historical completion metrics (`completed_count` / `total_count`) keyed by `date`. Enforces domain invariants (`0 <= completed_count <= total_count`). Automatically updated during cleanup transactions (`cleanupCompletedGoalsBeforeDate`) so historical completion ratios remain accessible forever even when old individual goal rows are cleaned up.
 
 ---
 
@@ -630,30 +675,41 @@ Habit1 is designed around absolute data containment:
 Habit1 adheres to Android platform security best practices:
 
 * **Android Application Sandbox**: App database files reside within the protected private internal storage directory (`/data/data/com.habit1.app/`). Other applications cannot access this data without root privileges.
+* **Biometric & Device Credential App Lock**:
+  * Built using AndroidX Biometric (`BiometricPrompt`) with support for Class 3 Strong Biometrics (Fingerprint / 3D Face) and device credential fallback (PIN / Pattern / Password).
+  * **Configurable Inactivity Timeout**: Options for *Immediate*, *30 seconds*, *1 minute*, *5 minutes*, and *15 minutes*.
+  * **Screen-Off Locking**: Optional instantaneous lock whenever the device screen turns off, tracked via Android `ProcessLifecycleOwner`.
+  * **Notification Action Protection**: When the app is locked, quick notification actions prompt biometric authentication before logging to ensure privacy.
+* **Accurate Physical Storage Audit**:
+  * Direct file-level accounting of Room SQLite files (`habit_app.db`, `habit_app.db-wal`, `habit_app.db-shm`), DataStore preferences (`habit1_preferences.preferences_pb`), and temporary app cache files.
+  * Real-time recalculation and transparent storage breakdown in Settings.
 * **Component Export Isolation**:
   * `AlarmReceiver`: `android:exported="false"`. Can only be invoked by internal explicit `PendingIntent`s from `AlarmManager`.
   * `HabitActionReceiver`: `android:exported="false"`. Can only be invoked by internal notification action intents.
   * `BootReceiver`: `android:exported="true"` with protected system intent-filters (`BOOT_COMPLETED`, `MY_PACKAGE_REPLACED`, `TIMEZONE_CHANGED`, `TIME_SET`).
-* **Storage Access Framework (SAF)**: Export and import operations do not request broad `READ_EXTERNAL_STORAGE` or `MANAGE_EXTERNAL_STORAGE` permissions. Access is granted scoped solely to the specific document URI selected by the user.
+* **Storage Access Framework (SAF)**: Export and import operations do not request broad `READ_EXTERNAL_STORAGE` or `MANAGE_EXTERNAL_STORAGE` permissions. Access is granted scoped solely to the specific document URI selected by the user, with cached stream reading to prevent double-read crashes.
 
 ---
 
-## 14. Backup, Restore & Integrity Subsystem
+## 14. Backup, Restore & Data Portability Subsystem
 
 The backup subsystem provides transparent user-controlled data portability without proprietary locks.
 
 ### Backup File Format (`BackupEnvelopeDto`)
 
-Backups are exported as UTF-8 canonical JSON envelopes:
+Backups are exported as UTF-8 canonical JSON envelopes with SHA-256 integrity verification:
 
 ```json
 {
   "formatVersion": 1,
-  "appVersion": "1.0.0",
-  "exportedAt": "2026-09-24T18:00:00Z",
+  "appVersion": "2.0",
+  "exportedAt": "2026-11-26T10:00:00Z",
   "checksum": "a3f5b2c9... (64-character SHA-256 hex string)",
   "payload": {
+    "categories": [ ... ],
     "habits": [ ... ],
+    "pauses": [ ... ],
+    "schedules": [ ... ],
     "records": [ ... ],
     "goals": [ ... ],
     "subtasks": [ ... ],
@@ -662,6 +718,14 @@ Backups are exported as UTF-8 canonical JSON envelopes:
   }
 }
 ```
+
+### Standalone Data Export (CSV & JSON)
+
+* **Habit-Specific & Global Exports**: Export individual habits or all habits with complete historical records, notes, and targets.
+* **Configurable Date Filtering**: Export specific calendar ranges or all-time history.
+* **Format Flexibility**:
+  * **CSV**: Comma-separated values formatted for spreadsheet analysis (Excel, Google Sheets) with proper escaping.
+  * **JSON**: Structured JSON array of habit instances and records for data science pipelines.
 
 ### Checksum & Integrity Architecture
 
@@ -677,7 +741,7 @@ Backups are exported as UTF-8 canonical JSON envelopes:
    * **Preserves Local Historical Records**: If an existing local record conflicts with a backup record on `[habit_id, date]`, the local record is preserved to protect local historical truth.
 2. **Replace All Mode**:
    * Pre-wipe alarm cancellation: Cancels all pending `AlarmManager` reminders to prevent phantom notifications.
-   * Single Room Transaction: Deletes tables in child-to-parent order (`subtasks` $\to$ `goals` $\to$ `records` $\to$ `habits` $\to$ `reviews`), then inserts payload in parent-to-child order.
+   * Single Room Transaction: Deletes tables in child-to-parent order (`subtasks` $\to$ `goals` $\to$ `records` $\to$ `schedules` $\to$ `pauses` $\to$ `habits` $\to$ `categories` $\to$ `reviews`), then inserts payload in parent-to-child order.
    * Transaction Rollback Safety: If any insertion fails, Room rolls back the database to its pre-restore state, and alarms are reconciled against the restored original state.
    * Post-Commit Alarm Synchronization: Platform reminders are rescheduled for all restored active habits.
 
@@ -691,11 +755,11 @@ In accordance with project engineering standards, empirical benchmarks are stric
 
 | Category | Metric | Value / Status | Verification Source & Method |
 | :--- | :--- | :--- | :--- |
-| **Measured Build** | Release APK Size | **1.71 MB** (1,796,282 bytes) | `app/build/outputs/apk/release/app-release.apk` (R8 minified, Proguard resource shrinking) |
-| **Measured Build** | Debug APK Size | **17.59 MB** (18,445,575 bytes) | `app/build/outputs/apk/debug/app-debug.apk` (Unminified with Compose tooling preview) |
-| **Measured Test** | Automated Unit Tests | **325 tests across 49 suites** | `./gradlew testDebugUnitTest` |
-| **Measured Test** | Test Passing Rate | **100%** (325 passed, 0 failed, 0 skipped) | Gradle JUnit XML execution reports (`app/build/test-results/`) |
-| **Measured Test** | Test Execution Duration | **~9.38 seconds** | Total test execution duration in JVM test executor |
+| **Measured Build** | Release APK Size | **2.58 MB** (2,705,679 bytes) | `apks/Habit1-v2.0.apk` / `app-release.apk` (R8 minified, ProGuard resource shrinking) |
+| **Measured Installed** | Physical Base APK on Device | **2.50 MB** | Verified via `adb shell ls -lh /data/app/.../base.apk` on Samsung SM-E546B |
+| **Measured Test** | Automated Unit Tests | **717 tests across 57 suites** | `./gradlew testDebugUnitTest` |
+| **Measured Test** | Test Passing Rate | **100%** (717 passed, 0 failed, 0 skipped) | Gradle JUnit XML execution reports (`app/build/test-results/`) |
+| **Measured Test** | Test Execution Duration | **~19 seconds** | Total test execution duration in JVM test executor |
 | **Architectural Fact** | Database Journal Mode | **WAL (Write-Ahead Logging)** | Verified in `AppDatabase.kt` Room configuration |
 | **Architectural Fact** | Persistent Background Jobs | **0 (Zero)** | WorkManager periodic jobs omitted; zero background services |
 | **Unmeasured** | App Cold Startup Timing | *Not formally benchmarked* | Requires Android Macrobenchmark setup on dedicated hardware |
@@ -810,23 +874,26 @@ adb install -r apks/Habit1-latest-release.apk
 
 ## 19. Practical User Guide
 
-### 1. Creating Your First Habit
-1. Navigate to the **Habits** tab and tap the **`+`** button (or tap **`+`** on Today).
+### 1. Creating & Customizing a Habit
+1. Navigate to the **Habits** tab and tap **`+`** (or tap **`+`** in the header on Today).
 2. Enter the habit name (e.g., *"Daily Reading"*).
 3. Select a **Measurement Type**:
-   * *Boolean*: Binary completion.
+   * *Boolean*: Binary completion (Done / Missed).
    * *Count*: Stepper repetitions (e.g., 8 glasses).
    * *Duration*: Target minutes (e.g., 30 min).
-   * *Quantity*: Numeric target with custom units (e.g., 5.0 km).
-4. Configure the **Schedule**:
-   * *Daily*, *Specific Days of the Week*, or *Intervals (every N days)*.
-5. Set an optional **Reminder Time** (e.g., `08:00 AM`).
-6. Tap **Save Habit**.
+   * *Quantity*: Numeric target with custom units (e.g., 5.0 km, 2.5 L); use quick example chips (*Water*, *Steps*, *Running*, *Calories*) for guidance.
+4. Pick an accent color: Choose from the curated **Presets** palette or switch to the **RGB Wheel** to select any color with an interactive HSV sweep wheel, brightness slider, individual RGB channel sliders (0–255), and hex code sync.
+5. Configure the **Schedule**: *Daily*, *Specific Days of the Week*, or *Intervals (every N days)*.
+6. Set an optional **Reminder Time** with the *"Get notified"* alert label.
+7. Tap **Save Habit**.
 
 ### 2. Daily Execution (Today Screen)
-* Tap the circular action button on any habit card to log completion.
-* For counter or quantity habits, tap `+` / `-` stepper buttons or tap the value to input numbers directly.
-* Completed items transition to a vibrant checkmark; uncompleted items display a subtle slate indicator.
+* **Interactive Boolean Actions**:
+  * Tap the **Checkmark** button to mark a habit as **Done**.
+  * Tap the **Crossmark ($\times$)** button to explicitly log the habit as **Missed**.
+  * Actions are mutually exclusive; tapping an active state unsets it, and the selected status tag is clearly displayed below the habit title.
+* **Contextual Options & Skips**: Tap the habit menu to open the Habit Action Sheet to log a **Skip** (with reason), add progress **Notes**, **Pause**, **Archive**, or **Edit**.
+* **Quantitative Habits**: Use `+` / `-` stepper buttons for rapid logging or tap the numeric value to open the direct entry dialog.
 
 ### 3. Managing Daily Goals
 * Tap **`+ Add Goal`** under the Daily Goals section.
@@ -834,16 +901,25 @@ adb install -r apks/Habit1-latest-release.apk
 * Tap the goal check button to mark it done.
 * If a goal is not finished today, open its menu and select **Move to Tomorrow**. An immediate snackbar offers a one-tap undo if shifted by mistake. In the History screen, goals on tomorrow can also be shifted back to today.
 
-### 4. Viewing History & Analytics
-* Open the **History** tab to inspect the monthly calendar heatmap.
-* Toggle to the **Year** view for an annual consistency matrix.
-* Tap any past calendar date to view the exact completed habits, goals, and daily reflection logged on that date.
-* Tap on any habit from the **Habits** tab to open its dedicated deep-dive view with streaks, completion trends, and frequency distributions.
+### 4. Viewing Habit History & Analytics
+* Tap any habit from the **Habits** tab or Today screen to open its dedicated analytical deep dive:
+  1. **Completion Trend**: Daily score trend and distribution graphs over selected presets (7D, 30D, 90D, Year, All).
+  2. **Calendar (Activity Heatmap)**: Complete calendar matrix using accessible 5-state grammar (Done, Partial, Skipped, Missed, Unrecorded).
+  3. **Quantitative Performance**: Toggle between *Daily Values* and *Cumulative Running Total*; inspect active day averages, total volume, daily targets, and attempt distributions.
+  4. **Patterns & Consistency**: Best continuous streaks timeline, day-of-week adherence percentages, and consistency breakdowns.
+* Open the global **History** tab to browse monthly calendar grids strictly bounded from Monday to Sunday and 1st to end-of-month. Tap any calendar day to inspect past accomplishments and reflection notes.
 
-### 5. Exporting & Restoring Backups
-* Navigate to **Settings** (gear icon on Today) $\to$ **Backup & Restore**.
-* Tap **Export Backup** to generate a canonical JSON file and save it to your preferred location using the Android Storage Access Framework.
-* To restore, tap **Import Backup**, select your file, choose between **Merge** or **Replace All**, and confirm after inspecting the validation summary.
+### 5. App Lock & Privacy Configuration
+* Navigate to **Settings** (gear icon on Today) $\to$ **Security & App Lock**.
+* Toggle **App Lock** on; the app will register biometric hardware (Fingerprint / Face) with device credential fallback.
+* Choose an **Auto-Lock Timeout**: *Immediate*, *30 seconds*, *1 minute*, *5 minutes*, or *15 minutes*.
+* Optionally enable **Screen-Off Locking** for instant security whenever the display turns off.
+
+### 6. Local Storage, Data Export & Backup
+* **Storage Breakdown**: View real-time physical file allocations for the SQLite database (`habit_app.db`, WAL, SHM), DataStore preferences, and cache with the **Recalculate** action.
+* **Export Habit Data**: Export individual or all habits to standard **CSV** (for spreadsheet analysis) or structured **JSON** with custom date range filters.
+* **Full Backup Archive**: Generate a complete, unencrypted portable JSON backup envelope verified by a SHA-256 integrity checksum.
+* **Restore Backup**: Select any valid backup file via the Android Storage Access Framework (SAF); review the verified habit/record counts, and choose between **Merge with Existing Data** (non-destructive) or **Replace All Data** (atomic Room transaction).
 
 ---
 
@@ -854,18 +930,20 @@ All production release binaries are maintained in the root `/apks` directory:
 ```
 habit1/
 └── apks/
+    ├── Habit1-v2.0.apk              # Version 2.0 release artifact (2.58 MB, R8 minified)
     ├── Habit1-latest-release.apk    # Synchronized latest verified production release build
-    └── app-release.apk              # Canonical release artifact (1.71 MB, R8 minified)
+    └── app-release.apk              # Canonical release artifact
 ```
 
 ### Build Types & Minification
 
-* **Release Variant (`app-release.apk`)**:
+* **Release Variant (`Habit1-v2.0.apk` / `app-release.apk`)**:
   * Minification (`isMinifyEnabled = true`): R8 full-mode tree-shaking and dead-code elimination.
   * Resource Shrinking (`isShrinkResources = true`): Strips unused drawables, strings, and layouts.
-  * Resulting Size: **`1.71 MB`** (`1,796,282 bytes`).
+  * Resulting Size: **`2.58 MB`** (`2,705,679 bytes`).
+  * On-Device Footprint: **`2.50 MB`** base APK; total app footprint under **`3.5 MB`** with user database.
 * **Debug Variant (`app-debug.apk`)**:
-  * Unminified with debug symbols and Compose inspection tooling preview (`17.59 MB`).
+  * Unminified development build with debug symbols and Compose inspection tooling preview.
   * Package namespace suffixed with `.debug`.
 
 ---
@@ -874,8 +952,8 @@ habit1/
 
 Habit1 follows [Semantic Versioning (SemVer 2.0.0)](https://semver.org/):
 
-* **Version Name**: `1.0.0` (Defined in `app/build.gradle.kts`)
-* **Version Code**: `1` (Monotonically increasing integer)
+* **Version Name**: `2.0` (Defined in `app/build.gradle.kts`)
+* **Version Code**: `2` (Monotonically increasing integer)
 * **Detailed History**: All release milestones, phase completions, and technical additions are documented in [CHANGELOG.md](CHANGELOG.md).
 
 ---
@@ -975,17 +1053,21 @@ No. Exported backup JSON files are plain text so that you own your data in a tra
 
 Based on the verified status in [DEVELOPMENT_ROADMAP.md](DEVELOPMENT_ROADMAP.md):
 
-### Completed Phases (Phases 1 – 10)
-- [x] **Phase 1**: Infrastructure, Gradle Kotlin DSL, and manual dependency injection.
-- [x] **Phase 2**: Room Database, WAL mode, migrations, and repository layer.
-- [x] **Phase 3**: Pure Kotlin domain engine, streak evaluator, and schedule calculator.
-- [x] **Phase 4**: Material 3 design system and core Today screen.
-- [x] **Phase 5**: Habit management with 4 measurement models (Boolean, Count, Duration, Quantity).
-- [x] **Phase 6**: Daily Goals, subtasks, independent completion, and date shifting with undo.
-- [x] **Phase 7**: Monthly heatmap, yearly matrix, and individual habit history.
-- [x] **Phase 8**: Battery-conscious AlarmManager reminders and boot recovery.
-- [x] **Phase 9**: Canonical JSON backup, export, import, and SHA-256 verification.
-- [x] **Phase 10**: Optional daily reflection/mood, hardening, and hardware test verification.
+### Completed Milestones
+- [x] **v1.0.0 Core Platform (Phases 1 – 10)**:
+  - Infrastructure, Room WAL database, pure Kotlin domain engine.
+  - Material 3 design system, 4 measurement models, Daily Goals & subtasks.
+  - Monthly heatmaps, AlarmManager reminders, canonical JSON backup & restore.
+- [x] **v2.0.0 Redesign, AMOLED Black, App Lock & Performance**:
+  - **Structural UI Redesign**: Material 3 card architecture with mutually exclusive Done / Missed boolean controls and contextual action sheets.
+  - **RGB Color Wheel**: Interactive HSV sweep picker, brightness adjustment, individual RGB numeric sliders (0–255), and hex synchronization.
+  - **Habit History Reorganization**: Streamlined flow (Completion Trend $\to$ Calendar Heatmap $\to$ Quantitative Performance $\to$ Patterns & Consistency).
+  - **Strict Calendar Bounds**: Monday–Sunday week bounds and clean 1st-to-end-of-month grid constraints.
+  - **Security & App Lock**: BiometricPrompt authentication (Fingerprint / Face), device credential fallback, auto-lock timeouts, and screen-off locking.
+  - **AMOLED Pure Black Theme**: True `#000000` dark theme for maximum power efficiency.
+  - **Storage Transparency & Data Export**: Direct physical file-level storage audit and standalone CSV/JSON exports with date filters.
+  - **App Size Optimization**: R8 minification and resource shrinking reducing installed app size to 2.58 MB (<10 MB target achieved).
+  - **Automated Quality**: 717 automated unit tests across 57 suites passing at 100%.
 
 ### Future Considerations
 - [ ] Android 13+ App-specific language selection support.
@@ -1043,9 +1125,9 @@ Licensing information for this repository is not formally specified. All rights 
 * **Data Storage**: Exclusively on-device SQLite database in the private Android app sandbox (`/data/data/com.habit1.app/databases/`).
 * **Privacy Model**: Zero network permissions (`INTERNET` omitted), zero telemetry, zero analytics tracking, zero ads, zero accounts.
 * **Key Engineering Concept**: **Historical Truth** — past accomplishments snapshot their configurations at write time and are never retroactively recalculated. Missed days are represented by the absence of a record, not fabricated rows.
-* **Testing**: **325 automated unit tests across 49 test suites** (100% passing, 0 failures, 0 skipped, executed in `~9.38s`).
-* **Performance**: **1.71 MB Release APK** (R8 minified), zero persistent background jobs.
+* **Testing**: **717 automated unit tests across 57 test suites** (100% passing, 0 failures, 0 skipped, executed in `~19s`).
+* **Performance**: **2.58 MB Release APK** (R8 minified), **2.50 MB** installed base APK, total app footprint under **3.5 MB** on-device, zero persistent background jobs.
 * **Build Command**: `./gradlew assembleRelease`
-* **Release Artifacts**: Pre-built release binaries maintained in `apks/` (`Habit1-latest-release.apk`, `app-release.apk`, 1.71 MB).
+* **Release Artifacts**: Pre-built release binaries maintained in `apks/` (`Habit1-v2.0.apk`, `Habit1-latest-release.apk`, `app-release.apk`, 2.58 MB).
 * **Current Limitations**: Android-only, manual backup transfer (no cloud sync), macrobenchmarks and formal TalkBack accessibility audits not yet formally automated.
-* **Status**: Production Release v1.0.0 (Phases 1 through 10 completed and verified).
+* **Status**: Production Release v2.0 (Phases 1 through 10, AMOLED Black, App Lock, Storage Transparency, and Major UI/Interaction Redesign verified on physical hardware).

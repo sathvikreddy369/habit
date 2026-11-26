@@ -7,6 +7,44 @@ The project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [2.0.0] - 2026-11-26
+
+### Major Redesign, AMOLED Theme, App Lock & Performance Release
+
+#### Added & Improved
+* **Home Screen & Habit Interaction Redesign**:
+  * Modern Material 3 structural card redesign with refined spacing, elevation, and distinct visual container hierarchy.
+  * Mutually exclusive, interactive checkmark (Done) and crossmark (Missed) actions with clear inline status text tags.
+  * Contextual Habit Action Sheet for logging skips, notes, pausing, archiving, and editing without cluttering the main screen.
+  * Compact daily completion ring indicator and live remaining habits counter.
+* **RGB Color Wheel & Habit Form Enhancements**:
+  * Dual-mode color selection: standard curated preset palette and interactive sweep-gradient HSV color wheel.
+  * Real-time HSV gesture picker with brightness slider, individual RGB numeric channel sliders (0–255), and hex code synchronization.
+  * Quantity preset example chips (e.g. *2.5 L Water*, *5 km Run*, *10,000 Steps*, *500 kcal*) for immediate measurement clarity.
+  * Restructured habit form placing time-of-day reminder above tracking start date with clear *"Get notified"* status indicators.
+* **Habits Screen Sleek Search & Unified Filters**:
+  * Streamlined, thin search bar with placeholder *"Search habits"*.
+  * Unified status filter dropdown menu (*All*, *Active*, *Paused*, *Archived*) eliminating visual chip clutter.
+* **Habit History & Analytics Reorganization**:
+  * Restructured Habit History screen into a clear, natural analytical flow:
+    1. **Completion Trend**: Daily score trend and distribution graphs.
+    2. **Calendar (Activity Heatmap)**: Range presets with 5-state accessible status grammar.
+    3. **Quantitative Performance**: Daily bars vs cumulative running total, total volume, active day average, and target distribution.
+    4. **Patterns & Consistency**: Best streaks timeline, weekday adherence, and consistency breakdown.
+  * Strict calendar boundary enforcement: Week view strictly constrained to Monday–Sunday; Month view strictly constrained to 1st through end-of-month (zero inter-month bleed).
+* **Settings, Privacy, & Storage Transparency**:
+  * True AMOLED Black theme option (`#000000`) for maximum power efficiency on OLED screens.
+  * App Lock security subsystem supporting Biometric authentication (fingerprint/face) and device credentials with customizable timeout intervals.
+  * Accurate, physical on-device storage audit reporting exact sizes for Room database (`habit_app.db`, WAL, SHM), DataStore preferences, and temporary cache.
+  * Standalone CSV and JSON data export with date filtering.
+  * Robust Storage Access Framework (SAF) backup and restore with cached streams, SHA-256 verification, and dual restore modes (*Merge* / *Replace All*).
+* **Packaging & Performance Optimization**:
+  * R8 minification and resource shrinking reducing installed app size to **2.58 MB** (over 90% footprint reduction).
+  * Maintained total device footprint under **3.5 MB** including active historical records.
+  * Extended test suite to **717 passing automated unit tests** across 57 test suites.
+
+---
+
 ## [1.0.0] - 2026-09-24
 
 ### Initial Production Release
