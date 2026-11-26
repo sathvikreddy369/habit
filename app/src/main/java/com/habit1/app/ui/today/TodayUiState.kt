@@ -1,6 +1,7 @@
 package com.habit1.app.ui.today
 
 import com.habit1.app.domain.model.DailyReview
+import com.habit1.app.domain.model.HabitRecordStatus
 import com.habit1.app.domain.model.MeasurementType
 import com.habit1.app.domain.model.StreakResult
 import java.time.LocalDate
@@ -16,12 +17,36 @@ data class TodayHabitItem(
     val targetValue: Double,
     val actualValue: Double,
     val unit: String?,
+    val status: HabitRecordStatus = HabitRecordStatus.UNRECORDED,
     val isCompleted: Boolean,
     val progressRatio: Float,
     val formattedProgress: String,
     val streakResult: StreakResult,
-    val colorHex: String? = null
+    val colorHex: String? = null,
+    val notes: String? = null,
+    val isScheduled: Boolean = true,
+    val categoryId: String? = null,
+    val categoryName: String? = null,
+    val categoryColorHex: String? = null,
+    val categoryIcon: String? = null
 )
+
+/**
+ * Grouped habits under a category on Today screen (Decision 6.1).
+ */
+data class TodayCategoryGroup(
+    val categoryId: String?,
+    val categoryName: String,
+    val categoryColorHex: String? = null,
+    val categoryIcon: String? = null,
+    val habits: List<TodayHabitItem>,
+    val completedCount: Int,
+    val totalCount: Int,
+    val isCollapsed: Boolean = false
+) {
+    val progress: Float
+        get() = if (totalCount > 0) completedCount.toFloat() / totalCount else 0.0f
+}
 
 /**
  * Immutable UI model representing a subtask on the Today screen.
@@ -56,8 +81,10 @@ data class TodayGoalItem(
  */
 data class TodayUiState(
     val currentDate: LocalDate,
+    val todayDate: LocalDate = currentDate,
     val formattedDate: String,
     val habits: List<TodayHabitItem> = emptyList(),
+    val unscheduledHabits: List<TodayHabitItem> = emptyList(),
     val goals: List<TodayGoalItem> = emptyList(),
     val completedHabitsCount: Int = 0,
     val totalScheduledHabitsCount: Int = 0,
@@ -75,6 +102,25 @@ data class TodayUiState(
     val goalPendingDeletion: TodayGoalItem? = null,
     val goalPendingMoveTomorrow: TodayGoalItem? = null,
     val lastMovedGoalId: String? = null,
-    val subtaskPendingEdit: Pair<String, TodaySubtaskItem>? = null
-)
+    val lastClearedRecordHabitName: String? = null,
+    val subtaskPendingEdit: Pair<String, TodaySubtaskItem>? = null,
+    val activeActionSheetHabit: TodayHabitItem? = null,
+    val isActionSheetOpen: Boolean = false,
+    val numericDialogHabit: TodayHabitItem? = null,
+    val notesDialogHabit: TodayHabitItem? = null,
+    val categoryGroupingEnabled: Boolean = false,
+    val selectedCategoryFilter: String? = null,
+    val categories: List<com.habit1.app.domain.model.Category> = emptyList(),
+    val collapsedCategoryIds: Set<String> = emptySet(),
+    val groupedHabits: List<TodayCategoryGroup> = emptyList()
+) {
+    val isViewingPastDate: Boolean
+        get() = currentDate.isBefore(todayDate)
+
+    val canStepBackward: Boolean
+        get() = currentDate.isAfter(todayDate.minusDays(7))
+
+    val canStepForward: Boolean
+        get() = currentDate.isBefore(todayDate)
+}
 

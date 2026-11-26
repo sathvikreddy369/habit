@@ -1,37 +1,71 @@
 package com.habit1.app.ui.components
 
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Today
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ProgressIndicatorDefaults
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 /**
- * Calm, focused header for the Today screen displaying civil date and daily progress.
+ * Compact, unified daily overview dashboard for the Today / Home screen.
  *
- * Strict UX Principle:
- * Keeps habits and daily goals strictly separate. Never combines them into a single percentage.
+ * Implements:
+ * - Integrated 7-day bounded date stepper navigation with past-date context indicator.
+ * - Prominent but compact radial completion donut (54dp).
+ * - Exact habit completion counts and clear remaining habits indicator.
+ * - Non-intrusive daily goals status.
+ * - Elegant empty state when no habits are scheduled.
  */
 @Composable
 fun TodayHeader(
-    formattedDate: String = "",
+    formattedDate: String,
+    isViewingPastDate: Boolean,
+    canStepBackward: Boolean,
+    canStepForward: Boolean,
+    onStepBackward: () -> Unit,
+    onStepForward: () -> Unit,
+    onReturnToToday: () -> Unit,
     completedHabitsCount: Int,
     totalScheduledHabitsCount: Int,
     habitProgress: Float,
@@ -41,94 +75,231 @@ fun TodayHeader(
     modifier: Modifier = Modifier
 ) {
     val animatedHabitProgress by animateFloatAsState(
-        targetValue = habitProgress,
-        animationSpec = ProgressIndicatorDefaults.ProgressAnimationSpec,
-        label = "daily_habit_progress"
+        targetValue = habitProgress.coerceIn(0f, 1f),
+        animationSpec = tween(durationMillis = 400, easing = FastOutSlowInEasing),
+        label = "overview_radial_progress"
     )
 
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp)
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
     ) {
-
-        // Habit Progress Section
-        val habitSummaryText = if (totalScheduledHabitsCount == 0) {
-            "No habits scheduled"
-        } else if (completedHabitsCount == totalScheduledHabitsCount) {
-            "All $totalScheduledHabitsCount habits completed"
-        } else {
-            "$completedHabitsCount of $totalScheduledHabitsCount habits completed"
-        }
-
-        val habitPercent = (habitProgress * 100).toInt()
-
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .semantics {
-                    contentDescription = "$habitSummaryText, $habitPercent percent completed"
-                },
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+                .padding(horizontal = 14.dp, vertical = 10.dp)
         ) {
-            Text(
-                text = habitSummaryText,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+            // 1. DATE NAVIGATION BAR
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                // Backward Chevron Button
+                IconButton(
+                    onClick = onStepBackward,
+                    enabled = canStepBackward,
+                    modifier = Modifier
+                        .size(36.dp)
+                        .semantics { contentDescription = "Previous Day" }
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                        contentDescription = null,
+                        tint = if (canStepBackward) {
+                            MaterialTheme.colorScheme.onSurface
+                        } else {
+                            MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                        },
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
 
-            if (totalScheduledHabitsCount > 0) {
-                Text(
-                    text = "$habitPercent%",
-                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
-                    color = MaterialTheme.colorScheme.primary
-                )
+                // Date Title & Context
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        text = if (isViewingPastDate) formattedDate else "Today • $formattedDate",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+
+                    if (isViewingPastDate) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Surface(
+                            onClick = onReturnToToday,
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier.height(26.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Today,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "Today",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Forward Chevron Button
+                IconButton(
+                    onClick = onStepForward,
+                    enabled = canStepForward,
+                    modifier = Modifier
+                        .size(36.dp)
+                        .semantics { contentDescription = "Next Day" }
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = null,
+                        tint = if (canStepForward) {
+                            MaterialTheme.colorScheme.onSurface
+                        } else {
+                            MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                        },
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
-        }
 
-        if (totalScheduledHabitsCount > 0) {
-            Spacer(modifier = Modifier.height(8.dp))
-            LinearProgressIndicator(
-                progress = { animatedHabitProgress },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(6.dp)
-                    .clip(RoundedCornerShape(3.dp)),
-                color = MaterialTheme.colorScheme.primary,
-                trackColor = MaterialTheme.colorScheme.surfaceVariant
-            )
-        }
+            Spacer(modifier = Modifier.height(6.dp))
 
-        // Daily Goals Progress (Separate from habits)
-        if (totalGoalsCount > 0) {
-            Spacer(modifier = Modifier.height(10.dp))
-            val goalSummaryText = if (completedGoalsCount == totalGoalsCount) {
-                "All $totalGoalsCount daily goals completed"
-            } else {
-                "$completedGoalsCount of $totalGoalsCount daily goals completed"
-            }
-            val goalPercent = (goalProgress * 100).toInt()
-
+            // 2. RADIAL COMPLETION DONUT & REMAINING SUMMARY ROW
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .semantics {
-                        contentDescription = "$goalSummaryText, $goalPercent percent completed"
-                    },
-                horizontalArrangement = Arrangement.SpaceBetween,
+                    .padding(vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = goalSummaryText,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = "$goalPercent%",
-                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium),
-                    color = MaterialTheme.colorScheme.secondary
-                )
+                // Radial Donut (54dp)
+                val primaryColor = MaterialTheme.colorScheme.primary
+                val trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                val isAllCompleted = totalScheduledHabitsCount > 0 && completedHabitsCount == totalScheduledHabitsCount
+
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(54.dp)
+                        .semantics {
+                            val percent = (habitProgress * 100).toInt()
+                            contentDescription = "$percent percent of scheduled habits completed"
+                        }
+                ) {
+                    Canvas(modifier = Modifier.size(54.dp)) {
+                        val strokePx = 5.dp.toPx()
+                        val arcSize = 54.dp.toPx() - strokePx
+                        val offset = strokePx / 2f
+
+                        // Background track
+                        drawCircle(
+                            color = trackColor,
+                            radius = arcSize / 2f,
+                            style = Stroke(width = strokePx)
+                        )
+
+                        // Progress arc
+                        if (animatedHabitProgress > 0f) {
+                            drawArc(
+                                color = if (isAllCompleted) Color(0xFF2E7D32) else primaryColor,
+                                startAngle = -90f,
+                                sweepAngle = animatedHabitProgress * 360f,
+                                useCenter = false,
+                                topLeft = androidx.compose.ui.geometry.Offset(offset, offset),
+                                size = androidx.compose.ui.geometry.Size(arcSize, arcSize),
+                                style = Stroke(width = strokePx, cap = StrokeCap.Round)
+                            )
+                        }
+                    }
+
+                    if (isAllCompleted) {
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = null,
+                            tint = Color(0xFF2E7D32),
+                            modifier = Modifier.size(24.dp)
+                        )
+                    } else {
+                        val percentInt = (habitProgress * 100).toInt()
+                        Text(
+                            text = "$percentInt%",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(14.dp))
+
+                // Textual Summary & Remaining Indicator
+                Column(modifier = Modifier.weight(1f)) {
+                    val habitHeadline = when {
+                        totalScheduledHabitsCount == 0 -> "No habits scheduled"
+                        isAllCompleted -> "All $totalScheduledHabitsCount habits completed"
+                        else -> "$completedHabitsCount of $totalScheduledHabitsCount habits completed"
+                    }
+
+                    Text(
+                        text = habitHeadline,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+
+                    Spacer(modifier = Modifier.height(2.dp))
+
+                    val remainingHabits = (totalScheduledHabitsCount - completedHabitsCount).coerceAtLeast(0)
+                    val remainingText = when {
+                        totalScheduledHabitsCount == 0 -> "Rest day • Bonus activities can still be logged"
+                        isAllCompleted -> "All caught up for today! 🎉"
+                        remainingHabits == 1 -> "1 habit remaining"
+                        else -> "$remainingHabits habits remaining"
+                    }
+                    val remainingColor = when {
+                        isAllCompleted -> Color(0xFF2E7D32)
+                        totalScheduledHabitsCount == 0 -> MaterialTheme.colorScheme.outline
+                        else -> MaterialTheme.colorScheme.primary
+                    }
+
+                    Text(
+                        text = remainingText,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Medium,
+                        color = remainingColor
+                    )
+
+                    // Secondary daily goals progress if any
+                    if (totalGoalsCount > 0) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Daily Goals: $completedGoalsCount of $totalGoalsCount completed",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
             }
         }
     }

@@ -49,6 +49,10 @@ class HabitReminderCoordinatorTest {
             lastScheduledZoneId = zoneId
         }
 
+        override fun scheduleSnooze(habitId: String, triggerEpochMillis: Long) {
+            // no-op for tests
+        }
+
         override fun cancelReminder(habitId: String) {
             canceledHabits.add(habitId)
         }
@@ -204,6 +208,34 @@ class HabitReminderCoordinatorTest {
         coordinator.onHabitDeleted("h1")
         assertTrue(canceledHabits.contains("h1"))
         assertTrue(canceledNotifications.contains("h1"))
+    }
+
+    @Test
+    fun testOnHabitCompletedToday_cancelsAlarmAndNotificationAndReschedules() = runTest(testDispatcher) {
+        val entity = HabitEntity(
+            id = "h_comp",
+            name = "Completed Habit",
+            measurementType = "BOOLEAN",
+            targetValue = 1.0,
+            unit = null,
+            scheduleType = "DAILY",
+            scheduleConfig = "{}",
+            reminderTime = "08:00",
+            displayOrder = 0,
+            isPaused = false,
+            isArchived = false,
+            createdAt = pastMillis,
+            updatedAt = pastMillis
+        )
+        database.habitDao().insert(entity)
+
+        coordinator.onHabitCompletedToday("h_comp")
+
+        // Must cancel today's alarm and notification
+        assertTrue(canceledHabits.contains("h_comp"))
+        assertTrue(canceledNotifications.contains("h_comp"))
+        // And reschedule for tomorrow
+        assertTrue(scheduledHabits.contains("h_comp"))
     }
 
     @Test

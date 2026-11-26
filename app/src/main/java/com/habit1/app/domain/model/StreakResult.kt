@@ -12,5 +12,7 @@ data class StreakResult(
     val longestStreak: Int,
     val totalCompletions: Int,
     val totalScheduledDays: Int,
-    val completionRate: Float
+    val completionRate: Float,
+    val isFrozen: Boolean = false,
+    val totalSkippedDays: Int = 0
 )

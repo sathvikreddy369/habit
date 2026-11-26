@@ -2,6 +2,7 @@ package com.habit1.app.data.local.db.entity
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
@@ -10,9 +11,18 @@ import androidx.room.PrimaryKey
  */
 @Entity(
     tableName = "habits",
+    foreignKeys = [
+        ForeignKey(
+            entity = CategoryEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["category_id"],
+            onDelete = ForeignKey.SET_NULL
+        )
+    ],
     indices = [
         Index(value = ["is_archived", "display_order"]),
-        Index(value = ["created_at"])
+        Index(value = ["created_at"]),
+        Index(value = ["category_id"])
     ]
 )
 data class HabitEntity(
@@ -73,6 +83,33 @@ data class HabitEntity(
 
     @ColumnInfo(name = "color_hex", defaultValue = "NULL")
     val colorHex: String? = null,
+
+    /**
+     * Effective tracking start civil date in ISO-8601 "YYYY-MM-DD" format.
+     * Dates before this date are classified as PreCreation and have no scheduled expectation.
+     */
+    @ColumnInfo(name = "start_date", defaultValue = "''")
+    val startDate: String = "",
+
+    /**
+     * Optional foreign key reference to CategoryEntity. Null represents Uncategorized.
+     */
+    @ColumnInfo(name = "category_id", defaultValue = "NULL")
+    val categoryId: String? = null,
+
+    /**
+     * Denormalized active pause flag cached for high-performance dashboard queries.
+     * True if there is an active row in habit_pauses covering today.
+     */
+    @ColumnInfo(name = "is_currently_paused", defaultValue = "0")
+    val isCurrentlyPaused: Boolean = false,
+
+    /**
+     * Timestamp in epoch millis when this habit was archived. Null if not archived.
+     * Serves as an immutable temporal boundary: no scheduled occurrences are projected after this date.
+     */
+    @ColumnInfo(name = "archived_at", defaultValue = "NULL")
+    val archivedAt: Long? = null,
 
     @ColumnInfo(name = "created_at")
     val createdAt: Long,

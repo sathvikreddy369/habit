@@ -1,7 +1,9 @@
 package com.habit1.app.domain
 
 import com.habit1.app.domain.model.Habit
+import com.habit1.app.domain.model.HabitPause
 import com.habit1.app.domain.model.HabitSchedule
+import com.habit1.app.domain.model.HabitScheduleVersion
 import com.habit1.app.domain.model.MeasurementType
 import com.habit1.app.domain.usecase.EvaluateScheduleUseCase
 import org.junit.Assert.assertEquals
@@ -131,5 +133,92 @@ class EvaluateScheduleUseCaseTest {
         assertEquals(2, range.size)
         assertEquals(LocalDate.of(2026, 9, 19), range[0]) // Saturday
         assertEquals(LocalDate.of(2026, 9, 20), range[1]) // Sunday
+    }
+
+    @Test
+    fun testTemporalPausesInclusiveSemantics() {
+        val habit = createHabit(HabitSchedule.Daily)
+        val pause = HabitPause(
+            id = "p1",
+            habitId = "test_h",
+            startDate = LocalDate.of(2026, 9, 10),
+            endDate = LocalDate.of(2026, 9, 12),
+            reason = "Vacation"
+        )
+        val pauses = listOf(pause)
+
+        // Day before pause -> scheduled
+        assertTrue(useCase.isScheduledOn(habit, LocalDate.of(2026, 9, 9), utcZone, pauses))
+        assertFalse(useCase.isDayPaused(habit, LocalDate.of(2026, 9, 9), pauses))
+
+        // First day of pause (inclusive) -> paused and not scheduled
+        assertFalse(useCase.isScheduledOn(habit, LocalDate.of(2026, 9, 10), utcZone, pauses))
+        assertTrue(useCase.isDayPaused(habit, LocalDate.of(2026, 9, 10), pauses))
+
+        // Middle day of pause -> paused
+        assertFalse(useCase.isScheduledOn(habit, LocalDate.of(2026, 9, 11), utcZone, pauses))
+        assertTrue(useCase.isDayPaused(habit, LocalDate.of(2026, 9, 11), pauses))
+
+        // Last day of pause (inclusive) -> paused
+        assertFalse(useCase.isScheduledOn(habit, LocalDate.of(2026, 9, 12), utcZone, pauses))
+        assertTrue(useCase.isDayPaused(habit, LocalDate.of(2026, 9, 12), pauses))
+
+        // Day after pause resumes -> scheduled and not paused
+        assertTrue(useCase.isScheduledOn(habit, LocalDate.of(2026, 9, 13), utcZone, pauses))
+        assertFalse(useCase.isDayPaused(habit, LocalDate.of(2026, 9, 13), pauses))
+    }
+
+    @Test
+    fun testScheduleVersionsPreserveHistoricalTruth() {
+        // Version 1 (Daily): from 2026-09-01 to 2026-09-09
+        val v1 = HabitScheduleVersion(
+            id = "v1",
+            habitId = "test_h",
+            schedule = HabitSchedule.Daily,
+            effectiveFrom = LocalDate.of(2026, 9, 1),
+            effectiveTo = LocalDate.of(2026, 9, 9)
+        )
+        // Version 2 (Weekends only): from 2026-09-10 onwards
+        val v2 = HabitScheduleVersion(
+            id = "v2",
+            habitId = "test_h",
+            schedule = HabitSchedule.SpecificDays(setOf(DayOfWeek.SATURDAY, DayOfWeek.SUNDAY)),
+            effectiveFrom = LocalDate.of(2026, 9, 10),
+            effectiveTo = null
+        )
+        val versions = listOf(v1, v2)
+        val habit = createHabit(schedule = HabitSchedule.Daily)
+
+        // 2026-09-08 is Tuesday -> under v1 (Daily), so scheduled
+        assertTrue(useCase.isScheduledOn(habit, LocalDate.of(2026, 9, 8), utcZone, scheduleVersions = versions))
+
+        // 2026-09-15 is Tuesday -> under v2 (Weekends), so NOT scheduled
+        assertFalse(useCase.isScheduledOn(habit, LocalDate.of(2026, 9, 15), utcZone, scheduleVersions = versions))
+
+        // 2026-09-19 is Saturday -> under v2 (Weekends), so scheduled
+        assertTrue(useCase.isScheduledOn(habit, LocalDate.of(2026, 9, 19), utcZone, scheduleVersions = versions))
+    }
+
+    @Test
+    fun testArchivedAtBoundarySuppressesOccurrencesAfterArchival() {
+        // Habit created on Sep 1, archived on Sep 10
+        val archivedInstant = Instant.parse("2026-09-10T15:00:00Z")
+        val habit = Habit(
+            id = "test_h",
+            name = "Archived Habit",
+            measurement = MeasurementType.BooleanChoice,
+            schedule = HabitSchedule.Daily,
+            isArchived = true,
+            archivedAt = archivedInstant,
+            createdAt = baseInstant,
+            updatedAt = archivedInstant
+        )
+
+        // On or before archive date (Sep 10): scheduled
+        assertTrue(useCase.isScheduledOn(habit, LocalDate.of(2026, 9, 10), utcZone))
+
+        // After archive date (Sep 11): NOT scheduled
+        assertFalse(useCase.isScheduledOn(habit, LocalDate.of(2026, 9, 11), utcZone))
+        assertFalse(useCase.isScheduledOn(habit, LocalDate.of(2026, 9, 12), utcZone))
     }
 }

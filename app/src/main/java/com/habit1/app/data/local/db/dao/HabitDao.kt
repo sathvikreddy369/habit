@@ -52,11 +52,20 @@ interface HabitDao {
     @Query("UPDATE habits SET display_order = :displayOrder, updated_at = :updatedAt WHERE id = :id")
     suspend fun updateDisplayOrder(id: String, displayOrder: Int, updatedAt: Long)
 
-    @Query("UPDATE habits SET is_archived = :isArchived, updated_at = :updatedAt WHERE id = :id")
+    @Query("UPDATE habits SET is_archived = :isArchived, archived_at = CASE WHEN :isArchived = 1 THEN :updatedAt ELSE NULL END, updated_at = :updatedAt WHERE id = :id")
     suspend fun setArchived(id: String, isArchived: Boolean, updatedAt: Long)
 
-    @Query("UPDATE habits SET is_paused = :isPaused, updated_at = :updatedAt WHERE id = :id")
+    @Query("UPDATE habits SET is_paused = :isPaused, is_currently_paused = :isPaused, updated_at = :updatedAt WHERE id = :id")
     suspend fun setPaused(id: String, isPaused: Boolean, updatedAt: Long)
+
+    @Query("UPDATE habits SET category_id = NULL WHERE category_id = :categoryId")
+    suspend fun clearCategoryId(categoryId: String)
+
+    @Query("UPDATE habits SET category_id = :categoryId, updated_at = :updatedAt WHERE id = :habitId")
+    suspend fun setHabitCategory(habitId: String, categoryId: String?, updatedAt: Long)
+
+    @Query("SELECT * FROM habits WHERE category_id = :categoryId AND is_archived = 0 ORDER BY display_order ASC")
+    fun observeHabitsByCategory(categoryId: String): Flow<List<HabitEntity>>
 
     @Query("SELECT COUNT(*) FROM habits WHERE is_archived = 0")
     suspend fun countActive(): Int

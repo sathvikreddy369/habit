@@ -73,6 +73,14 @@ fun ReminderTimePickerDialog(
 
     val isPastTime = minTime != null && selectedTime != null && selectedTime.isBefore(minTime)
 
+    val context = LocalContext.current
+    val isExactAlarmPermitted = remember {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+            val am = context.getSystemService(android.content.Context.ALARM_SERVICE) as? android.app.AlarmManager
+            am?.canScheduleExactAlarms() ?: true
+        } else true
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
@@ -113,6 +121,15 @@ fun ReminderTimePickerDialog(
                         text = "Reminder cannot be set in the past for today (current time is ${com.habit1.app.core.util.DateTimeUtils.formatTime(minTime)})",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 8.dp)
+                    )
+                } else if (!isExactAlarmPermitted) {
+                    androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Exact alarms are disabled. Alert may be slightly delayed by system battery optimization.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                         modifier = Modifier.padding(horizontal = 8.dp)
                     )

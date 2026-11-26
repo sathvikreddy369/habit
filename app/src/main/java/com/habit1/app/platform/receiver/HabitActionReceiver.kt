@@ -3,43 +3,50 @@ package com.habit1.app.platform.receiver
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.widget.Toast
 import com.habit1.app.HabitApplication
 import com.habit1.app.core.util.DateTimeUtils
-import com.habit1.app.domain.mapper.EntityMappers.toDomain
+import com.habit1.app.domain.model.MeasurementType
+import com.habit1.app.domain.reminder.SnoozeCalculator
+import com.habit1.app.domain.reminder.SnoozeResult
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.time.LocalDateTime
 import java.time.ZoneId
 
 /**
  * BroadcastReceiver triggered by user interactions with actionable habit reminder notifications.
  *
  * Actions Handled:
- * - ACTION_HABIT_RECORD_YES: Sets actualValue = 1.0, isCompleted = true for BooleanChoice habit
- * - ACTION_HABIT_RECORD_NO: Sets actualValue = 0.0, isCompleted = false for BooleanChoice habit
- * - ACTION_HABIT_RECORD_DONE: Promotes to target completion for Quantitative habit
+ * - ACTION_HABIT_RECORD_DONE / ACTION_HABIT_RECORD_YES: Completes habit to target for today.
+ * - ACTION_HABIT_RECORD_SKIP: Explicitly sets status to SKIPPED for today (neutral streak freeze).
+ * - ACTION_HABIT_SNOOZE: Reschedules reminder within midnight-bounded snooze rules.
  *
  * Enforces:
- * - Defense in depth: Re-reads current habit and validates status (not paused, not archived).
- * - Explicit civil target date: Uses EXTRA_TARGET_DATE rather than assuming system now.
- * - Non-destructive DONE: Preserves existing actualValue if it exceeds target.
- * - Single Notification Update: Updates notification to confirmed state without spam.
+ * - Defense in depth: Re-reads current habit and record, validating status (not paused, not archived).
+ * - Action safety: Never overwrites existing completions, notes, or partial volumes accidentally.
+ * - Swiping away notification: Dismisses only, never persists a MISSED record.
  */
 class HabitActionReceiver : BroadcastReceiver() {
 
     companion object {
-        const val ACTION_HABIT_RECORD_YES = "com.habit1.app.ACTION_HABIT_RECORD_YES"
-        const val ACTION_HABIT_RECORD_NO = "com.habit1.app.ACTION_HABIT_RECORD_NO"
         const val ACTION_HABIT_RECORD_DONE = "com.habit1.app.ACTION_HABIT_RECORD_DONE"
+        const val ACTION_HABIT_RECORD_YES = "com.habit1.app.ACTION_HABIT_RECORD_YES" // Backwards compatibility
+        const val ACTION_HABIT_RECORD_SKIP = "com.habit1.app.ACTION_HABIT_RECORD_SKIP"
+        const val ACTION_HABIT_SNOOZE = "com.habit1.app.ACTION_HABIT_SNOOZE"
 
         const val EXTRA_HABIT_ID = "extra_habit_id"
         const val EXTRA_TARGET_DATE = "extra_target_date"
         const val EXTRA_NOTIFICATION_ID = "extra_notification_id"
     }
 
+    private val snoozeCalculator = SnoozeCalculator()
+
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action ?: return
-        if (action !in listOf(ACTION_HABIT_RECORD_YES, ACTION_HABIT_RECORD_NO, ACTION_HABIT_RECORD_DONE)) {
+        if (action !in listOf(ACTION_HABIT_RECORD_DONE, ACTION_HABIT_RECORD_YES, ACTION_HABIT_RECORD_SKIP, ACTION_HABIT_SNOOZE)) {
             return
         }
 
@@ -63,38 +70,70 @@ class HabitActionReceiver : BroadcastReceiver() {
         val container = app.container
         val progressUseCase = container.recordHabitProgressUseCase
         val habitRepository = container.habitRepository
+        val habitRecordRepository = container.habitRecordRepository
         val notificationHelper = container.notificationHelper
+        val scheduler = container.reminderScheduler
 
         val pendingResult = goAsync()
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val zoneId = ZoneId.systemDefault()
-                val result = when (action) {
-                    ACTION_HABIT_RECORD_YES -> progressUseCase.markCompleted(
-                        habitId = habitId,
-                        targetDate = targetDate,
-                        zoneId = zoneId,
-                        enforceSchedule = true
-                    )
-                    ACTION_HABIT_RECORD_NO -> progressUseCase.markIncomplete(
-                        habitId = habitId,
-                        targetDate = targetDate,
-                        zoneId = zoneId,
-                        enforceSchedule = true
-                    )
-                    ACTION_HABIT_RECORD_DONE -> progressUseCase.markCompleted(
-                        habitId = habitId,
-                        targetDate = targetDate,
-                        zoneId = zoneId,
-                        enforceSchedule = true
-                    )
-                    else -> Result.failure(IllegalArgumentException("Unsupported action: $action"))
+                val habitEntity = habitRepository.getHabitById(habitId)
+
+                if (habitEntity == null || habitEntity.isArchived || habitEntity.isPaused) {
+                    notificationHelper.cancelNotification(notificationId)
+                    return@launch
                 }
 
-                // Immediately dismiss the notification once the user has interacted with it,
-                // regardless of whether progress was recorded or habit was stale/deleted/paused.
-                notificationHelper.cancelNotification(notificationId)
+                when (action) {
+                    ACTION_HABIT_RECORD_DONE,
+                    ACTION_HABIT_RECORD_YES -> {
+                        progressUseCase.markCompleted(
+                            habitId = habitId,
+                            targetDate = targetDate,
+                            zoneId = zoneId,
+                            enforceSchedule = true
+                        )
+                        notificationHelper.cancelNotification(notificationId)
+                    }
+
+                    ACTION_HABIT_RECORD_SKIP -> {
+                        val existingRecord = habitRecordRepository.getRecord(habitId, targetDateStr)
+                        // Safety: Do not overwrite an already completed record with SKIP
+                        if (existingRecord != null && existingRecord.isCompleted) {
+                            notificationHelper.cancelNotification(notificationId)
+                            return@launch
+                        }
+
+                        progressUseCase.markSkipped(
+                            habitId = habitId,
+                            targetDate = targetDate,
+                            notes = existingRecord?.notes,
+                            zoneId = zoneId
+                        )
+                        notificationHelper.cancelNotification(notificationId)
+                    }
+
+                    ACTION_HABIT_SNOOZE -> {
+                        val now = LocalDateTime.now(zoneId)
+                        when (val snoozeResult = snoozeCalculator.calculateSnooze(now, zoneId)) {
+                            is SnoozeResult.Scheduled -> {
+                                scheduler.scheduleSnooze(habitId, snoozeResult.triggerEpochMillis)
+                                notificationHelper.cancelNotification(notificationId)
+                            }
+                            is SnoozeResult.DisallowedPastBoundary -> {
+                                withContext(Dispatchers.Main) {
+                                    Toast.makeText(
+                                        context,
+                                        "Cannot snooze past 23:50 today.",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                            }
+                        }
+                    }
+                }
             } catch (t: Throwable) {
                 t.printStackTrace()
             } finally {

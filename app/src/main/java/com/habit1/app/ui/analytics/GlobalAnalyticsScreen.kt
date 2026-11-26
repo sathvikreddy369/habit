@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
@@ -44,6 +46,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.habit1.app.domain.model.HabitPerformanceItem
 import com.habit1.app.domain.model.StreakLeaderItem
+import com.habit1.app.ui.components.AnalyticsInsightsSection
+import com.habit1.app.ui.components.DailyTrendLineChart
+import com.habit1.app.ui.components.HabitFrequencyCard
+import com.habit1.app.ui.components.PeriodComparisonCard
+import com.habit1.app.ui.components.RecordBreakdownCard
 
 /**
  * Clean, production-grade Global Analytics Screen.
@@ -96,10 +103,11 @@ fun GlobalAnalyticsScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // Preset Range Selector Row
+            // Preset Range Selector Row (Decision 5.1.2)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
@@ -150,9 +158,10 @@ fun GlobalAnalyticsScreen(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(16.dp),
                             colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surface
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
                             ),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
+                            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                         ) {
                             Column(
                                 modifier = Modifier
@@ -226,7 +235,46 @@ fun GlobalAnalyticsScreen(
                         }
                     }
 
-                    // 2. Factual Streaks Section
+                    // 2. Period Comparison (when sufficient data exists)
+                    if (summary.periodComparison != null && summary.periodComparison.isSufficientData) {
+                        item(key = "period_comparison") {
+                            PeriodComparisonCard(comparison = summary.periodComparison)
+                        }
+                    }
+
+                    // 3. Observations & Insights
+                    if (summary.insights.isNotEmpty()) {
+                        item(key = "insights_section") {
+                            AnalyticsInsightsSection(
+                                insights = summary.insights,
+                                onInspectHabit = onInspectHabit
+                            )
+                        }
+                    }
+
+                    // 4. Daily Completion Trend Graph
+                    if (summary.dailyTrend.isNotEmpty()) {
+                        item(key = "daily_trend_graph") {
+                            DailyTrendLineChart(points = summary.dailyTrend)
+                        }
+                    }
+
+                    // 5. Weekday Consistency Distribution
+                    if (summary.weekdayAdherence.isNotEmpty()) {
+                        item(key = "weekday_adherence") {
+                            HabitFrequencyCard(
+                                weekdayAdherence = summary.weekdayAdherence,
+                                accentColor = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+
+                    // 6. Record Distribution Breakdown (Completed, Partial, Skipped, Missed)
+                    item(key = "record_breakdown") {
+                        RecordBreakdownCard(breakdown = summary.recordBreakdown)
+                    }
+
+                    // 7. Factual Streaks Section
                     if (summary.streakLeaders.isNotEmpty()) {
                         item(key = "streaks_section") {
                             Column(modifier = Modifier.fillMaxWidth()) {
@@ -241,8 +289,9 @@ fun GlobalAnalyticsScreen(
                                 Card(
                                     modifier = Modifier.fillMaxWidth(),
                                     shape = RoundedCornerShape(14.dp),
-                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
+                                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                                 ) {
                                     Column(modifier = Modifier.padding(12.dp)) {
                                         summary.streakLeaders.forEachIndexed { index, leader ->
@@ -360,8 +409,9 @@ private fun HabitPerformanceCard(
                 contentDescription = "${item.habitName}, ${item.completionRate.toInt()}% completion, ${item.currentStreak} day streak"
             },
         shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
@@ -387,6 +437,21 @@ private fun HabitPerformanceCard(
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (item.isArchived) {
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            modifier = Modifier.padding(end = 8.dp)
+                        ) {
+                            Text(
+                                text = "Archived",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+
                     if (item.currentStreak > 0) {
                         Surface(
                             shape = RoundedCornerShape(6.dp),

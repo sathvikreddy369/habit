@@ -30,16 +30,20 @@ open class NotificationHelper(
         const val CHANNEL_ID_REMINDERS = "habit_reminders"
         private const val CHANNEL_NAME = "Habit Reminders"
         private const val CHANNEL_DESC = "Reminders for scheduled habits"
+
+        const val CHANNEL_ID_DIGEST = "evening_digest"
+        private const val DIGEST_CHANNEL_NAME = "Evening Digest"
+        private const val DIGEST_CHANNEL_DESC = "Daily evening summaries of scheduled habits"
     }
 
     private val notificationManager: NotificationManager =
         context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
     /**
-     * Initializes the notification channel on Android 8.0+ (API 26+).
+     * Initializes the notification channels on Android 8.0+ (API 26+).
      */
     open fun createNotificationChannel() {
-        val channel = NotificationChannel(
+        val reminderChannel = NotificationChannel(
             CHANNEL_ID_REMINDERS,
             CHANNEL_NAME,
             NotificationManager.IMPORTANCE_HIGH
@@ -48,7 +52,18 @@ open class NotificationHelper(
             enableVibration(true)
             setShowBadge(true)
         }
-        notificationManager.createNotificationChannel(channel)
+        notificationManager.createNotificationChannel(reminderChannel)
+
+        val digestChannel = NotificationChannel(
+            CHANNEL_ID_DIGEST,
+            DIGEST_CHANNEL_NAME,
+            NotificationManager.IMPORTANCE_DEFAULT
+        ).apply {
+            description = DIGEST_CHANNEL_DESC
+            enableVibration(false)
+            setShowBadge(true)
+        }
+        notificationManager.createNotificationChannel(digestChannel)
     }
 
     /**
@@ -111,54 +126,70 @@ open class NotificationHelper(
                 }
                 builder.setContentText(promptText)
 
-                // YES action
-                val yesIntent = Intent(context, HabitActionReceiver::class.java).apply {
-                    action = HabitActionReceiver.ACTION_HABIT_RECORD_YES
-                    data = Uri.parse("habit1://action/${habit.id}/$targetDate/YES")
+                // Done action
+                val doneIntent = Intent(context, HabitActionReceiver::class.java).apply {
+                    action = HabitActionReceiver.ACTION_HABIT_RECORD_DONE
+                    data = Uri.parse("habit1://action/${habit.id}/$targetDate/DONE")
                     putExtra(HabitActionReceiver.EXTRA_HABIT_ID, habit.id)
                     putExtra(HabitActionReceiver.EXTRA_TARGET_DATE, targetDate)
                     putExtra(HabitActionReceiver.EXTRA_NOTIFICATION_ID, notificationId)
                 }
-                val yesPendingIntent = PendingIntent.getBroadcast(
+                val donePendingIntent = PendingIntent.getBroadcast(
                     context,
-                    Objects.hash(habit.id, targetDate, "YES"),
-                    yesIntent,
+                    Objects.hash(habit.id, targetDate, "DONE"),
+                    doneIntent,
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                 )
 
-                // NO action
-                val noIntent = Intent(context, HabitActionReceiver::class.java).apply {
-                    action = HabitActionReceiver.ACTION_HABIT_RECORD_NO
-                    data = Uri.parse("habit1://action/${habit.id}/$targetDate/NO")
+                // Snooze (1 hour) action
+                val snoozeIntent = Intent(context, HabitActionReceiver::class.java).apply {
+                    action = HabitActionReceiver.ACTION_HABIT_SNOOZE
+                    data = Uri.parse("habit1://action/${habit.id}/$targetDate/SNOOZE")
                     putExtra(HabitActionReceiver.EXTRA_HABIT_ID, habit.id)
                     putExtra(HabitActionReceiver.EXTRA_TARGET_DATE, targetDate)
                     putExtra(HabitActionReceiver.EXTRA_NOTIFICATION_ID, notificationId)
                 }
-                val noPendingIntent = PendingIntent.getBroadcast(
+                val snoozePendingIntent = PendingIntent.getBroadcast(
                     context,
-                    Objects.hash(habit.id, targetDate, "NO"),
-                    noIntent,
+                    Objects.hash(habit.id, targetDate, "SNOOZE"),
+                    snoozeIntent,
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                 )
 
-                builder.addAction(0, "YES", yesPendingIntent)
-                builder.addAction(0, "NO", noPendingIntent)
+                // Skip Today action
+                val skipIntent = Intent(context, HabitActionReceiver::class.java).apply {
+                    action = HabitActionReceiver.ACTION_HABIT_RECORD_SKIP
+                    data = Uri.parse("habit1://action/${habit.id}/$targetDate/SKIP")
+                    putExtra(HabitActionReceiver.EXTRA_HABIT_ID, habit.id)
+                    putExtra(HabitActionReceiver.EXTRA_TARGET_DATE, targetDate)
+                    putExtra(HabitActionReceiver.EXTRA_NOTIFICATION_ID, notificationId)
+                }
+                val skipPendingIntent = PendingIntent.getBroadcast(
+                    context,
+                    Objects.hash(habit.id, targetDate, "SKIP"),
+                    skipIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+
+                builder.addAction(0, "Done", donePendingIntent)
+                builder.addAction(0, "Snooze (1 hour)", snoozePendingIntent)
+                builder.addAction(0, "Skip Today", skipPendingIntent)
             }
 
             is MeasurementType.Count -> {
-                val promptText = "Complete your ${m.target} ${m.unit} goal today?"
+                val promptText = "Target: ${m.target} ${m.unit} today"
                 builder.setContentText(promptText)
                 addQuantitativeActions(builder, habit, targetDate, notificationId)
             }
 
             is MeasurementType.Duration -> {
-                val promptText = "Complete your ${m.targetMinutes} min goal today?"
+                val promptText = "Target: ${m.targetMinutes} min today"
                 builder.setContentText(promptText)
                 addQuantitativeActions(builder, habit, targetDate, notificationId)
             }
 
             is MeasurementType.Quantity -> {
-                val promptText = "Did you reach your ${m.target} ${m.unit} goal today?"
+                val promptText = "Target: ${m.target} ${m.unit} today"
                 builder.setContentText(promptText)
                 addQuantitativeActions(builder, habit, targetDate, notificationId)
             }
@@ -173,7 +204,7 @@ open class NotificationHelper(
         targetDate: String,
         notificationId: Int
     ) {
-        // DONE action
+        // Done action (complete to target)
         val doneIntent = Intent(context, HabitActionReceiver::class.java).apply {
             action = HabitActionReceiver.ACTION_HABIT_RECORD_DONE
             data = Uri.parse("habit1://action/${habit.id}/$targetDate/DONE")
@@ -188,20 +219,64 @@ open class NotificationHelper(
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        // OPEN action
-        val openIntent = Intent(context, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-            data = Uri.parse("habit1://open_habit/${habit.id}/$targetDate")
+        // Snooze (1 hour) action
+        val snoozeIntent = Intent(context, HabitActionReceiver::class.java).apply {
+            action = HabitActionReceiver.ACTION_HABIT_SNOOZE
+            data = Uri.parse("habit1://action/${habit.id}/$targetDate/SNOOZE")
+            putExtra(HabitActionReceiver.EXTRA_HABIT_ID, habit.id)
+            putExtra(HabitActionReceiver.EXTRA_TARGET_DATE, targetDate)
+            putExtra(HabitActionReceiver.EXTRA_NOTIFICATION_ID, notificationId)
         }
-        val openPendingIntent = PendingIntent.getActivity(
+        val snoozePendingIntent = PendingIntent.getBroadcast(
             context,
-            Objects.hash(habit.id, targetDate, "OPEN"),
-            openIntent,
+            Objects.hash(habit.id, targetDate, "SNOOZE"),
+            snoozeIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        builder.addAction(0, "DONE", donePendingIntent)
-        builder.addAction(0, "OPEN", openPendingIntent)
+        builder.addAction(0, "Done", donePendingIntent)
+        builder.addAction(0, "Snooze (1 hour)", snoozePendingIntent)
+    }
+
+    /**
+     * Shows an Evening Digest notification summarizing scheduled habits for today.
+     */
+    open fun showEveningDigestNotification(
+        summary: com.habit1.app.domain.reminder.EveningDigestSummary
+    ) {
+        if (!areNotificationsEnabled()) return
+        createNotificationChannel()
+
+        val digestId = 888888
+        val dateStr = DateTimeUtils.formatDate(summary.date)
+
+        val openAppIntent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            data = Uri.parse("habit1://digest_open/$dateStr")
+        }
+        val contentPendingIntent = PendingIntent.getActivity(
+            context,
+            Objects.hash("DIGEST", dateStr),
+            openAppIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val contentText = if (summary.pendingCount == 0) {
+            "All ${summary.totalScheduledCount} scheduled habits completed today! Well done."
+        } else {
+            "${summary.completedCount} of ${summary.totalScheduledCount} habits completed today. ${summary.pendingCount} remaining."
+        }
+
+        val builder = NotificationCompat.Builder(context, CHANNEL_ID_DIGEST)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle("Evening Digest")
+            .setContentText(contentText)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .setAutoCancel(true)
+            .setContentIntent(contentPendingIntent)
+
+        notificationManager.notify(digestId, builder.build())
     }
 
     /**

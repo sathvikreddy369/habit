@@ -14,7 +14,8 @@ data class HabitPerformanceItem(
     val completedDays: Int,
     val recentTrendDelta: Float?,
     val isPaused: Boolean,
-    val targetFormatted: String
+    val targetFormatted: String,
+    val isArchived: Boolean = false
 )
 
 /**
@@ -37,5 +38,20 @@ data class GlobalAnalyticsSummary(
     val totalScheduledDays: Int,
     val activeHabitsCount: Int,
     val streakLeaders: List<StreakLeaderItem>,
-    val habitPerformances: List<HabitPerformanceItem>
+    val habitPerformances: List<HabitPerformanceItem>,
+    val recordBreakdown: RecordBreakdown = RecordBreakdown(
+        completedCount = totalCompletedDays,
+        partialCount = 0,
+        skippedCount = 0,
+        missedCount = (totalScheduledDays - totalCompletedDays).coerceAtLeast(0),
+        unrecordedCount = 0,
+        restCount = 0,
+        pausedCount = 0,
+        totalScheduledInstances = totalScheduledDays,
+        totalRecordedInstances = totalCompletedDays
+    ),
+    val dailyTrend: List<DailyCompletionPoint> = emptyList(),
+    val weekdayAdherence: List<WeekdayAdherence> = emptyList(),
+    val periodComparison: PeriodComparison? = null,
+    val insights: List<HabitInsight> = emptyList()
 )

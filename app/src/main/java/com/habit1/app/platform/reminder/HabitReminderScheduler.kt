@@ -17,6 +17,7 @@ import java.time.ZoneId
  */
 interface HabitReminderScheduler {
     fun scheduleNextReminder(habit: Habit, fromInstant: Instant = Instant.now(), zoneId: ZoneId = ZoneId.systemDefault())
+    fun scheduleSnooze(habitId: String, triggerEpochMillis: Long) {}
     fun cancelReminder(habitId: String)
 }
 
@@ -49,6 +50,20 @@ class AlarmManagerHabitReminderScheduler(
         val pendingIntent = PendingIntent.getBroadcast(
             context,
             habit.id.hashCode(),
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        scheduleAlarm(triggerEpochMillis, pendingIntent)
+    }
+
+    override fun scheduleSnooze(habitId: String, triggerEpochMillis: Long) {
+        cancelReminder(habitId)
+
+        val intent = createAlarmIntent(habitId)
+        val pendingIntent = PendingIntent.getBroadcast(
+            context,
+            habitId.hashCode(),
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )

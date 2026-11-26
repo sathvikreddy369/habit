@@ -22,4 +22,9 @@ interface BackupRepository {
      * Restores a previously validated backup file from the SAF URI using the selected mode.
      */
     suspend fun restoreBackup(uri: Uri, mode: RestoreMode): Result<BackupRestoreSummary>
+
+    /**
+     * Restores a pre-validated in-memory backup envelope using the selected mode without re-opening SAF streams.
+     */
+    suspend fun restoreBackup(envelope: com.habit1.app.data.backup.model.BackupEnvelopeDto, mode: RestoreMode): Result<BackupRestoreSummary>
 }

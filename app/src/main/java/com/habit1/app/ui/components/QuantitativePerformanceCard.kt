@@ -2,6 +2,7 @@ package com.habit1.app.ui.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,16 +13,20 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -30,12 +35,21 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.habit1.app.domain.model.CalendarDayStatus
 import com.habit1.app.domain.model.Habit
 import com.habit1.app.domain.model.HabitAnalyticsSummary
 import com.habit1.app.domain.model.HabitHistoryDay
 import com.habit1.app.domain.model.MeasurementType
 import com.habit1.app.ui.history.HeatmapRangePreset
+
+/**
+ * Chart mode for quantitative analytics (Decision 5.2.1).
+ */
+enum class QuantitativeChartMode(val label: String) {
+    DAILY_BARS("Daily Bars"),
+    CUMULATIVE("Cumulative Running Total")
+}
 
 /**
  * Performance distribution breakdown of recorded days relative to their snapshot target.
@@ -58,11 +72,6 @@ data class QuantitativeDistribution(
 
 /**
  * Calculates distribution of recorded days from historical snapshots.
- *
- * Rules:
- * - Each recorded day is evaluated against its immutable historical snapshot target.
- * - Recorded 0 is treated as a factual recorded attempt (Below target).
- * - Projected missed, rest, paused, pre-creation, and future days have NO record and are excluded.
  */
 fun calculateQuantitativeDistribution(
     dailyBreakdown: List<HabitHistoryDay>
@@ -85,7 +94,11 @@ fun calculateQuantitativeDistribution(
                 below++
             }
 
-            // Unrecorded days are not included in recorded-day distributions
+            is CalendarDayStatus.ExplicitMissed -> {
+                below++
+            }
+
+            is CalendarDayStatus.Skipped,
             is CalendarDayStatus.ProjectedMissed,
             is CalendarDayStatus.ProjectedRest,
             is CalendarDayStatus.Paused,
@@ -127,12 +140,15 @@ fun formatQuantityValue(value: Double): String {
 }
 
 /**
- * Clean, accessible quantitative analytics component native to Habit1.
+ * Quantitative analytics component native to Habit1 (Decision 5.2).
  *
- * Visualizes:
- * 1. 2x2 Metric Summary Tiles (Total, Daily Target, Average on Recorded, Target Achievement)
- * 2. Actual vs Target Visual Comparison
- * 3. Performance Distribution across recorded attempts (Below, At, Above target)
+ * Implements:
+ * 1. Compact toggle between Daily Bars and Cumulative Running Total (Decision 5.2.1).
+ * 2. Three Clearly Defined Quantitative Metrics (Decision 5.2.2):
+ *    - Total Volume (disclosing bonus activity per Decision 5.2.3)
+ *    - Active Day Average (Total Volume / Days with actual_value > 0)
+ *    - Scheduled Daily Average (Volume on Scheduled Days / (Eligible Scheduled Days - Count(SKIPPED)))
+ * 3. Daily target & performance distribution across recorded attempts.
  */
 @Composable
 fun QuantitativePerformanceCard(
@@ -147,6 +163,8 @@ fun QuantitativePerformanceCard(
         calculateQuantitativeDistribution(summary.dailyBreakdown)
     }
 
+    var chartMode by remember { mutableStateOf(QuantitativeChartMode.DAILY_BARS) }
+
     val targetValue = remember(habit.measurement) {
         when (val m = habit.measurement) {
             is MeasurementType.Count -> m.target.toDouble()
@@ -156,12 +174,26 @@ fun QuantitativePerformanceCard(
         }
     }
 
+    // Cumulative progression calculation
+    val cumulativeSteps = remember(summary.dailyBreakdown) {
+        var runningTotal = 0.0
+        summary.dailyBreakdown.map { day ->
+            val dayValue = when (val s = day.status) {
+                is CalendarDayStatus.Completed -> s.actualValue
+                is CalendarDayStatus.RecordedIncomplete -> s.actualValue
+                else -> 0.0
+            }
+            runningTotal += dayValue
+            Pair(day.date, runningTotal)
+        }
+    }
+
     val cardA11yDescription = remember(summary, qStats, unitStr, targetValue) {
         val totalFormatted = formatQuantityValue(qStats.totalActualValue)
-        val avgFormatted = qStats.averageOnRecordedDays?.let { formatQuantityValue(it) } ?: "none"
+        val activeAvgFormatted = qStats.activeDayAverage?.let { formatQuantityValue(it) } ?: "none"
+        val schedAvgFormatted = qStats.scheduledDailyAverage?.let { formatQuantityValue(it) } ?: "none"
         val targetFormatted = formatQuantityValue(targetValue)
-        val rateFormatted = "${qStats.targetAchievementRate.toInt()}%"
-        "Quantitative performance for ${habit.name}. Total volume: $totalFormatted $unitStr. Average on recorded days: $avgFormatted $unitStr. Daily target: $targetFormatted $unitStr. Target achievement rate: $rateFormatted."
+        "Quantitative performance for ${habit.name}. Total volume: $totalFormatted $unitStr. Active day average: $activeAvgFormatted $unitStr. Scheduled daily average: $schedAvgFormatted $unitStr. Daily target: $targetFormatted $unitStr."
     }
 
     Card(
@@ -169,15 +201,16 @@ fun QuantitativePerformanceCard(
             .fillMaxWidth()
             .semantics { contentDescription = cardA11yDescription },
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-            // Header
+            // Header with Unit Badge
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -202,12 +235,33 @@ fun QuantitativePerformanceCard(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            // 1. Core Summary Metrics 2x2 Grid
+            // Mode Switcher: Daily Bars vs Cumulative Running Total (Decision 5.2.1)
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FilterChip(
+                    selected = chartMode == QuantitativeChartMode.DAILY_BARS,
+                    onClick = { chartMode = QuantitativeChartMode.DAILY_BARS },
+                    label = { Text("Daily Values", style = MaterialTheme.typography.labelSmall) },
+                    modifier = Modifier.height(32.dp)
+                )
+                FilterChip(
+                    selected = chartMode == QuantitativeChartMode.CUMULATIVE,
+                    onClick = { chartMode = QuantitativeChartMode.CUMULATIVE },
+                    label = { Text("Cumulative Total", style = MaterialTheme.typography.labelSmall) },
+                    modifier = Modifier.height(32.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // 1. Core Quantitative Metrics (Decision 5.2.2)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 MetricTile(
                     label = "Total Volume",
@@ -225,160 +279,232 @@ fun QuantitativePerformanceCard(
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 MetricTile(
-                    label = "Average (Recorded)",
-                    value = qStats.averageOnRecordedDays?.let { "${formatQuantityValue(it)} $unitStr" } ?: "—",
+                    label = "Active Day Avg",
+                    value = qStats.activeDayAverage?.let { "${formatQuantityValue(it)} $unitStr" } ?: "—",
                     modifier = Modifier.weight(1f)
                 )
                 MetricTile(
-                    label = "Target Achievement",
-                    value = "${qStats.targetAchievementRate.toInt()}%",
+                    label = "Scheduled Avg",
+                    value = qStats.scheduledDailyAverage?.let { "${formatQuantityValue(it)} $unitStr" } ?: "—",
                     modifier = Modifier.weight(1f)
                 )
             }
 
-            // Secondary completed-days average if available
-            qStats.averageOnCompletedDays?.let { avgCompleted ->
-                if (qStats.averageOnRecordedDays != null && avgCompleted != qStats.averageOnRecordedDays) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "Average on completed days: ${formatQuantityValue(avgCompleted)} $unitStr",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // 2. Actual vs Target Visual Comparison
-            Text(
-                text = "Actual vs Target Comparison",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            if (qStats.averageOnRecordedDays == null) {
+            // Bonus Activity Disclosure (Decision 5.2.3)
+            if (qStats.bonusDaysCount > 0) {
+                Spacer(modifier = Modifier.height(8.dp))
+                val bonusUnit = if (unitStr.isNotEmpty()) " $unitStr" else ""
+                val daysPlural = if (qStats.bonusDaysCount > 1) "s" else ""
                 Text(
-                    text = "No recorded days in this period to compare.",
+                    text = "${formatQuantityValue(qStats.totalActualValue)}$bonusUnit total · ${formatQuantityValue(qStats.bonusVolume)}$bonusUnit on ${qStats.bonusDaysCount} bonus day$daysPlural",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.outline
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-            } else {
-                val avgActual = qStats.averageOnRecordedDays
-                val maxRef = maxOf(targetValue, avgActual) * 1.15
-                val actualRatio = (avgActual / maxRef).toFloat().coerceIn(0f, 1f)
-                val targetRatio = (targetValue / maxRef).toFloat().coerceIn(0f, 1f)
+            }
 
-                val diff = avgActual - targetValue
-                val comparisonLabel = when {
-                    diff > 0.0 -> "Above target (+${formatQuantityValue(diff)} $unitStr)"
-                    diff < 0.0 -> "Below target (${formatQuantityValue(diff)} $unitStr)"
-                    else -> "Exact target reached"
+            Spacer(modifier = Modifier.height(18.dp))
+
+            // 2. Chart Section: Daily Bars vs Cumulative Running Total
+            when (chartMode) {
+                QuantitativeChartMode.DAILY_BARS -> {
+                    // Actual vs Target Comparison View
+                    Text(
+                        text = "Actual vs Target Comparison",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    if (qStats.averageOnRecordedDays == null) {
+                        Text(
+                            text = "No recorded days in this period to compare.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                    } else {
+                        val avgActual = qStats.averageOnRecordedDays
+                        val maxRef = maxOf(targetValue, avgActual) * 1.15
+                        val actualRatio = (avgActual / maxRef).toFloat().coerceIn(0f, 1f)
+                        val targetRatio = (targetValue / maxRef).toFloat().coerceIn(0f, 1f)
+
+                        val diff = avgActual - targetValue
+                        val comparisonLabel = when {
+                            diff > 0.0 -> "Above target (+${formatQuantityValue(diff)} $unitStr)"
+                            diff < 0.0 -> "Below target (${formatQuantityValue(diff)} $unitStr)"
+                            else -> "Exact target reached"
+                        }
+
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .semantics {
+                                    contentDescription =
+                                        "Average actual: ${formatQuantityValue(avgActual)} $unitStr. Daily target: ${formatQuantityValue(targetValue)} $unitStr. $comparisonLabel."
+                                },
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            // Average Actual Bar
+                            Column {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = "Average actual",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = "${formatQuantityValue(avgActual)} $unitStr",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (avgActual >= targetValue) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.tertiary
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(10.dp)
+                                        .clip(RoundedCornerShape(5.dp))
+                                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth(actualRatio)
+                                            .fillMaxHeight()
+                                            .clip(RoundedCornerShape(5.dp))
+                                            .background(
+                                                if (avgActual >= targetValue) MaterialTheme.colorScheme.primary
+                                                else MaterialTheme.colorScheme.tertiary
+                                            )
+                                    )
+                                }
+                            }
+
+                            // Daily Target Bar
+                            Column {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = "Daily target",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = "${formatQuantityValue(targetValue)} $unitStr",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(10.dp)
+                                        .clip(RoundedCornerShape(5.dp))
+                                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth(targetRatio)
+                                            .fillMaxHeight()
+                                            .clip(RoundedCornerShape(5.dp))
+                                            .background(MaterialTheme.colorScheme.outline)
+                                    )
+                                }
+                            }
+
+                            // Comparison Label
+                            Text(
+                                text = comparisonLabel,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (diff >= 0.0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.tertiary
+                            )
+                        }
+                    }
                 }
 
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .semantics {
-                            contentDescription =
-                                "Average actual: ${formatQuantityValue(avgActual)} $unitStr. Daily target: ${formatQuantityValue(targetValue)} $unitStr. $comparisonLabel."
-                        },
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    // Average Actual Bar
-                    Column {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = "Average actual",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = "${formatQuantityValue(avgActual)} $unitStr",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = if (avgActual >= targetValue) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.tertiary
-                            )
-                        }
+                QuantitativeChartMode.CUMULATIVE -> {
+                    // Cumulative Running Total View (Decision 5.2.1)
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            text = "Cumulative Running Total",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
                         Spacer(modifier = Modifier.height(4.dp))
-                        Box(
+                        Text(
+                            text = "Progressive volume accumulation across ${selectedPreset.label} (${formatQuantityValue(qStats.totalActualValue)} $unitStr total)",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        val finalTotal = cumulativeSteps.lastOrNull()?.second ?: 0.0
+                        val maxCumulative = maxOf(finalTotal, 1.0)
+
+                        // Stepped horizontal cumulative progress summary
+                        Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(10.dp)
-                                .clip(RoundedCornerShape(5.dp))
+                                .height(16.dp)
+                                .clip(RoundedCornerShape(8.dp))
                                 .background(MaterialTheme.colorScheme.surfaceVariant)
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth(actualRatio)
-                                    .fillMaxHeight()
-                                    .clip(RoundedCornerShape(5.dp))
-                                    .background(
-                                        if (avgActual >= targetValue) MaterialTheme.colorScheme.primary
-                                        else MaterialTheme.colorScheme.tertiary
-                                    )
-                            )
+                            if (finalTotal > 0.0) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth((finalTotal / maxCumulative).toFloat().coerceIn(0f, 1f))
+                                        .fillMaxHeight()
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(MaterialTheme.colorScheme.primary)
+                                )
+                            }
                         }
-                    }
 
-                    // Daily Target Bar
-                    Column {
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // Compact milestone breakdown
+                        val eligibleDaysCount = summary.eligibleScheduledDays
+                        val scheduledExpectedTotal = eligibleDaysCount * targetValue
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "Daily target",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = "${formatQuantityValue(targetValue)} $unitStr",
-                                style = MaterialTheme.typography.labelSmall,
+                                text = "Recorded: ${formatQuantityValue(finalTotal)} $unitStr",
+                                style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
+                                color = MaterialTheme.colorScheme.primary
                             )
-                        }
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(10.dp)
-                                .clip(RoundedCornerShape(5.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth(targetRatio)
-                                    .fillMaxHeight()
-                                    .clip(RoundedCornerShape(5.dp))
-                                    .background(MaterialTheme.colorScheme.outline)
-                            )
+                            if (scheduledExpectedTotal > 0.0) {
+                                Text(
+                                    text = "Target pacing: ${formatQuantityValue(scheduledExpectedTotal)} $unitStr",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.outline
+                                )
+                            }
                         }
                     }
-
-                    // Comparison Status Pill
-                    Text(
-                        text = comparisonLabel,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (diff >= 0.0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.tertiary
-                    )
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(18.dp))
 
-            // 3. Performance Distribution / Variability
+            // 3. Performance Distribution across recorded attempts
             Text(
                 text = "Performance Distribution",
                 style = MaterialTheme.typography.titleSmall,

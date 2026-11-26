@@ -24,8 +24,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Today
+import com.habit1.app.ui.components.HabitActionSheet
+import com.habit1.app.ui.components.HabitNotesDialog
+import com.habit1.app.ui.components.NumericEntryDialog
+import com.habit1.app.ui.today.TodayHabitItem
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
@@ -47,7 +52,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -81,6 +88,10 @@ fun HistoryScreen(
     val isViewingCurrentMonth = uiState.selectedMonth == YearMonth.from(today)
     val isViewingToday = uiState.selectedDate == today
     val snackbarHostState = remember { SnackbarHostState() }
+
+    var editingHabit by remember { androidx.compose.runtime.mutableStateOf<HabitDayBreakdownItem?>(null) }
+    var editingValueHabit by remember { androidx.compose.runtime.mutableStateOf<HabitDayBreakdownItem?>(null) }
+    var editingNotesHabit by remember { androidx.compose.runtime.mutableStateOf<HabitDayBreakdownItem?>(null) }
 
     LaunchedEffect(uiState.userMessage) {
         uiState.userMessage?.let { msg ->
@@ -551,6 +562,19 @@ fun HistoryScreen(
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     StatusBadge(status = item.status)
+                                    if (!breakdown.date.isAfter(today) && item.status !is CalendarDayStatus.PreCreation && item.status !is CalendarDayStatus.Paused) {
+                                        IconButton(
+                                            onClick = { editingHabit = item },
+                                            modifier = Modifier.size(32.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Edit,
+                                                contentDescription = "Edit ${item.habitName}",
+                                                modifier = Modifier.size(16.dp),
+                                                tint = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                    }
                                     Icon(
                                         imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                                         contentDescription = null,
@@ -835,6 +859,91 @@ fun HistoryScreen(
             }
         }
     }
+    // Historical Record Action Sheet (Decision 2.1)
+    editingHabit?.let { item ->
+        val status = when (item.status) {
+            is CalendarDayStatus.Completed -> com.habit1.app.domain.model.HabitRecordStatus.DONE
+            is CalendarDayStatus.RecordedIncomplete -> com.habit1.app.domain.model.HabitRecordStatus.PARTIAL
+            is CalendarDayStatus.ExplicitMissed -> com.habit1.app.domain.model.HabitRecordStatus.MISSED
+            is CalendarDayStatus.Skipped -> com.habit1.app.domain.model.HabitRecordStatus.SKIPPED
+            else -> com.habit1.app.domain.model.HabitRecordStatus.UNRECORDED
+        }
+        val habitItem = TodayHabitItem(
+            id = item.habitId,
+            name = item.habitName,
+            description = null,
+            measurementType = item.measurementType,
+            targetValue = item.targetValue,
+            actualValue = item.actualValue,
+            unit = item.unit,
+            status = status,
+            isCompleted = status == com.habit1.app.domain.model.HabitRecordStatus.DONE,
+            progressRatio = if (item.targetValue > 0.0) (item.actualValue / item.targetValue).toFloat().coerceIn(0f, 1f) else 0f,
+            formattedProgress = item.formattedProgress,
+            streakResult = com.habit1.app.domain.model.StreakResult(0, 0, 0, 0, 0f, false),
+            colorHex = item.colorHex,
+            notes = item.notes
+        )
+
+        HabitActionSheet(
+            habitItem = habitItem,
+            dateLabel = uiState.selectedDate.toString(),
+            onDismiss = { editingHabit = null },
+            onCompleteToTarget = {
+                viewModel.onEvent(HistoryUiEvent.CompleteToTarget(item.habitId, uiState.selectedDate))
+                editingHabit = null
+            },
+            onOpenNumericEntry = {
+                editingValueHabit = item
+                editingHabit = null
+            },
+            onMarkSkipped = {
+                viewModel.onEvent(HistoryUiEvent.MarkSkipped(item.habitId, uiState.selectedDate))
+                editingHabit = null
+            },
+            onMarkMissed = {
+                viewModel.onEvent(HistoryUiEvent.MarkMissed(item.habitId, uiState.selectedDate))
+                editingHabit = null
+            },
+            onClearRecord = {
+                viewModel.onEvent(HistoryUiEvent.ClearRecord(item.habitId, uiState.selectedDate))
+                editingHabit = null
+            },
+            onEditNotes = {
+                editingNotesHabit = item
+                editingHabit = null
+            }
+        )
+    }
+
+    // Direct Numeric Entry Dialog
+    editingValueHabit?.let { item ->
+        NumericEntryDialog(
+            habitName = item.habitName,
+            measurementType = item.measurementType,
+            currentValue = item.actualValue,
+            targetValue = item.targetValue,
+            unit = item.unit,
+            onDismiss = { editingValueHabit = null },
+            onConfirm = { value ->
+                viewModel.onEvent(HistoryUiEvent.SetHabitValue(item.habitId, uiState.selectedDate, value))
+                editingValueHabit = null
+            }
+        )
+    }
+
+    // Notes Dialog
+    editingNotesHabit?.let { item ->
+        HabitNotesDialog(
+            habitName = item.habitName,
+            initialNotes = item.notes,
+            onDismiss = { editingNotesHabit = null },
+            onSave = { notes ->
+                viewModel.onEvent(HistoryUiEvent.SaveNotes(item.habitId, uiState.selectedDate, notes))
+                editingNotesHabit = null
+            }
+        )
+    }
 }
 
 @Composable
@@ -1021,6 +1130,16 @@ private fun StatusBadge(
                 )
             }
         }
+        is CalendarDayStatus.ExplicitMissed -> Triple(
+            "Missed",
+            MaterialTheme.colorScheme.errorContainer,
+            MaterialTheme.colorScheme.onErrorContainer
+        )
+        is CalendarDayStatus.Skipped -> Triple(
+            "Skipped",
+            MaterialTheme.colorScheme.surfaceVariant,
+            MaterialTheme.colorScheme.outline
+        )
         CalendarDayStatus.ProjectedMissed -> Triple(
             "Missed",
             MaterialTheme.colorScheme.surfaceVariant,

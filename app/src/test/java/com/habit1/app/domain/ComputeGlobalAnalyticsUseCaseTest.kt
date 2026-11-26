@@ -189,6 +189,49 @@ class ComputeGlobalAnalyticsUseCaseTest {
     }
 
     @Test
+    fun testArchivedHabits_includedWhenIncludeArchivedIsTrue_boundedAtArchivalDate() {
+        val today = LocalDate.of(2026, 9, 21)
+        val range = AnalyticsRange(LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 20))
+
+        val activeHabit = createHabit(id = "h_active", name = "Active Habit", isArchived = false)
+        val archivedHabit = createHabit(
+            id = "h_archived",
+            name = "Archived Habit",
+            isArchived = true,
+            createdAt = Instant.parse("2026-09-01T00:00:00Z")
+        ).copy(archivedAt = Instant.parse("2026-09-10T12:00:00Z"))
+
+        val records = mapOf(
+            "h_active" to (1..10).map { createRecord("h_active", LocalDate.of(2026, 9, it), isCompleted = true) },
+            "h_archived" to (1..5).map { createRecord("h_archived", LocalDate.of(2026, 9, it), isCompleted = true) }
+        )
+
+        val summary = useCase.execute(
+            habits = listOf(activeHabit, archivedHabit),
+            recordsByHabit = records,
+            range = range,
+            todayDate = today,
+            zoneId = zoneId,
+            includeArchived = true
+        )
+
+        // Active habits count strictly excludes archived habit
+        assertEquals(1, summary.activeHabitsCount)
+        // Both performances are present
+        assertEquals(2, summary.habitPerformances.size)
+
+        val archivedPerf = summary.habitPerformances.first { it.habitId == "h_archived" }
+        assertTrue(archivedPerf.isArchived)
+        assertEquals(5, archivedPerf.completedDays)
+        // Scheduled days bounded at archival date Sep 10 (10 scheduled days, not 20)
+        assertEquals(10, archivedPerf.scheduledDays)
+        assertEquals(50.0f, archivedPerf.completionRate, 0.01f)
+
+        // Streak leaders strictly exclude archived habit
+        assertTrue(summary.streakLeaders.none { it.habitId == "h_archived" })
+    }
+
+    @Test
     fun testStreakLeaders_sortedByCurrentStreakDescending() {
         val today = LocalDate.of(2026, 9, 14)
         val range = AnalyticsRange.ofDaysEndingAt(today, 14)

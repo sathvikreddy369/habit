@@ -17,6 +17,26 @@ sealed interface TodayUiEvent {
     data object RefreshDate : TodayUiEvent
     data object DismissMessage : TodayUiEvent
 
+    // Date Stepper Actions (Decision 2.1)
+    data object StepDateBackward : TodayUiEvent
+    data object StepDateForward : TodayUiEvent
+    data object ReturnToToday : TodayUiEvent
+    data class SelectDate(val date: java.time.LocalDate) : TodayUiEvent
+
+    // 5-State Habit Actions & Sheet (Decisions 1.1, 1.3, 2.2)
+    data class OpenHabitActionSheet(val habit: TodayHabitItem) : TodayUiEvent
+    data object DismissHabitActionSheet : TodayUiEvent
+    data class CompleteToTarget(val habitId: String) : TodayUiEvent
+    data class MarkSkipped(val habitId: String, val notes: String? = null) : TodayUiEvent
+    data class MarkMissed(val habitId: String, val notes: String? = null) : TodayUiEvent
+    data class ClearRecord(val habitId: String) : TodayUiEvent
+    data object UndoClearRecord : TodayUiEvent
+    data class OpenNumericDialog(val habit: TodayHabitItem) : TodayUiEvent
+    data object DismissNumericDialog : TodayUiEvent
+    data class OpenNotesDialog(val habit: TodayHabitItem) : TodayUiEvent
+    data object DismissNotesDialog : TodayUiEvent
+    data class SaveNotes(val habitId: String, val notes: String?) : TodayUiEvent
+
     // Goal Management Dialogs & Actions
     data object OpenAddGoalDialog : TodayUiEvent
     data object DismissGoalDialog : TodayUiEvent
@@ -50,5 +70,10 @@ sealed interface TodayUiEvent {
     data object DismissReviewDialog : TodayUiEvent
     data class SaveReview(val notes: String?, val mood: String?) : TodayUiEvent
     data object DeleteReview : TodayUiEvent
+
+    // Phase 5 Category Actions (Decision 6.1)
+    data object ToggleCategoryGrouping : TodayUiEvent
+    data class ToggleCategoryCollapsed(val categoryId: String?) : TodayUiEvent
+    data class SelectCategoryFilter(val categoryId: String?) : TodayUiEvent
 }
 

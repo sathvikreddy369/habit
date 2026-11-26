@@ -16,6 +16,7 @@ import com.habit1.app.data.repository.HabitRecordRepository
 import com.habit1.app.data.repository.HabitRecordRepositoryImpl
 import com.habit1.app.data.repository.HabitRepository
 import com.habit1.app.data.repository.HabitRepositoryImpl
+import com.habit1.app.domain.model.HabitRecordStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -44,6 +45,7 @@ class TodayViewModelTest {
     private val testDispatcher = StandardTestDispatcher()
     private lateinit var database: AppDatabase
     private lateinit var habitRepository: HabitRepository
+    private lateinit var categoryRepository: com.habit1.app.data.repository.CategoryRepository
     private lateinit var habitRecordRepository: HabitRecordRepository
     private lateinit var dailyGoalRepository: DailyGoalRepository
     private lateinit var dailyReviewRepository: DailyReviewRepository
@@ -58,6 +60,11 @@ class TodayViewModelTest {
         database = AppDatabase.buildInMemoryDatabase(context)
 
         habitRepository = HabitRepositoryImpl(database.habitDao(), testDispatcher)
+        categoryRepository = com.habit1.app.data.repository.CategoryRepositoryImpl(
+            categoryDao = database.categoryDao(),
+            habitDao = database.habitDao(),
+            ioDispatcher = testDispatcher
+        )
         habitRecordRepository = HabitRecordRepositoryImpl(database.habitRecordDao(), testDispatcher)
         dailyGoalRepository = DailyGoalRepositoryImpl(database.dailyGoalDao(), testDispatcher)
         dailyReviewRepository = DailyReviewRepositoryImpl(database.dailyReviewDao(), testDispatcher)
@@ -67,6 +74,7 @@ class TodayViewModelTest {
             habitRecordRepository = habitRecordRepository,
             dailyGoalRepository = dailyGoalRepository,
             dailyReviewRepository = dailyReviewRepository,
+            categoryRepository = categoryRepository,
             zoneId = zoneId
         )
     }
@@ -836,6 +844,154 @@ class TodayViewModelTest {
             val afterDeleteState = awaitItem()
             assertEquals(0, afterDeleteState.goals.size)
             assertEquals(goal.id, fakeScheduler.cancelledGoalId)
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun categoryGrouping_andCollapsibleSections() = runTest(testDispatcher) {
+        val cat = com.habit1.app.data.local.db.entity.CategoryEntity(
+            id = "cat_morning",
+            name = "Morning Routine",
+            colorHex = "#FFA726",
+            icon = "morning",
+            displayOrder = 0,
+            createdAt = 1000L
+        )
+        categoryRepository.createCategory(cat)
+
+        val h1 = HabitEntity(id = "h1", name = "Hydrate", measurementType = "BOOLEAN", scheduleType = "DAILY", scheduleConfig = "{}", displayOrder = 0, isPaused = false, isArchived = false, categoryId = "cat_morning", startDate = "2026-01-01", createdAt = 1000L, updatedAt = 1000L)
+        val h2 = HabitEntity(id = "h2", name = "Meditate", measurementType = "BOOLEAN", scheduleType = "DAILY", scheduleConfig = "{}", displayOrder = 1, isPaused = false, isArchived = false, categoryId = null, startDate = "2026-01-01", createdAt = 1000L, updatedAt = 1000L)
+        habitRepository.createHabit(h1)
+        habitRepository.createHabit(h2)
+        advanceUntilIdle()
+
+        viewModel.uiState.test {
+            awaitItem()
+            val initial = awaitItem()
+            assertFalse("Default category grouping is disabled", initial.categoryGroupingEnabled)
+            assertEquals(2, initial.habits.size)
+
+            // Enable Category Grouping
+            viewModel.onEvent(TodayUiEvent.ToggleCategoryGrouping)
+            val groupedState = awaitItem()
+            assertTrue(groupedState.categoryGroupingEnabled)
+            assertEquals("Must have 2 groups: Morning Routine and Uncategorized", 2, groupedState.groupedHabits.size)
+
+            val morningGroup = groupedState.groupedHabits[0]
+            assertEquals("Morning Routine", morningGroup.categoryName)
+            assertEquals(1, morningGroup.habits.size)
+            assertEquals("Hydrate", morningGroup.habits[0].name)
+            assertFalse(morningGroup.isCollapsed)
+
+            val uncatGroup = groupedState.groupedHabits[1]
+            assertEquals("Uncategorized", uncatGroup.categoryName)
+            assertEquals(1, uncatGroup.habits.size)
+            assertEquals("Meditate", uncatGroup.habits[0].name)
+
+            // Collapse Morning Routine group
+            viewModel.onEvent(TodayUiEvent.ToggleCategoryCollapsed("cat_morning"))
+            val collapsedState = awaitItem()
+            assertTrue(collapsedState.groupedHabits[0].isCollapsed)
+
+            // Re-expand
+            viewModel.onEvent(TodayUiEvent.ToggleCategoryCollapsed("cat_morning"))
+            val reexpandedState = awaitItem()
+            assertFalse(reexpandedState.groupedHabits[0].isCollapsed)
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun topCategoryFilter_focusesOnSingleCategory() = runTest(testDispatcher) {
+        val catA = com.habit1.app.data.local.db.entity.CategoryEntity(id = "cat_a", name = "Category A", displayOrder = 0, createdAt = 1000L)
+        val catB = com.habit1.app.data.local.db.entity.CategoryEntity(id = "cat_b", name = "Category B", displayOrder = 1, createdAt = 1000L)
+        categoryRepository.createCategory(catA)
+        categoryRepository.createCategory(catB)
+
+        val hA = HabitEntity(id = "ha", name = "Habit A", measurementType = "BOOLEAN", scheduleType = "DAILY", scheduleConfig = "{}", displayOrder = 0, isPaused = false, isArchived = false, categoryId = "cat_a", startDate = "2026-01-01", createdAt = 1000L, updatedAt = 1000L)
+        val hB = HabitEntity(id = "hb", name = "Habit B", measurementType = "BOOLEAN", scheduleType = "DAILY", scheduleConfig = "{}", displayOrder = 1, isPaused = false, isArchived = false, categoryId = "cat_b", startDate = "2026-01-01", createdAt = 1000L, updatedAt = 1000L)
+        habitRepository.createHabit(hA)
+        habitRepository.createHabit(hB)
+        advanceUntilIdle()
+
+        viewModel.uiState.test {
+            awaitItem()
+            val state = awaitItem()
+            assertEquals(2, state.habits.size)
+
+            // Select Category A filter
+            viewModel.onEvent(TodayUiEvent.SelectCategoryFilter("cat_a"))
+            val filteredA = awaitItem()
+            assertEquals(1, filteredA.habits.size)
+            assertEquals("Habit A", filteredA.habits[0].name)
+
+            // Clear filter
+            viewModel.onEvent(TodayUiEvent.SelectCategoryFilter(null))
+            val reset = awaitItem()
+            assertEquals(2, reset.habits.size)
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun testBooleanCheckAndSkipDirectActions() = runTest {
+        val boolHabit = HabitEntity(
+            id = "h_action_bool",
+            name = "Morning Walk",
+            measurementType = "BOOLEAN",
+            targetValue = 1.0,
+            unit = null,
+            scheduleType = "DAILY",
+            scheduleConfig = "{}",
+            displayOrder = 0,
+            createdAt = System.currentTimeMillis(),
+            updatedAt = System.currentTimeMillis()
+        )
+        habitRepository.createHabit(boolHabit)
+
+        viewModel.uiState.test {
+            // Initial state: UNRECORDED
+            var item = awaitItem()
+            while (item.habits.none { it.id == "h_action_bool" }) {
+                item = awaitItem()
+            }
+            val habitInitial = item.habits.first { it.id == "h_action_bool" }
+            assertEquals(HabitRecordStatus.UNRECORDED, habitInitial.status)
+            assertFalse(habitInitial.isCompleted)
+
+            // Direct Check (Done) Action
+            viewModel.onEvent(TodayUiEvent.ToggleHabit("h_action_bool"))
+            var itemDone = awaitItem()
+            while (itemDone.habits.first { it.id == "h_action_bool" }.status != HabitRecordStatus.DONE) {
+                itemDone = awaitItem()
+            }
+            val habitDone = itemDone.habits.first { it.id == "h_action_bool" }
+            assertEquals(HabitRecordStatus.DONE, habitDone.status)
+            assertTrue(habitDone.isCompleted)
+
+            // Direct Skip Action (marks SKIPPED)
+            viewModel.onEvent(TodayUiEvent.MarkSkipped("h_action_bool"))
+            var itemSkipped = awaitItem()
+            while (itemSkipped.habits.first { it.id == "h_action_bool" }.status != HabitRecordStatus.SKIPPED) {
+                itemSkipped = awaitItem()
+            }
+            val habitSkipped = itemSkipped.habits.first { it.id == "h_action_bool" }
+            assertEquals(HabitRecordStatus.SKIPPED, habitSkipped.status)
+            assertFalse(habitSkipped.isCompleted)
+
+            // Direct Skip Action again (untoggles SKIPPED back to UNRECORDED)
+            viewModel.onEvent(TodayUiEvent.MarkSkipped("h_action_bool"))
+            var itemUnskipped = awaitItem()
+            while (itemUnskipped.habits.first { it.id == "h_action_bool" }.status != HabitRecordStatus.UNRECORDED) {
+                itemUnskipped = awaitItem()
+            }
+            val habitUnskipped = itemUnskipped.habits.first { it.id == "h_action_bool" }
+            assertEquals(HabitRecordStatus.UNRECORDED, habitUnskipped.status)
+            assertFalse(habitUnskipped.isCompleted)
 
             cancelAndIgnoreRemainingEvents()
         }

@@ -20,18 +20,28 @@ import androidx.compose.ui.unit.dp
 
 /**
  * Calm, non-judgmental streak badge showing current consistency.
+ * Supports frozen status when an active streak is bridged across skip/pause periods.
  */
 @Composable
 fun StreakBadge(
     streakCount: Int,
+    isFrozen: Boolean = false,
     modifier: Modifier = Modifier,
     accentColor: androidx.compose.ui.graphics.Color? = null
 ) {
     if (streakCount <= 0) return
 
     val label = if (streakCount == 1) "1 day" else "$streakCount days"
-    val containerColor = accentColor?.copy(alpha = 0.15f) ?: MaterialTheme.colorScheme.secondaryContainer
-    val contentColor = accentColor ?: MaterialTheme.colorScheme.onSecondaryContainer
+    val containerColor = if (isFrozen) {
+        MaterialTheme.colorScheme.surfaceVariant
+    } else {
+        accentColor?.copy(alpha = 0.15f) ?: MaterialTheme.colorScheme.secondaryContainer
+    }
+    val contentColor = if (isFrozen) {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    } else {
+        accentColor ?: MaterialTheme.colorScheme.onSecondaryContainer
+    }
 
     Row(
         modifier = modifier
@@ -40,15 +50,23 @@ fun StreakBadge(
             .padding(horizontal = 8.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            imageVector = Icons.Default.Star,
-            contentDescription = null,
-            modifier = Modifier.size(14.dp),
-            tint = contentColor
-        )
-        Spacer(modifier = Modifier.width(4.dp))
+        if (isFrozen) {
+            Text(
+                text = "❄️",
+                style = MaterialTheme.typography.labelSmall
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+        } else {
+            Icon(
+                imageVector = Icons.Default.Star,
+                contentDescription = null,
+                modifier = Modifier.size(14.dp),
+                tint = contentColor
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+        }
         Text(
-            text = label,
+            text = if (isFrozen) "$label (Frozen)" else label,
             style = MaterialTheme.typography.labelSmall,
             color = contentColor
         )

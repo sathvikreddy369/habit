@@ -1,5 +1,17 @@
 package com.habit1.app.domain.model
 
+import java.time.DayOfWeek
+
+/**
+ * Day-of-week adherence breakdown (Monday through Sunday) per Decision 5.1.3.
+ */
+data class WeekdayAdherence(
+    val dayOfWeek: DayOfWeek,
+    val completedCount: Int,
+    val eligibleScheduledCount: Int,
+    val adherenceRate: Float? // null if eligibleScheduledCount == 0 (displayed as '—')
+)
+
 /**
  * Authoritative, read-only analytics summary for a habit over an [AnalyticsRange].
  *
@@ -31,7 +43,16 @@ data class HabitAnalyticsSummary(
     val quantitativeStats: QuantitativeAnalyticsStats?,
 
     // Daily breakdown across the range (for heatmaps and trend graphs)
-    val dailyBreakdown: List<HabitHistoryDay>
+    val dailyBreakdown: List<HabitHistoryDay>,
+
+    // Monday-to-Sunday 7-day adherence breakdown (Decision 5.1.3)
+    val weekdayAdherence: List<WeekdayAdherence> = emptyList(),
+
+    // Period comparison with preceding equivalent period
+    val periodComparison: PeriodComparison? = null,
+
+    // Specific deterministic insights for this habit
+    val insights: List<HabitInsight> = emptyList()
 ) {
     val totalActualValue: Double
         get() = quantitativeStats?.totalActualValue ?: 0.0
@@ -44,7 +65,7 @@ data class HabitAnalyticsSummary(
 }
 
 /**
- * Quantitative metrics for habits with Count, Duration, or Quantity measurements.
+ * Quantitative metrics for habits with Count, Duration, or Quantity measurements (Decision 5.2.2).
  *
  * All numbers preserve their domain meaning without artificial score normalizations.
  */
@@ -87,5 +108,24 @@ data class QuantitativeAnalyticsStats(
      * Percentage of recorded attempts on which the target was achieved (completedDaysCount / recordedDaysCount).
      * Null if no records were logged in the range.
      */
-    val successRateOnRecordedDays: Float?
+    val successRateOnRecordedDays: Float?,
+
+    /**
+     * Decision 5.2.2: Active Day Average = Total Volume / Days with actual_value > 0.
+     */
+    val activeDaysCount: Int = recordedDaysCount,
+    val activeDayAverage: Double? = averageOnRecordedDays,
+
+    /**
+     * Decision 5.2.2: Scheduled Daily Average = Volume on Scheduled Days / (Eligible Scheduled Days - Count(SKIPPED)).
+     * Strictly excludes bonus-day volume. Displays null ('—') when denominator == 0.
+     */
+    val scheduledDailyAverage: Double? = null,
+    val scheduledVolume: Double = totalActualValue,
+
+    /**
+     * Decision 5.2.3: Disclosed bonus contributions (activity on unscheduled/rest days).
+     */
+    val bonusDaysCount: Int = 0,
+    val bonusVolume: Double = 0.0
 )

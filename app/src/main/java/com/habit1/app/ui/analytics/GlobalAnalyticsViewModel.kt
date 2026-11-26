@@ -3,12 +3,14 @@ package com.habit1.app.ui.analytics
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.habit1.app.data.local.db.entity.HabitEntity
 import com.habit1.app.data.repository.HabitRecordRepository
 import com.habit1.app.data.repository.HabitRepository
 import com.habit1.app.domain.mapper.EntityMappers.toDomain
 import com.habit1.app.domain.model.AnalyticsRange
 import com.habit1.app.domain.model.GlobalAnalyticsSummary
 import com.habit1.app.domain.usecase.ComputeGlobalAnalyticsUseCase
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -17,17 +19,27 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.time.DayOfWeek
 import java.time.LocalDate
+import java.time.temporal.TemporalAdjusters
 
-import kotlinx.coroutines.CoroutineDispatcher
-
+/**
+ * Standardized rolling UI presets for Global Analytics (Decision 5.1.2).
+ */
 enum class GlobalAnalyticsPreset(val label: String) {
-    ThisWeek("This Week"),
-    ThisMonth("This Month"),
-    ThisYear("This Year")
+    Last7Days("Last 7 Days"),
+    Last30Days("Last 30 Days"),
+    Last90Days("Last 90 Days"),
+    Last365Days("Last 365 Days"),
+    AllTime("All Time");
+
+    companion object {
+        val ThisWeek = Last7Days
+        val ThisMonth = Last30Days
+        val ThisYear = Last365Days
+    }
 }
 
 data class GlobalAnalyticsUiState(
-    val selectedPreset: GlobalAnalyticsPreset = GlobalAnalyticsPreset.ThisMonth,
+    val selectedPreset: GlobalAnalyticsPreset = GlobalAnalyticsPreset.Last30Days,
     val summary: GlobalAnalyticsSummary? = null,
     val isLoading: Boolean = true
 )
@@ -48,9 +60,12 @@ class GlobalAnalyticsViewModel(
     private val _uiState = MutableStateFlow(GlobalAnalyticsUiState())
     val uiState: StateFlow<GlobalAnalyticsUiState> = _uiState.asStateFlow()
 
+    private val allHabitsFlow = MutableStateFlow<List<HabitEntity>>(emptyList())
+
     init {
         viewModelScope.launch {
-            habitRepository.observeActiveHabits().collectLatest {
+            habitRepository.observeAllHabits().collectLatest { habits ->
+                allHabitsFlow.value = habits
                 computeAnalytics()
             }
         }
@@ -71,36 +86,45 @@ class GlobalAnalyticsViewModel(
     private fun computeAnalytics() {
         viewModelScope.launch(defaultDispatcher) {
             val todayDate = todayDateProvider()
+            val allHabits = allHabitsFlow.value.map { it.toDomain() }
+            val earliestStart = allHabits.minOfOrNull { it.startDate } ?: todayDate.minusYears(1)
+
             val range = when (_uiState.value.selectedPreset) {
-                GlobalAnalyticsPreset.ThisWeek -> {
-                    val monday = todayDate.with(DayOfWeek.MONDAY)
-                    val sunday = todayDate.with(DayOfWeek.SUNDAY)
+                GlobalAnalyticsPreset.Last7Days -> {
+                    val monday = todayDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+                    val sunday = monday.plusDays(6)
                     AnalyticsRange(monday, sunday)
                 }
-                GlobalAnalyticsPreset.ThisMonth -> {
+                GlobalAnalyticsPreset.Last30Days -> {
                     val start = todayDate.withDayOfMonth(1)
                     val end = todayDate.withDayOfMonth(todayDate.lengthOfMonth())
                     AnalyticsRange(start, end)
                 }
-                GlobalAnalyticsPreset.ThisYear -> {
+                GlobalAnalyticsPreset.Last90Days -> AnalyticsRange.ofDaysEndingAt(todayDate, 90)
+                GlobalAnalyticsPreset.Last365Days -> {
                     val start = todayDate.withDayOfYear(1)
                     val end = todayDate.withDayOfYear(todayDate.lengthOfYear())
                     AnalyticsRange(start, end)
                 }
+                GlobalAnalyticsPreset.AllTime -> {
+                    val start = if (earliestStart.isAfter(todayDate)) todayDate else earliestStart
+                    AnalyticsRange(start, todayDate)
+                }
             }
 
-            val activeHabits = habitRepository.getActiveHabitsList().map { it.toDomain() }
-            val activeIds = activeHabits.map { it.id }
-            val recordsEntities = habitRecordRepository.getRecordsForHabits(activeIds)
+            val allIds = allHabits.map { it.id }
+            val recordsEntities = habitRecordRepository.getRecordsForHabits(allIds)
             val recordsByHabit = recordsEntities
                 .map { it.toDomain() }
                 .groupBy { it.habitId }
 
+            // Decision 5.3: Include archived habits in historical analytics for their active periods
             val summary = computeGlobalAnalyticsUseCase.execute(
-                habits = activeHabits,
+                habits = allHabits,
                 recordsByHabit = recordsByHabit,
                 range = range,
-                todayDate = todayDate
+                todayDate = todayDate,
+                includeArchived = true
             )
 
             _uiState.value = _uiState.value.copy(

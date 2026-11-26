@@ -163,7 +163,25 @@ fun extractTrendPoints(summary: HabitAnalyticsSummary): List<TrendPoint> {
                 )
             }
 
-            // Non-scheduled, paused, pre-creation, and future days do NOT have plotted points
+            is CalendarDayStatus.ExplicitMissed -> {
+                val desc = "${day.date.format(dateDescFormatter)} — missed — 0%"
+                points.add(
+                    TrendPoint(
+                        dayIndex = index,
+                        totalRangeDays = totalDays,
+                        date = day.date,
+                        status = status,
+                        percentage = 0.0f,
+                        isFactual = true,
+                        isTargetAchieved = false,
+                        accessibilityText = desc,
+                        day = day
+                    )
+                )
+            }
+
+            // Non-scheduled, skipped, paused, pre-creation, and future days do NOT have plotted points
+            is CalendarDayStatus.Skipped,
             is CalendarDayStatus.ProjectedRest,
             is CalendarDayStatus.Paused,
             is CalendarDayStatus.PreCreation,
@@ -426,15 +444,19 @@ fun CompletionTrendGraph(
 
                         // 3. Draw X-Axis Labels (Date markers)
                         val xLabelCount = when (selectedPreset) {
-                            HeatmapRangePreset.THIS_WEEK -> 4
-                            HeatmapRangePreset.THIS_MONTH -> 4
-                            HeatmapRangePreset.THIS_YEAR -> 6
+                            HeatmapRangePreset.LAST_7_DAYS -> 4
+                            HeatmapRangePreset.LAST_30_DAYS -> 4
+                            HeatmapRangePreset.LAST_90_DAYS -> 5
+                            HeatmapRangePreset.LAST_365_DAYS,
+                            HeatmapRangePreset.ALL_TIME -> 6
                         }
 
                         val xFormatter = when (selectedPreset) {
-                            HeatmapRangePreset.THIS_WEEK -> DateTimeFormatter.ofPattern("EEE d", Locale.getDefault())
-                            HeatmapRangePreset.THIS_MONTH -> DateTimeFormatter.ofPattern("MMM d", Locale.getDefault())
-                            HeatmapRangePreset.THIS_YEAR -> DateTimeFormatter.ofPattern("MMM", Locale.getDefault())
+                            HeatmapRangePreset.LAST_7_DAYS -> DateTimeFormatter.ofPattern("EEE d", Locale.getDefault())
+                            HeatmapRangePreset.LAST_30_DAYS,
+                            HeatmapRangePreset.LAST_90_DAYS -> DateTimeFormatter.ofPattern("MMM d", Locale.getDefault())
+                            HeatmapRangePreset.LAST_365_DAYS,
+                            HeatmapRangePreset.ALL_TIME -> DateTimeFormatter.ofPattern("MMM", Locale.getDefault())
                         }
 
                         val step = (totalDays - 1).toFloat() / (xLabelCount - 1).coerceAtLeast(1)

@@ -2,7 +2,7 @@ package com.habit1.app.ui
 
 import android.content.Intent
 import android.os.Bundle
-import androidx.activity.ComponentActivity
+import android.view.WindowManager
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -16,7 +16,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -27,6 +29,7 @@ import com.habit1.app.ui.habits.form.HabitFormViewModel
 import com.habit1.app.ui.habits.list.HabitListScreen
 import com.habit1.app.ui.habits.list.HabitListViewModel
 import com.habit1.app.ui.navigation.Screen
+import com.habit1.app.ui.security.LockScreen
 import com.habit1.app.ui.theme.HabitTheme
 import com.habit1.app.ui.today.TodayScreen
 import com.habit1.app.ui.today.TodayViewModel
@@ -46,7 +49,7 @@ import androidx.compose.material3.Text
 import com.habit1.app.ui.analytics.GlobalAnalyticsScreen
 import com.habit1.app.ui.analytics.GlobalAnalyticsViewModel
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
 
     private val pendingDestination = mutableStateOf<Screen?>(null)
 
@@ -57,7 +60,9 @@ class MainActivity : ComponentActivity() {
             habitRecordRepository = app.container.habitRecordRepository,
             dailyGoalRepository = app.container.dailyGoalRepository,
             dailyReviewRepository = app.container.dailyReviewRepository,
-            goalReminderScheduler = app.container.goalReminderScheduler
+            goalReminderScheduler = app.container.goalReminderScheduler,
+            categoryRepository = app.container.categoryRepository,
+            userPreferences = app.container.userPreferences
         )
     }
 
@@ -85,16 +90,60 @@ class MainActivity : ComponentActivity() {
             val userPrefs by app.container.userPreferences.userPreferencesFlow.collectAsStateWithLifecycle(initialValue = null)
             val isDarkTheme = when (userPrefs?.themeMode) {
                 "LIGHT" -> false
-                "DARK" -> true
+                "DARK", "AMOLED" -> true
                 else -> isSystemInDarkTheme()
             }
+            val isAmoled = userPrefs?.themeMode == "AMOLED"
 
-            HabitTheme(darkTheme = isDarkTheme) {
+            HabitTheme(darkTheme = isDarkTheme, isAmoled = isAmoled) {
+                val isLocked by app.container.appLockManager.isLocked.collectAsStateWithLifecycle()
+                val isAppLockEnabled by app.container.appLockManager.isAppLockEnabled.collectAsStateWithLifecycle()
+
+                // Dynamic FLAG_SECURE protection (Decision 7.2)
+                LaunchedEffect(isAppLockEnabled) {
+                    if (isAppLockEnabled) {
+                        window.setFlags(
+                            WindowManager.LayoutParams.FLAG_SECURE,
+                            WindowManager.LayoutParams.FLAG_SECURE
+                        )
+                    } else {
+                        window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                    }
+                }
+
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    val initialDestination = remember { parseDestination(intent) }
+                    if (isLocked) {
+                        var authError by remember { mutableStateOf<String?>(null) }
+                        LockScreen(
+                            onTriggerAuth = {
+                                authError = null
+                                app.container.biometricAuthManager.authenticate(
+                                    activity = this@MainActivity,
+                                    title = "Unlock Habit1",
+                                    subtitle = "Authenticate to access your habits and history",
+                                    onSuccess = {
+                                        authError = null
+                                        app.container.appLockManager.unlock()
+                                    },
+                                    onError = { errorCode, errString ->
+                                        if (errorCode != androidx.biometric.BiometricPrompt.ERROR_USER_CANCELED &&
+                                            errorCode != androidx.biometric.BiometricPrompt.ERROR_NEGATIVE_BUTTON &&
+                                            errorCode != androidx.biometric.BiometricPrompt.ERROR_CANCELED) {
+                                            authError = errString.toString()
+                                        }
+                                    },
+                                    onFailed = {
+                                        authError = "Authentication failed. Please try again."
+                                    }
+                                )
+                            },
+                            errorMessage = authError
+                        )
+                    } else {
+                        val initialDestination = remember { parseDestination(intent) }
                     val backstack = remember {
                         mutableStateListOf<Screen>().apply {
                             add(Screen.Today)
@@ -179,6 +228,23 @@ class MainActivity : ComponentActivity() {
                                         },
                                         label = { Text("History") }
                                     )
+                                    NavigationBarItem(
+                                        selected = currentScreen is Screen.Analytics,
+                                        onClick = {
+                                            if (currentScreen !is Screen.Analytics) {
+                                                backstack.clear()
+                                                backstack.add(Screen.Today)
+                                                backstack.add(Screen.Analytics)
+                                            }
+                                        },
+                                        icon = {
+                                            Icon(
+                                                imageVector = Icons.Default.Assessment,
+                                                contentDescription = "Analytics"
+                                            )
+                                        },
+                                        label = { Text("Analytics") }
+                                    )
                                 }
                             }
                         }
@@ -218,6 +284,8 @@ class MainActivity : ComponentActivity() {
                                     val habitListViewModel: HabitListViewModel = viewModel(
                                         factory = HabitListViewModel.Factory(
                                             habitRepository = app.container.habitRepository,
+                                            categoryRepository = app.container.categoryRepository,
+                                            habitRecordRepository = app.container.habitRecordRepository,
                                             reminderCoordinator = app.container.reminderCoordinator
                                         )
                                     )
@@ -262,6 +330,7 @@ class MainActivity : ComponentActivity() {
                                         factory = HabitFormViewModel.Factory(
                                             habitRepository = app.container.habitRepository,
                                             reminderCoordinator = app.container.reminderCoordinator,
+                                            categoryRepository = app.container.categoryRepository,
                                             habitId = currentScreen.habitId,
                                             templateId = currentScreen.templateId
                                         )
@@ -344,7 +413,14 @@ class MainActivity : ComponentActivity() {
                                     val settingsViewModel: com.habit1.app.ui.settings.SettingsViewModel = viewModel(
                                         factory = com.habit1.app.ui.settings.SettingsViewModel.Factory(
                                             backupRepository = app.container.backupRepository,
-                                            userPreferences = app.container.userPreferences
+                                            userPreferences = app.container.userPreferences,
+                                            habitRepository = app.container.habitRepository,
+                                            habitRecordRepository = app.container.habitRecordRepository,
+                                            categoryRepository = app.container.categoryRepository,
+                                            eveningDigestScheduler = app.container.eveningDigestScheduler,
+                                            biometricAuthManager = app.container.biometricAuthManager,
+                                            appLockManager = app.container.appLockManager,
+                                            appContext = applicationContext
                                         )
                                     )
                                     com.habit1.app.ui.settings.SettingsScreen(
@@ -358,6 +434,7 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                         }
+                    }
                     }
                 }
             }

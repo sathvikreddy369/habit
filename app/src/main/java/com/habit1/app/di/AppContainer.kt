@@ -28,18 +28,22 @@ interface AppContainer {
     val database: AppDatabase
     val userPreferences: UserPreferencesDataStore
     val habitRepository: HabitRepository
+    val categoryRepository: com.habit1.app.data.repository.CategoryRepository
     val habitRecordRepository: HabitRecordRepository
     val dailyGoalRepository: DailyGoalRepository
     val dailyReviewRepository: DailyReviewRepository
 
     val notificationHelper: com.habit1.app.platform.notification.NotificationHelper
     val reminderScheduler: com.habit1.app.platform.reminder.HabitReminderScheduler
+    val eveningDigestScheduler: com.habit1.app.platform.reminder.EveningDigestScheduler
     val goalReminderScheduler: com.habit1.app.platform.reminder.GoalReminderScheduler
     val reminderCoordinator: com.habit1.app.domain.reminder.HabitReminderCoordinator
     val backupRepository: com.habit1.app.data.repository.BackupRepository
     val recordHabitProgressUseCase: com.habit1.app.domain.usecase.RecordHabitProgressUseCase
     val computeHabitAnalyticsUseCase: com.habit1.app.domain.usecase.ComputeHabitAnalyticsUseCase
     val computeGlobalAnalyticsUseCase: com.habit1.app.domain.usecase.ComputeGlobalAnalyticsUseCase
+    val biometricAuthManager: com.habit1.app.platform.security.BiometricAuthManager
+    val appLockManager: com.habit1.app.platform.security.AppLockManager
 }
 
 /**
@@ -65,6 +69,10 @@ class DefaultAppContainer(
         HabitRepositoryImpl(database.habitDao(), ioDispatcher)
     }
 
+    override val categoryRepository: com.habit1.app.data.repository.CategoryRepository by lazy {
+        com.habit1.app.data.repository.CategoryRepositoryImpl(database.categoryDao(), database.habitDao(), ioDispatcher)
+    }
+
     override val habitRecordRepository: HabitRecordRepository by lazy {
         HabitRecordRepositoryImpl(database.habitRecordDao(), ioDispatcher)
     }
@@ -85,6 +93,10 @@ class DefaultAppContainer(
         com.habit1.app.platform.reminder.AlarmManagerHabitReminderScheduler(context)
     }
 
+    override val eveningDigestScheduler: com.habit1.app.platform.reminder.EveningDigestScheduler by lazy {
+        com.habit1.app.platform.reminder.AlarmManagerEveningDigestScheduler(context)
+    }
+
     override val goalReminderScheduler: com.habit1.app.platform.reminder.GoalReminderScheduler by lazy {
         com.habit1.app.platform.reminder.AlarmManagerGoalReminderScheduler(context)
     }
@@ -93,7 +105,10 @@ class DefaultAppContainer(
         com.habit1.app.domain.reminder.HabitReminderCoordinator(
             habitRepository = habitRepository,
             scheduler = reminderScheduler,
-            notificationHelper = notificationHelper
+            notificationHelper = notificationHelper,
+            habitRecordRepository = habitRecordRepository,
+            eveningDigestScheduler = eveningDigestScheduler,
+            userPreferences = userPreferences
         )
     }
 
@@ -117,7 +132,8 @@ class DefaultAppContainer(
     override val recordHabitProgressUseCase: com.habit1.app.domain.usecase.RecordHabitProgressUseCase by lazy {
         com.habit1.app.domain.usecase.RecordHabitProgressUseCase(
             habitRepository = habitRepository,
-            habitRecordRepository = habitRecordRepository
+            habitRecordRepository = habitRecordRepository,
+            reminderCoordinator = reminderCoordinator
         )
     }
 
@@ -127,5 +143,13 @@ class DefaultAppContainer(
 
     override val computeGlobalAnalyticsUseCase: com.habit1.app.domain.usecase.ComputeGlobalAnalyticsUseCase by lazy {
         com.habit1.app.domain.usecase.ComputeGlobalAnalyticsUseCase(computeHabitAnalyticsUseCase)
+    }
+
+    override val biometricAuthManager: com.habit1.app.platform.security.BiometricAuthManager by lazy {
+        com.habit1.app.platform.security.BiometricAuthManagerImpl(context)
+    }
+
+    override val appLockManager: com.habit1.app.platform.security.AppLockManager by lazy {
+        com.habit1.app.platform.security.AppLockManagerImpl(userPreferences)
     }
 }

@@ -34,6 +34,8 @@ class HabitListViewModelTest {
     private val testDispatcher = StandardTestDispatcher()
     private lateinit var database: AppDatabase
     private lateinit var habitRepository: HabitRepository
+    private lateinit var categoryRepository: com.habit1.app.data.repository.CategoryRepository
+    private lateinit var habitRecordRepository: com.habit1.app.data.repository.HabitRecordRepository
     private lateinit var viewModel: HabitListViewModel
 
     @Before
@@ -42,7 +44,17 @@ class HabitListViewModelTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         database = AppDatabase.buildInMemoryDatabase(context)
         habitRepository = HabitRepositoryImpl(database.habitDao(), testDispatcher)
-        viewModel = HabitListViewModel(habitRepository)
+        categoryRepository = com.habit1.app.data.repository.CategoryRepositoryImpl(
+            categoryDao = database.categoryDao(),
+            habitDao = database.habitDao(),
+            ioDispatcher = testDispatcher
+        )
+        habitRecordRepository = com.habit1.app.data.repository.HabitRecordRepositoryImpl(database.habitRecordDao(), testDispatcher)
+        viewModel = HabitListViewModel(
+            habitRepository = habitRepository,
+            categoryRepository = categoryRepository,
+            habitRecordRepository = habitRecordRepository
+        )
     }
 
     @After
@@ -191,6 +203,153 @@ class HabitListViewModelTest {
             }
             assertEquals(0, deletedState.activeHabits.size)
             assertNull(habitRepository.getHabitById("h_del"))
+        }
+    }
+
+    @Test
+    fun searchQuery_filtersByNameAndDescriptionCaseInsensitive() = runTest(testDispatcher) {
+        val h1 = HabitEntity(id = "h1", name = "Morning Run", description = "5km in park", measurementType = "BOOLEAN", scheduleType = "DAILY", scheduleConfig = "{}", displayOrder = 0, isPaused = false, isArchived = false, createdAt = 1000L, updatedAt = 1000L)
+        val h2 = HabitEntity(id = "h2", name = "Read Book", description = "Read chapter 1", measurementType = "BOOLEAN", scheduleType = "DAILY", scheduleConfig = "{}", displayOrder = 1, isPaused = false, isArchived = false, createdAt = 1000L, updatedAt = 1000L)
+        habitRepository.createHabit(h1)
+        habitRepository.createHabit(h2)
+        advanceUntilIdle()
+
+        viewModel.uiState.test {
+            awaitItem()
+            val state = awaitItem()
+            assertEquals(2, state.filteredHabits.size)
+
+            // Search by name substring "run"
+            viewModel.onEvent(HabitListUiEvent.UpdateSearchQuery("run"))
+            val searchRun = awaitItem()
+            assertEquals(1, searchRun.filteredHabits.size)
+            assertEquals("Morning Run", searchRun.filteredHabits[0].name)
+
+            // Search by description substring "chapter"
+            viewModel.onEvent(HabitListUiEvent.UpdateSearchQuery("CHAPTER"))
+            val searchDesc = awaitItem()
+            assertEquals(1, searchDesc.filteredHabits.size)
+            assertEquals("Read Book", searchDesc.filteredHabits[0].name)
+
+            // Clear search
+            viewModel.onEvent(HabitListUiEvent.UpdateSearchQuery(""))
+            val searchEmpty = awaitItem()
+            assertEquals(2, searchEmpty.filteredHabits.size)
+        }
+    }
+
+    @Test
+    fun statusFilter_filtersActivePausedAndArchived() = runTest(testDispatcher) {
+        val active = HabitEntity(id = "h_act", name = "Active", measurementType = "BOOLEAN", scheduleType = "DAILY", scheduleConfig = "{}", displayOrder = 0, isPaused = false, isArchived = false, createdAt = 1000L, updatedAt = 1000L)
+        val paused = HabitEntity(id = "h_pau", name = "Paused", measurementType = "BOOLEAN", scheduleType = "DAILY", scheduleConfig = "{}", displayOrder = 1, isPaused = true, isArchived = false, createdAt = 1000L, updatedAt = 1000L)
+        val archived = HabitEntity(id = "h_arc", name = "Archived", measurementType = "BOOLEAN", scheduleType = "DAILY", scheduleConfig = "{}", displayOrder = 2, isPaused = false, isArchived = true, createdAt = 1000L, updatedAt = 1000L)
+        habitRepository.createHabit(active)
+        habitRepository.createHabit(paused)
+        habitRepository.createHabit(archived)
+        advanceUntilIdle()
+
+        viewModel.uiState.test {
+            awaitItem()
+            val state = awaitItem()
+            // Default ALL shows all 3
+            assertEquals(3, state.filteredHabits.size)
+
+            // Filter ACTIVE
+            viewModel.onEvent(HabitListUiEvent.SelectStatusFilter(HabitStatusFilter.ACTIVE))
+            val actState = awaitItem()
+            assertEquals(1, actState.filteredHabits.size)
+            assertEquals("Active", actState.filteredHabits[0].name)
+
+            // Filter PAUSED
+            viewModel.onEvent(HabitListUiEvent.SelectStatusFilter(HabitStatusFilter.PAUSED))
+            val pauState = awaitItem()
+            assertEquals(1, pauState.filteredHabits.size)
+            assertEquals("Paused", pauState.filteredHabits[0].name)
+
+            // Filter ARCHIVED
+            viewModel.onEvent(HabitListUiEvent.SelectStatusFilter(HabitStatusFilter.ARCHIVED))
+            val arcState = awaitItem()
+            assertEquals(1, arcState.filteredHabits.size)
+            assertEquals("Archived", arcState.filteredHabits[0].name)
+        }
+    }
+
+    @Test
+    fun categoryFilter_andCategoryOperations() = runTest(testDispatcher) {
+        // Create Category via event
+        viewModel.onEvent(
+            HabitListUiEvent.SaveCategory(
+                id = null,
+                name = "Fitness",
+                colorHex = "#F08A6C",
+                icon = "fitness"
+            )
+        )
+        advanceUntilIdle()
+
+        val cats = categoryRepository.getAllCategories()
+        assertEquals(1, cats.size)
+        val catId = cats[0].id
+
+        val hWithCat = HabitEntity(id = "h1", name = "Gym", measurementType = "BOOLEAN", scheduleType = "DAILY", scheduleConfig = "{}", displayOrder = 0, isPaused = false, isArchived = false, categoryId = catId, createdAt = 1000L, updatedAt = 1000L)
+        val hNoCat = HabitEntity(id = "h2", name = "Meditate", measurementType = "BOOLEAN", scheduleType = "DAILY", scheduleConfig = "{}", displayOrder = 1, isPaused = false, isArchived = false, categoryId = null, createdAt = 1000L, updatedAt = 1000L)
+        habitRepository.createHabit(hWithCat)
+        habitRepository.createHabit(hNoCat)
+        advanceUntilIdle()
+
+        viewModel.uiState.test {
+            awaitItem()
+            val state = awaitItem()
+            assertEquals(2, state.filteredHabits.size)
+
+            // Filter by Fitness category
+            viewModel.onEvent(HabitListUiEvent.SelectCategoryFilter(catId))
+            val filteredCat = awaitItem()
+            assertEquals(1, filteredCat.filteredHabits.size)
+            assertEquals("Gym", filteredCat.filteredHabits[0].name)
+            assertEquals("Fitness", filteredCat.filteredHabits[0].categoryName)
+
+            // Clear category filter
+            viewModel.onEvent(HabitListUiEvent.SelectCategoryFilter(null))
+            val all = awaitItem()
+            assertEquals(2, all.filteredHabits.size)
+        }
+    }
+
+    @Test
+    fun presentationSorting_doesNotMutatePersistedDisplayOrder() = runTest(testDispatcher) {
+        // Create habits with distinct names and initial display orders
+        val h1 = HabitEntity(id = "h1", name = "Zebra Habit", measurementType = "BOOLEAN", scheduleType = "DAILY", scheduleConfig = "{}", displayOrder = 0, isPaused = false, isArchived = false, createdAt = 1000L, updatedAt = 1000L)
+        val h2 = HabitEntity(id = "h2", name = "Alpha Habit", measurementType = "BOOLEAN", scheduleType = "DAILY", scheduleConfig = "{}", displayOrder = 1, isPaused = false, isArchived = false, createdAt = 1000L, updatedAt = 1000L)
+        habitRepository.createHabit(h1)
+        habitRepository.createHabit(h2)
+        advanceUntilIdle()
+
+        viewModel.uiState.test {
+            awaitItem()
+            val manualState = awaitItem()
+            // In MANUAL mode, h1 is first (displayOrder 0), h2 is second (displayOrder 1)
+            assertEquals("Zebra Habit", manualState.filteredHabits[0].name)
+            assertEquals("Alpha Habit", manualState.filteredHabits[1].name)
+
+            // Switch presentation sort mode to NAME_ASC
+            viewModel.onEvent(HabitListUiEvent.SelectSortMode(HabitSortMode.NAME_ASC))
+            val sortedState = awaitItem()
+            // Presentation list is sorted alphabetically
+            assertEquals("Alpha Habit", sortedState.filteredHabits[0].name)
+            assertEquals("Zebra Habit", sortedState.filteredHabits[1].name)
+
+            // INVARIANT SAFEGUARD (Decision 6.2): Persisted displayOrder in DB MUST NOT be altered!
+            val dbH1 = habitRepository.getHabitById("h1")
+            val dbH2 = habitRepository.getHabitById("h2")
+            assertEquals("Persisted displayOrder must remain 0 for h1", 0, dbH1?.displayOrder)
+            assertEquals("Persisted displayOrder must remain 1 for h2", 1, dbH2?.displayOrder)
+
+            // Switching back to MANUAL restores custom order
+            viewModel.onEvent(HabitListUiEvent.SelectSortMode(HabitSortMode.MANUAL))
+            val restoredState = awaitItem()
+            assertEquals("Zebra Habit", restoredState.filteredHabits[0].name)
+            assertEquals("Alpha Habit", restoredState.filteredHabits[1].name)
         }
     }
 }

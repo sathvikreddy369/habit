@@ -5,7 +5,10 @@ import com.habit1.app.domain.model.CalendarDayStatus
 import com.habit1.app.domain.model.Habit
 import com.habit1.app.domain.model.HabitHistoryDay
 import com.habit1.app.domain.model.HabitHistorySummary
+import com.habit1.app.domain.model.HabitPause
 import com.habit1.app.domain.model.HabitRecord
+import com.habit1.app.domain.model.HabitRecordStatus
+import com.habit1.app.domain.model.HabitScheduleVersion
 import java.time.LocalDate
 import java.time.ZoneId
 
@@ -25,13 +28,22 @@ class EvaluateHabitHistoryUseCase(
         startDate: LocalDate,
         endDate: LocalDate,
         todayDate: LocalDate,
-        zoneId: ZoneId
+        zoneId: ZoneId,
+        pauses: List<HabitPause> = emptyList(),
+        scheduleVersions: List<HabitScheduleVersion> = emptyList()
     ): HabitHistorySummary {
-        val creationDate = DateTimeUtils.toLocalDate(habit.createdAt, zoneId)
+        val creationDate = habit.startDate
         val recordsMap = records.associateBy { it.date }
 
         // 1. Single source of truth for streaks & overall consistency
-        val streakResult = calculateStreaks.execute(habit, records, todayDate, zoneId)
+        val streakResult = calculateStreaks.execute(
+            habit = habit,
+            records = records,
+            todayDate = todayDate,
+            zoneId = zoneId,
+            pauses = pauses,
+            scheduleVersions = scheduleVersions
+        )
 
         val historyDays = mutableListOf<HabitHistoryDay>()
         var completedCount = 0
@@ -40,35 +52,57 @@ class EvaluateHabitHistoryUseCase(
         var projectedRestCount = 0
 
         var currentDate = startDate
+        val habitForSchedule = if (habit.isArchived) habit.copy(isArchived = false) else habit
+        val archiveCivilDate = habit.archivedAt?.let { DateTimeUtils.toLocalDate(it, zoneId) }
+
         while (!currentDate.isAfter(endDate)) {
             val record = recordsMap[currentDate]
             val status: CalendarDayStatus = when {
                 currentDate.isAfter(todayDate) -> CalendarDayStatus.Future
                 currentDate.isBefore(creationDate) -> CalendarDayStatus.PreCreation
+                archiveCivilDate != null && currentDate.isAfter(archiveCivilDate) -> CalendarDayStatus.ProjectedRest
                 record != null -> {
-                    if (record.isCompleted) {
-                        completedCount++
-                        CalendarDayStatus.Completed(
-                            actualValue = record.actualValue,
-                            targetValue = record.targetValue,
-                            unit = record.unit,
-                            measurementType = record.measurementType
-                        )
-                    } else {
-                        recordedIncompleteCount++
-                        CalendarDayStatus.RecordedIncomplete(
-                            actualValue = record.actualValue,
-                            targetValue = record.targetValue,
-                            unit = record.unit,
-                            measurementType = record.measurementType
-                        )
+                    when (record.status) {
+                        HabitRecordStatus.DONE -> {
+                            completedCount++
+                            CalendarDayStatus.Completed(
+                                actualValue = record.actualValue,
+                                targetValue = record.targetValue,
+                                unit = record.unit,
+                                measurementType = record.measurementType
+                            )
+                        }
+                        HabitRecordStatus.PARTIAL -> {
+                            recordedIncompleteCount++
+                            CalendarDayStatus.RecordedIncomplete(
+                                actualValue = record.actualValue,
+                                targetValue = record.targetValue,
+                                unit = record.unit,
+                                measurementType = record.measurementType
+                            )
+                        }
+                        HabitRecordStatus.SKIPPED -> {
+                            CalendarDayStatus.Skipped(
+                                actualValue = record.actualValue,
+                                targetValue = record.targetValue,
+                                unit = record.unit,
+                                measurementType = record.measurementType
+                            )
+                        }
+                        HabitRecordStatus.MISSED -> {
+                            CalendarDayStatus.ExplicitMissed(
+                                notes = record.notes
+                            )
+                        }
+                        HabitRecordStatus.UNRECORDED -> {
+                            CalendarDayStatus.ProjectedMissed
+                        }
                     }
                 }
-                habit.isPaused -> CalendarDayStatus.Paused
+                pauses.any { it.covers(currentDate) } || habit.isCurrentlyPaused || habit.isPaused -> CalendarDayStatus.Paused
                 currentDate == todayDate -> CalendarDayStatus.Future
                 else -> {
-                    val habitForSchedule = if (habit.isArchived) habit.copy(isArchived = false) else habit
-                    val isScheduled = evaluateSchedule.isScheduledOn(habitForSchedule, currentDate, zoneId)
+                    val isScheduled = evaluateSchedule.isScheduledOn(habitForSchedule, currentDate, zoneId, pauses, scheduleVersions)
                     if (isScheduled) {
                         projectedMissedCount++
                         CalendarDayStatus.ProjectedMissed
@@ -85,7 +119,7 @@ class EvaluateHabitHistoryUseCase(
 
         // Quantitative history in window
         val windowRecords = records.filter { it.date in startDate..endDate }
-        val completedWindowRecords = windowRecords.filter { it.isCompleted }
+        val completedWindowRecords = windowRecords.filter { it.status == HabitRecordStatus.DONE }
         val totalVolume = windowRecords.sumOf { it.actualValue }
 
         val avgCompleted = if (completedWindowRecords.isNotEmpty()) {

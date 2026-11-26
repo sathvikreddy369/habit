@@ -10,9 +10,10 @@ import androidx.room.PrimaryKey
  * Historical record of a habit on a specific calendar date.
  *
  * Preserves Historical Truth (Product Principle #7):
- * - Missed days are represented by the absence of a completion record; records are NEVER fabricated.
+ * - Missed days are represented by the absence of a completion record; records are NEVER fabricated automatically.
  * - Snapshots measurement_type, target_value, and unit at the moment of recording, ensuring that
  *   future edits to a habit's definition never retroactively reinterpret historical accomplishments.
+ * - status: "DONE", "PARTIAL", "SKIPPED", "MISSED".
  */
 @Entity(
     tableName = "habit_records",
@@ -27,7 +28,8 @@ import androidx.room.PrimaryKey
     indices = [
         Index(value = ["habit_id", "date"], unique = true),
         Index(value = ["date"]),
-        Index(value = ["habit_id", "is_completed"])
+        Index(value = ["habit_id", "is_completed"]),
+        Index(value = ["habit_id", "status"])
     ]
 )
 data class HabitRecordEntity(
@@ -69,9 +71,6 @@ data class HabitRecordEntity(
     @ColumnInfo(name = "unit")
     val unit: String? = null,
 
-    /**
-     * Authoritative completion status for this calendar day.
-     */
     @ColumnInfo(name = "is_completed")
     val isCompleted: Boolean,
 
@@ -79,5 +78,12 @@ data class HabitRecordEntity(
     val notes: String? = null,
 
     @ColumnInfo(name = "recorded_at")
-    val recordedAt: Long
+    val recordedAt: Long,
+
+    /**
+     * Authoritative completion status for this calendar day:
+     * "DONE", "PARTIAL", "SKIPPED", "MISSED"
+     */
+    @ColumnInfo(name = "status", defaultValue = "'DONE'")
+    val status: String = if (isCompleted) "DONE" else "PARTIAL"
 )

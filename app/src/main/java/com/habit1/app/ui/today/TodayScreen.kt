@@ -1,7 +1,11 @@
 package com.habit1.app.ui.today
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,14 +21,26 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -45,25 +61,28 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.habit1.app.ui.components.DailyReviewCard
 import com.habit1.app.ui.components.DailyReviewEditorDialog
 import com.habit1.app.ui.components.GoalCard
 import com.habit1.app.ui.components.GoalEditorDialog
+import com.habit1.app.ui.theme.HabitColors
+import com.habit1.app.ui.theme.HabitIcons
+import com.habit1.app.ui.components.HabitActionSheet
 import com.habit1.app.ui.components.HabitCard
+import com.habit1.app.ui.components.HabitNotesDialog
+import com.habit1.app.ui.components.NumericEntryDialog
 import com.habit1.app.ui.components.TodayHeader
 
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
-
 /**
- * Primary Today screen composable that renders habits, goals, and daily progress.
+ * Primary Today screen composable that renders habits, goals, daily progress,
+ * 7-day bounded date stepper, past-date context banner, and safe 5-state interaction sheets.
  */
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TodayScreen(
     viewModel: TodayViewModel,
@@ -74,21 +93,26 @@ fun TodayScreen(
     onNavigateToHistory: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {}
 ) {
-
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     var showCreateSheet by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState.userMessage) {
         uiState.userMessage?.let { message ->
-            val canUndo = uiState.lastMovedGoalId != null
+            val canUndoGoal = uiState.lastMovedGoalId != null
+            val canUndoClear = uiState.lastClearedRecordHabitName != null
+            val canUndo = canUndoGoal || canUndoClear
             val result = snackbarHostState.showSnackbar(
                 message = message,
                 actionLabel = if (canUndo) "Undo" else null,
                 duration = androidx.compose.material3.SnackbarDuration.Short
             )
-            if (result == androidx.compose.material3.SnackbarResult.ActionPerformed && canUndo) {
-                viewModel.onEvent(TodayUiEvent.UndoLastMovedGoal)
+            if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
+                if (canUndoClear) {
+                    viewModel.onEvent(TodayUiEvent.UndoClearRecord)
+                } else if (canUndoGoal) {
+                    viewModel.onEvent(TodayUiEvent.UndoLastMovedGoal)
+                }
             }
             viewModel.onEvent(TodayUiEvent.DismissMessage)
         }
@@ -107,6 +131,18 @@ fun TodayScreen(
                     )
                 },
                 actions = {
+                    IconButton(
+                        onClick = { viewModel.onEvent(TodayUiEvent.ToggleCategoryGrouping) },
+                        modifier = Modifier.semantics {
+                            contentDescription = if (uiState.categoryGroupingEnabled) "Disable Category Grouping" else "Enable Category Grouping"
+                        }
+                    ) {
+                        Icon(
+                            imageVector = if (uiState.categoryGroupingEnabled) Icons.Default.Folder else Icons.Default.FolderOpen,
+                            contentDescription = "Category Grouping",
+                            tint = if (uiState.categoryGroupingEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                     IconButton(
                         onClick = { showCreateSheet = true },
                         modifier = Modifier.semantics {
@@ -140,18 +176,68 @@ fun TodayScreen(
                 .padding(innerPadding),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp)
         ) {
-            // Header: Goal & habit progress overview
+            // 1. Unified Daily Overview Dashboard (Integrated Stepper + Radial Donut + Remaining count)
             item(key = "header") {
                 TodayHeader(
                     formattedDate = uiState.formattedDate,
+                    isViewingPastDate = uiState.isViewingPastDate,
+                    canStepBackward = uiState.canStepBackward,
+                    canStepForward = uiState.canStepForward,
+                    onStepBackward = { viewModel.onEvent(TodayUiEvent.StepDateBackward) },
+                    onStepForward = { viewModel.onEvent(TodayUiEvent.StepDateForward) },
+                    onReturnToToday = { viewModel.onEvent(TodayUiEvent.ReturnToToday) },
                     completedHabitsCount = uiState.completedHabitsCount,
                     totalScheduledHabitsCount = uiState.totalScheduledHabitsCount,
                     habitProgress = uiState.habitProgress,
                     completedGoalsCount = uiState.completedGoalsCount,
                     totalGoalsCount = uiState.totalGoalsCount,
                     goalProgress = uiState.goalProgress,
-                    modifier = Modifier.padding(vertical = 2.dp)
+                    modifier = Modifier.padding(bottom = 6.dp)
                 )
+            }
+
+            // Top Category Focus Chips (shown when habit count >= 10 and categories exist)
+            if (uiState.totalScheduledHabitsCount >= 10 && uiState.categories.isNotEmpty()) {
+                item(key = "today_category_focus_chips") {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        FilterChip(
+                            selected = uiState.selectedCategoryFilter == null,
+                            onClick = { viewModel.onEvent(TodayUiEvent.SelectCategoryFilter(null)) },
+                            label = { Text("All", style = MaterialTheme.typography.labelSmall) }
+                        )
+                        uiState.categories.forEach { category ->
+                            val isSelected = uiState.selectedCategoryFilter == category.id
+                            val vectorIcon = HabitIcons.getVectorIcon(category.icon)
+                            FilterChip(
+                                selected = isSelected,
+                                onClick = {
+                                    val targetId = if (isSelected) null else category.id
+                                    viewModel.onEvent(TodayUiEvent.SelectCategoryFilter(targetId))
+                                },
+                                leadingIcon = {
+                                    if (vectorIcon != null) {
+                                        Icon(
+                                            imageVector = vectorIcon,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(14.dp),
+                                            tint = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else HabitColors.parseColor(category.colorHex)
+                                        )
+                                    } else if (HabitIcons.isEmoji(category.icon)) {
+                                        Text(category.icon ?: "", fontSize = 12.sp)
+                                    }
+                                },
+                                label = { Text(category.name, style = MaterialTheme.typography.labelSmall) }
+                            )
+                        }
+                    }
+                }
             }
 
             // 1. Daily Goals Section (Prioritized at top)
@@ -214,7 +300,7 @@ fun TodayScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "No goals planned for today",
+                                text = "No goals planned for this day",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -243,7 +329,37 @@ fun TodayScreen(
                 )
             }
 
-            if (uiState.habits.isNotEmpty()) {
+            if (uiState.categoryGroupingEnabled && uiState.groupedHabits.isNotEmpty()) {
+                uiState.groupedHabits.forEach { group ->
+                    item(key = "cat_group_header_${group.categoryId ?: "uncat"}") {
+                        TodayCategoryGroupHeader(
+                            group = group,
+                            onToggleCollapse = { viewModel.onEvent(TodayUiEvent.ToggleCategoryCollapsed(group.categoryId)) }
+                        )
+                    }
+
+                    if (!group.isCollapsed) {
+                        items(
+                            items = group.habits,
+                            key = { "group_habit_${it.id}" }
+                        ) { habitItem ->
+                            HabitCard(
+                                habitItem = habitItem,
+                                onToggle = { viewModel.onEvent(TodayUiEvent.ToggleHabit(habitItem.id)) },
+                                onIncrement = { viewModel.onEvent(TodayUiEvent.IncrementHabit(habitItem.id)) },
+                                onDecrement = { viewModel.onEvent(TodayUiEvent.DecrementHabit(habitItem.id)) },
+                                onSetValue = { value -> viewModel.onEvent(TodayUiEvent.SetHabitValue(habitItem.id, value)) },
+                                onMarkMissed = { viewModel.onEvent(TodayUiEvent.MarkMissed(habitItem.id)) },
+                                onMarkSkipped = { viewModel.onEvent(TodayUiEvent.MarkSkipped(habitItem.id)) },
+                                onCompleteToTarget = { viewModel.onEvent(TodayUiEvent.CompleteToTarget(habitItem.id)) },
+                                onClick = { onInspectHabit(habitItem.id) },
+                                onOpenActionSheet = { viewModel.onEvent(TodayUiEvent.OpenHabitActionSheet(habitItem)) },
+                                modifier = Modifier.padding(vertical = 4.dp)
+                            )
+                        }
+                    }
+                }
+            } else if (uiState.habits.isNotEmpty()) {
                 items(
                     items = uiState.habits,
                     key = { "habit_${it.id}" }
@@ -254,7 +370,11 @@ fun TodayScreen(
                         onIncrement = { viewModel.onEvent(TodayUiEvent.IncrementHabit(habitItem.id)) },
                         onDecrement = { viewModel.onEvent(TodayUiEvent.DecrementHabit(habitItem.id)) },
                         onSetValue = { value -> viewModel.onEvent(TodayUiEvent.SetHabitValue(habitItem.id, value)) },
+                        onMarkMissed = { viewModel.onEvent(TodayUiEvent.MarkMissed(habitItem.id)) },
+                        onMarkSkipped = { viewModel.onEvent(TodayUiEvent.MarkSkipped(habitItem.id)) },
+                        onCompleteToTarget = { viewModel.onEvent(TodayUiEvent.CompleteToTarget(habitItem.id)) },
                         onClick = { onInspectHabit(habitItem.id) },
+                        onOpenActionSheet = { viewModel.onEvent(TodayUiEvent.OpenHabitActionSheet(habitItem)) },
                         modifier = Modifier.padding(vertical = 4.dp)
                     )
                 }
@@ -264,11 +384,12 @@ fun TodayScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 4.dp),
-                        shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
-                        colors = androidx.compose.material3.CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surface
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
                         ),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                     ) {
                         Column(
                             modifier = Modifier
@@ -277,13 +398,13 @@ fun TodayScreen(
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
-                                text = "No habits scheduled for today",
+                                text = "No habits scheduled for this day",
                                 style = MaterialTheme.typography.titleSmall,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "Create your first habit or adjust schedules to start tracking today.",
+                                text = "Create habits or adjust schedules to start tracking.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -298,7 +419,37 @@ fun TodayScreen(
                 }
             }
 
-            // 3. Daily Reflection Section
+            // 3. Bonus & Rest Day Activity Section (Unscheduled habits on this date)
+            if (uiState.unscheduledHabits.isNotEmpty()) {
+                item(key = "unscheduled_header") {
+                    Spacer(modifier = Modifier.height(14.dp))
+                    SectionHeader(
+                        title = "Bonus & Rest Day Activity",
+                        countText = "${uiState.unscheduledHabits.count { it.isCompleted || it.actualValue > 0.0 }}/${uiState.unscheduledHabits.size}"
+                    )
+                }
+
+                items(
+                    items = uiState.unscheduledHabits,
+                    key = { "unscheduled_${it.id}" }
+                ) { habitItem ->
+                    HabitCard(
+                        habitItem = habitItem,
+                        onToggle = { viewModel.onEvent(TodayUiEvent.ToggleHabit(habitItem.id)) },
+                        onIncrement = { viewModel.onEvent(TodayUiEvent.IncrementHabit(habitItem.id)) },
+                        onDecrement = { viewModel.onEvent(TodayUiEvent.DecrementHabit(habitItem.id)) },
+                        onSetValue = { value -> viewModel.onEvent(TodayUiEvent.SetHabitValue(habitItem.id, value)) },
+                        onMarkMissed = { viewModel.onEvent(TodayUiEvent.MarkMissed(habitItem.id)) },
+                        onMarkSkipped = { viewModel.onEvent(TodayUiEvent.MarkSkipped(habitItem.id)) },
+                        onCompleteToTarget = { viewModel.onEvent(TodayUiEvent.CompleteToTarget(habitItem.id)) },
+                        onClick = { onInspectHabit(habitItem.id) },
+                        onOpenActionSheet = { viewModel.onEvent(TodayUiEvent.OpenHabitActionSheet(habitItem)) },
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    )
+                }
+            }
+
+            // 4. Daily Reflection Section
             item(key = "daily_reflection") {
                 Spacer(modifier = Modifier.height(12.dp))
                 SectionHeader(
@@ -317,7 +468,7 @@ fun TodayScreen(
         }
     }
 
-    // Create Bottom Sheet (Replaces dropdown for clean modern UX)
+    // Create Bottom Sheet
     if (showCreateSheet) {
         val sheetState = rememberModalBottomSheetState()
         ModalBottomSheet(
@@ -414,6 +565,48 @@ fun TodayScreen(
         }
     }
 
+    // Habit Action Sheet (Decision 1.3, 2.2)
+    if (uiState.isActionSheetOpen && uiState.activeActionSheetHabit != null) {
+        val habit = uiState.activeActionSheetHabit!!
+        HabitActionSheet(
+            habitItem = habit,
+            dateLabel = uiState.formattedDate,
+            onDismiss = { viewModel.onEvent(TodayUiEvent.DismissHabitActionSheet) },
+            onCompleteToTarget = { viewModel.onEvent(TodayUiEvent.CompleteToTarget(habit.id)) },
+            onOpenNumericEntry = { viewModel.onEvent(TodayUiEvent.OpenNumericDialog(habit)) },
+            onMarkSkipped = { viewModel.onEvent(TodayUiEvent.MarkSkipped(habit.id)) },
+            onMarkMissed = { viewModel.onEvent(TodayUiEvent.MarkMissed(habit.id)) },
+            onClearRecord = { viewModel.onEvent(TodayUiEvent.ClearRecord(habit.id)) },
+            onEditNotes = { viewModel.onEvent(TodayUiEvent.OpenNotesDialog(habit)) }
+        )
+    }
+
+    // Direct Numeric Entry Dialog
+    uiState.numericDialogHabit?.let { habit ->
+        NumericEntryDialog(
+            habitName = habit.name,
+            measurementType = habit.measurementType,
+            currentValue = habit.actualValue,
+            targetValue = habit.targetValue,
+            unit = habit.unit,
+            onDismiss = { viewModel.onEvent(TodayUiEvent.DismissNumericDialog) },
+            onConfirm = { value ->
+                viewModel.onEvent(TodayUiEvent.SetHabitValue(habit.id, value))
+            }
+        )
+    }
+
+    // Habit Notes Dialog
+    uiState.notesDialogHabit?.let { habit ->
+        HabitNotesDialog(
+            habitName = habit.name,
+            initialNotes = habit.notes,
+            onDismiss = { viewModel.onEvent(TodayUiEvent.DismissNotesDialog) },
+            onSave = { notes ->
+                viewModel.onEvent(TodayUiEvent.SaveNotes(habit.id, notes))
+            }
+        )
+    }
 
     // Add Goal Dialog
     if (uiState.isAddGoalDialogOpen) {
@@ -570,7 +763,6 @@ fun TodayScreen(
     }
 }
 
-
 @Composable
 private fun SectionHeader(
     title: String,
@@ -578,7 +770,6 @@ private fun SectionHeader(
     modifier: Modifier = Modifier,
     onAddAction: (() -> Unit)? = null
 ) {
-
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -611,6 +802,92 @@ private fun SectionHeader(
                     contentDescription = "Add $title",
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TodayCategoryGroupHeader(
+    group: TodayCategoryGroup,
+    onToggleCollapse: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val categoryColor = HabitColors.parseColor(group.categoryColorHex)
+    val vectorIcon = HabitIcons.getVectorIcon(group.categoryIcon)
+
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+            .clickable(onClick = onToggleCollapse),
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(categoryColor.copy(alpha = 0.2f))
+                ) {
+                    if (vectorIcon != null) {
+                        Icon(
+                            imageVector = vectorIcon,
+                            contentDescription = null,
+                            tint = categoryColor,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    } else if (HabitIcons.isEmoji(group.categoryIcon)) {
+                        Text(group.categoryIcon ?: "", fontSize = 14.sp)
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Category,
+                            contentDescription = null,
+                            tint = categoryColor,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(10.dp))
+
+                Text(
+                    text = group.categoryName,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "${group.completedCount}/${group.totalCount}",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+
+                Spacer(modifier = Modifier.width(6.dp))
+
+                Icon(
+                    imageVector = if (group.isCollapsed) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
+                    contentDescription = if (group.isCollapsed) "Expand" else "Collapse",
+                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }

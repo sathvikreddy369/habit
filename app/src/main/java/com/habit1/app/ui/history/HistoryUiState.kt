@@ -27,7 +27,13 @@ data class HabitDayBreakdownItem(
     val status: CalendarDayStatus,
     val formattedProgress: String,
     val isPartial: Boolean = false,
-    val isCompleted: Boolean = false
+    val isCompleted: Boolean = false,
+    val measurementType: com.habit1.app.domain.model.MeasurementType = com.habit1.app.domain.model.MeasurementType.BooleanChoice,
+    val actualValue: Double = 0.0,
+    val targetValue: Double = 1.0,
+    val unit: String? = null,
+    val notes: String? = null,
+    val colorHex: String? = null
 )
 
 data class SelectedDateBreakdown(

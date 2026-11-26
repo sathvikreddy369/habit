@@ -242,6 +242,26 @@ class HabitHistoryViewModelTest {
             state = awaitItem()
             assertEquals(null, state.selectedDayDetail)
 
+            // Switch to 90 Days preset (Decision 5.1.2)
+            viewModel.onEvent(HabitHistoryUiEvent.SelectPreset(HeatmapRangePreset.LAST_90_DAYS))
+            state = awaitItem()
+            assertEquals(HeatmapRangePreset.LAST_90_DAYS, state.selectedPreset)
+            assertEquals(90, state.currentRange.dayCount)
+            assertEquals(false, state.canNavigateNext) // Bounded at today
+
+            // Switch to 365 Days preset (Decision 5.1.2)
+            viewModel.onEvent(HabitHistoryUiEvent.SelectPreset(HeatmapRangePreset.LAST_365_DAYS))
+            state = awaitItem()
+            assertEquals(HeatmapRangePreset.LAST_365_DAYS, state.selectedPreset)
+            assertEquals(365, state.currentRange.dayCount)
+            assertEquals(false, state.canNavigateNext)
+
+            // Switch to All Time preset
+            viewModel.onEvent(HabitHistoryUiEvent.SelectPreset(HeatmapRangePreset.ALL_TIME))
+            state = awaitItem()
+            assertEquals(HeatmapRangePreset.ALL_TIME, state.selectedPreset)
+            assertEquals(false, state.canNavigateNext)
+
             cancelAndIgnoreRemainingEvents()
         }
     }

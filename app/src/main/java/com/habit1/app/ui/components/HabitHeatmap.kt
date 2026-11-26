@@ -52,19 +52,23 @@ import com.habit1.app.domain.model.MeasurementType
 import com.habit1.app.ui.history.HeatmapRangePreset
 import java.time.DayOfWeek
 import java.time.LocalDate
-import java.time.Month
 import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 import java.time.temporal.TemporalAdjusters
 import java.util.Locale
 import kotlin.math.ceil
 
 /**
- * Habit1 Calendar Heatmap component.
+ * Habit1 Calendar Heatmap component (Decision 5.1).
  *
- * Supports three dedicated, high-information-density visualizations:
- * 1. [HeatmapRangePreset.THIS_WEEK]: Single-row 7-day Monday -> Sunday view with weekday labels and today indicator.
- * 2. [HeatmapRangePreset.THIS_MONTH]: Standard 7-column calendar grid (Monday-first) with correct blank offsets.
- * 3. [HeatmapRangePreset.THIS_YEAR]: GitHub/Loop-style 7x53 horizontal activity matrix with month markers and annual metrics.
+ * Implements accessible 5-state status visual grammar:
+ * - DONE: Solid accent fill
+ * - PARTIAL: Partial fill or progress ring using habit accent color
+ * - SKIPPED: Neutral slash or distinct subdued symbol
+ * - MISSED: Distinct hollow ring with muted border
+ * - Past scheduled UNRECORDED: Dashed / hollow outline
+ * - REST / UNSCHEDULED: Plain neutral surface (subtle '+' marker if bonus activity)
+ * - PAUSED: Paused muted surface
  */
 @Composable
 fun HabitHeatmap(
@@ -86,8 +90,9 @@ fun HabitHeatmap(
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
     ) {
         Column(
             modifier = Modifier
@@ -104,9 +109,11 @@ fun HabitHeatmap(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Range Preset Chips
+            // Standardized Rolling Range Preset Chips (Decision 5.1.2)
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 HeatmapRangePreset.entries.forEach { preset ->
@@ -126,7 +133,7 @@ fun HabitHeatmap(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Navigation Bar: Prev / Range Text / Next / Today
+            // Navigation Bar: Prev / Range Text / Next / Today (bounded at today)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -180,9 +187,9 @@ fun HabitHeatmap(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Heatmap View Dispatcher
+            // Heatmap View Dispatcher based on range duration
             when (selectedPreset) {
-                HeatmapRangePreset.THIS_WEEK -> {
+                HeatmapRangePreset.LAST_7_DAYS -> {
                     WeekHeatmapView(
                         summary = summary,
                         isQuantitative = isQuantitative,
@@ -190,7 +197,7 @@ fun HabitHeatmap(
                         accentColor = accentColor
                     )
                 }
-                HeatmapRangePreset.THIS_MONTH -> {
+                HeatmapRangePreset.LAST_30_DAYS -> {
                     MonthCalendarHeatmapView(
                         summary = summary,
                         isQuantitative = isQuantitative,
@@ -198,7 +205,9 @@ fun HabitHeatmap(
                         accentColor = accentColor
                     )
                 }
-                HeatmapRangePreset.THIS_YEAR -> {
+                HeatmapRangePreset.LAST_90_DAYS,
+                HeatmapRangePreset.LAST_365_DAYS,
+                HeatmapRangePreset.ALL_TIME -> {
                     YearActivityMatrixView(
                         summary = summary,
                         isQuantitative = isQuantitative,
@@ -210,7 +219,7 @@ fun HabitHeatmap(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Legend
+            // Accessible Legend
             HeatmapLegend(
                 isQuantitative = isQuantitative,
                 accentColor = accentColor
@@ -220,7 +229,7 @@ fun HabitHeatmap(
 }
 
 /**
- * 1. Weekly Heatmap: 7 equal-width columns (Monday through Sunday) with clear date tiles.
+ * 1. Weekly Heatmap: 7 equal-width columns (Monday through Sunday).
  */
 @Composable
 private fun WeekHeatmapView(
@@ -254,7 +263,7 @@ private fun WeekHeatmapView(
 
         Spacer(modifier = Modifier.height(6.dp))
 
-        // Weekday day cells (7 days: Monday to Sunday)
+        // 7 days in the week range
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -282,9 +291,6 @@ private fun WeekHeatmapView(
     }
 }
 
-/**
- * Individual cell for weekly heatmap.
- */
 @Composable
 private fun WeekHeatmapCell(
     day: HabitHistoryDay,
@@ -296,7 +302,7 @@ private fun WeekHeatmapCell(
 ) {
     val status = day.status
     val accessibilityLabel = buildCellAccessibilityText(day, isQuantitative)
-    val (bgColor, textColor, border) = resolveCellStyle(status, isQuantitative, isToday, accentColor)
+    val (bgColor, textColor, border, cellSymbol) = resolveCellStyle(status, isQuantitative, isToday, accentColor)
 
     Box(
         modifier = modifier
@@ -320,13 +326,12 @@ private fun WeekHeatmapCell(
                 textAlign = TextAlign.Center
             )
 
-            if (status is CalendarDayStatus.ProjectedRest) {
-                Spacer(modifier = Modifier.height(2.dp))
-                Box(
-                    modifier = Modifier
-                        .size(4.dp)
-                        .clip(CircleShape)
-                        .background(textColor.copy(alpha = 0.7f))
+            if (cellSymbol != null) {
+                Text(
+                    text = cellSymbol,
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                    fontWeight = FontWeight.Bold,
+                    color = textColor
                 )
             }
         }
@@ -334,7 +339,7 @@ private fun WeekHeatmapCell(
 }
 
 /**
- * 2. Monthly Calendar Heatmap: 7-column calendar grid with Monday-first alignment and proper leading empty offsets.
+ * 2. 7-column Calendar Heatmap (Monday-first alignment).
  */
 @Composable
 private fun MonthCalendarHeatmapView(
@@ -348,11 +353,11 @@ private fun MonthCalendarHeatmapView(
     val daysMap = remember(summary.dailyBreakdown) { summary.dailyBreakdown.associateBy { it.date } }
     val weekdays = listOf("M", "T", "W", "T", "F", "S", "S")
 
-    val firstDayOfMonth = summary.range.startDate
-    val daysInMonth = firstDayOfMonth.lengthOfMonth()
-    // Monday = 1, Sunday = 7 -> leading offset (Mon=0, Tue=1, ..., Sun=6)
-    val leadingOffset = (firstDayOfMonth.dayOfWeek.value - 1)
-    val totalSlots = leadingOffset + daysInMonth
+    val startDate = summary.range.startDate
+    val daysCount = summary.range.dayCount
+    // Monday = 1, Sunday = 7 -> leading offset (Mon=0..Sun=6)
+    val leadingOffset = (startDate.dayOfWeek.value - 1)
+    val totalSlots = leadingOffset + daysCount
     val rowCount = ceil(totalSlots / 7.0).toInt()
 
     Column(
@@ -386,10 +391,10 @@ private fun MonthCalendarHeatmapView(
             ) {
                 for (col in 0 until 7) {
                     val slotIndex = row * 7 + col
-                    val dayOfMonth = slotIndex - leadingOffset + 1
+                    val dayOffset = slotIndex - leadingOffset
 
-                    if (dayOfMonth in 1..daysInMonth) {
-                        val date = firstDayOfMonth.withDayOfMonth(dayOfMonth)
+                    if (dayOffset in 0 until daysCount) {
+                        val date = startDate.plusDays(dayOffset.toLong())
                         val historyDay = daysMap[date]
                         val isToday = date == today
 
@@ -406,7 +411,6 @@ private fun MonthCalendarHeatmapView(
                             Spacer(modifier = Modifier.weight(1f))
                         }
                     } else {
-                        // Empty slot outside the month
                         Spacer(modifier = Modifier.weight(1f))
                     }
                 }
@@ -415,9 +419,6 @@ private fun MonthCalendarHeatmapView(
     }
 }
 
-/**
- * Individual cell for monthly calendar heatmap.
- */
 @Composable
 private fun MonthCalendarCell(
     day: HabitHistoryDay,
@@ -429,7 +430,7 @@ private fun MonthCalendarCell(
 ) {
     val status = day.status
     val accessibilityLabel = buildCellAccessibilityText(day, isQuantitative)
-    val (bgColor, textColor, border) = resolveCellStyle(status, isQuantitative, isToday, accentColor)
+    val (bgColor, textColor, border, cellSymbol) = resolveCellStyle(status, isQuantitative, isToday, accentColor)
 
     Box(
         modifier = modifier
@@ -453,13 +454,12 @@ private fun MonthCalendarCell(
                 textAlign = TextAlign.Center
             )
 
-            if (status is CalendarDayStatus.ProjectedRest) {
-                Spacer(modifier = Modifier.height(1.dp))
-                Box(
-                    modifier = Modifier
-                        .size(3.dp)
-                        .clip(CircleShape)
-                        .background(textColor.copy(alpha = 0.7f))
+            if (cellSymbol != null) {
+                Text(
+                    text = cellSymbol,
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp),
+                    fontWeight = FontWeight.Bold,
+                    color = textColor
                 )
             }
         }
@@ -467,7 +467,7 @@ private fun MonthCalendarCell(
 }
 
 /**
- * 3. Yearly Activity Matrix: 7 rows (Mon-Sun) by 53 weeks horizontal scrollable matrix (GitHub/Loop style).
+ * 3. Horizontal Activity Matrix (7 rows Mon-Sun by N weeks, scrollable).
  */
 @Composable
 private fun YearActivityMatrixView(
@@ -479,22 +479,19 @@ private fun YearActivityMatrixView(
 ) {
     val today = remember { LocalDate.now() }
     val daysMap = remember(summary.dailyBreakdown) { summary.dailyBreakdown.associateBy { it.date } }
-    val year = summary.range.startDate.year
-    val jan1 = LocalDate.of(year, Month.JANUARY, 1)
-    val firstMonday = jan1.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
-    val dec31 = LocalDate.of(year, Month.DECEMBER, 31)
+
+    val startDate = summary.range.startDate
+    val endDate = summary.range.endDate
+    val firstMonday = startDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+    val totalDays = ChronoUnit.DAYS.between(firstMonday, endDate) + 1
+    val totalWeeks = ceil(totalDays / 7.0).toInt().coerceAtLeast(1)
 
     val scrollState = rememberScrollState()
 
-    // Scroll to today's week when opening current year
-    LaunchedEffect(year) {
-        if (year == today.year) {
-            val daysSinceFirstMonday = java.time.temporal.ChronoUnit.DAYS.between(firstMonday, today)
-            val weekIndex = (daysSinceFirstMonday / 7).toInt().coerceIn(0, 52)
-            // 15dp cell + 3dp gap = 18dp per week approx
-            val targetScroll = (weekIndex * 40).coerceAtLeast(0)
-            scrollState.scrollTo(targetScroll)
-        }
+    // Scroll to the latest weeks when opening
+    LaunchedEffect(summary.range) {
+        val targetScroll = (totalWeeks * 20).coerceAtLeast(0)
+        scrollState.scrollTo(targetScroll)
     }
 
     Column(modifier = modifier.fillMaxWidth()) {
@@ -504,11 +501,10 @@ private fun YearActivityMatrixView(
                 modifier = Modifier.width(18.dp),
                 verticalArrangement = Arrangement.spacedBy(3.dp)
             ) {
-                Spacer(modifier = Modifier.height(18.dp)) // Offset for month label row
+                Spacer(modifier = Modifier.height(18.dp)) // Offset for month labels
                 listOf("M", "", "W", "", "F", "", "S").forEach { label ->
                     Box(
-                        modifier = Modifier
-                            .size(13.dp),
+                        modifier = Modifier.size(13.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
@@ -523,7 +519,7 @@ private fun YearActivityMatrixView(
 
             Spacer(modifier = Modifier.width(4.dp))
 
-            // Horizontally scrollable activity matrix
+            // Horizontally scrollable matrix
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -532,14 +528,14 @@ private fun YearActivityMatrixView(
                 Column {
                     // Month labels row
                     Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                        for (week in 0 until 53) {
+                        for (week in 0 until totalWeeks) {
                             val weekStartDate = firstMonday.plusDays((week * 7).toLong())
-                            val isFirstWeekOfMonth = weekStartDate.dayOfMonth <= 7 && weekStartDate.year == year
+                            val isFirstWeekOfMonth = weekStartDate.dayOfMonth <= 7
                             Box(
                                 modifier = Modifier.width(13.dp),
                                 contentAlignment = Alignment.CenterStart
                             ) {
-                                if (isFirstWeekOfMonth) {
+                                if (isFirstWeekOfMonth && !weekStartDate.isAfter(endDate)) {
                                     Text(
                                         text = weekStartDate.format(DateTimeFormatter.ofPattern("MMM", Locale.getDefault())).take(3),
                                         style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
@@ -554,16 +550,16 @@ private fun YearActivityMatrixView(
 
                     Spacer(modifier = Modifier.height(4.dp))
 
-                    // 7 rows of days
+                    // 7 rows of days (Monday through Sunday)
                     for (dayOfWeek in 0 until 7) {
                         Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                            for (week in 0 until 53) {
+                            for (week in 0 until totalWeeks) {
                                 val date = firstMonday.plusDays((week * 7 + dayOfWeek).toLong())
-                                val isWithinYear = date.year == year
+                                val isWithinRange = date in summary.range
                                 val historyDay = daysMap[date]
                                 val isToday = date == today
 
-                                if (isWithinYear && historyDay != null) {
+                                if (isWithinRange && historyDay != null) {
                                     YearMatrixCell(
                                         day = historyDay,
                                         isToday = isToday,
@@ -588,7 +584,7 @@ private fun YearActivityMatrixView(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Annual factual metrics banner
+        // Factual metrics banner
         Surface(
             shape = RoundedCornerShape(8.dp),
             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
@@ -602,7 +598,7 @@ private fun YearActivityMatrixView(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "${summary.completedDays} / ${summary.scheduledDays} days completed (${summary.completionRate.toInt()}%)",
+                    text = "${summary.completedDays} / ${summary.eligibleScheduledDays} days completed (${summary.completionRate.toInt()}%)",
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -618,9 +614,6 @@ private fun YearActivityMatrixView(
     }
 }
 
-/**
- * Individual cell for the yearly matrix.
- */
 @Composable
 private fun YearMatrixCell(
     day: HabitHistoryDay,
@@ -631,7 +624,7 @@ private fun YearMatrixCell(
 ) {
     val status = day.status
     val accessibilityLabel = buildCellAccessibilityText(day, isQuantitative)
-    val (bgColor, _, border) = resolveCellStyle(status, isQuantitative, isToday, accentColor)
+    val (bgColor, _, border, cellSymbol) = resolveCellStyle(status, isQuantitative, isToday, accentColor)
 
     Box(
         modifier = Modifier
@@ -643,19 +636,21 @@ private fun YearMatrixCell(
             .semantics { contentDescription = accessibilityLabel },
         contentAlignment = Alignment.Center
     ) {
-        if (status is CalendarDayStatus.ProjectedRest) {
+        if (cellSymbol != null && cellSymbol == "+") {
             Box(
                 modifier = Modifier
                     .size(2.5.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+                    .background(accentColor)
             )
         }
     }
 }
 
 /**
- * Shared color and border resolution across all heatmap views.
+ * Shared color, border, and symbol resolution across heatmap views (Decision 5.1.1).
+ *
+ * Returns: Quadruple(bgColor, textColor, borderStroke, cellSymbol)
  */
 @Composable
 private fun resolveCellStyle(
@@ -663,90 +658,109 @@ private fun resolveCellStyle(
     isQuantitative: Boolean,
     isToday: Boolean,
     accentColor: Color = MaterialTheme.colorScheme.primary
-): Triple<Color, Color, BorderStroke?> {
+): CellStyleResult {
     val todayBorder = if (isToday) BorderStroke(1.5.dp, accentColor) else null
 
     return when (status) {
         is CalendarDayStatus.Completed -> {
-            if (isQuantitative) {
-                val ratio = if (status.targetValue > 0.0) (status.actualValue / status.targetValue).toFloat() else 1.0f
-                val alpha = when {
-                    ratio >= 1.0f -> 1.0f
-                    ratio >= 0.5f -> 0.70f
-                    else -> 0.40f
-                }
-                val hasExceeded = status.actualValue > status.targetValue
-                val cellBorder = when {
-                    isToday -> BorderStroke(2.dp, Color.White)
-                    hasExceeded -> BorderStroke(1.5.dp, accentColor)
-                    else -> null
-                }
-                Triple(
-                    accentColor.copy(alpha = alpha),
-                    if (alpha >= 0.7f) Color.White else MaterialTheme.colorScheme.onSurface,
-                    cellBorder
-                )
-            } else {
-                Triple(
-                    accentColor,
-                    Color.White,
-                    if (isToday) BorderStroke(2.dp, Color.White) else null
-                )
-            }
+            val cellBorder = if (isToday) BorderStroke(2.dp, Color.White) else null
+            CellStyleResult(
+                backgroundColor = accentColor,
+                textColor = Color.White,
+                border = cellBorder,
+                symbol = null
+            )
         }
 
+        // PARTIAL: Accent color with partial fill / ring
         is CalendarDayStatus.RecordedIncomplete -> {
-            Triple(
-                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.8f),
-                MaterialTheme.colorScheme.onErrorContainer,
-                todayBorder ?: BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f))
+            CellStyleResult(
+                backgroundColor = accentColor.copy(alpha = 0.35f),
+                textColor = MaterialTheme.colorScheme.onSurface,
+                border = todayBorder ?: BorderStroke(1.5.dp, accentColor),
+                symbol = null
             )
         }
 
+        // MISSED: Distinct hollow ring with muted border
+        is CalendarDayStatus.ExplicitMissed -> {
+            CellStyleResult(
+                backgroundColor = MaterialTheme.colorScheme.surface,
+                textColor = MaterialTheme.colorScheme.error,
+                border = todayBorder ?: BorderStroke(1.5.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.7f)),
+                symbol = "✕"
+            )
+        }
+
+        // SKIPPED: Neutral surface with subdued slash/dash
+        is CalendarDayStatus.Skipped -> {
+            CellStyleResult(
+                backgroundColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                textColor = MaterialTheme.colorScheme.outline,
+                border = todayBorder ?: BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)),
+                symbol = "—"
+            )
+        }
+
+        // Past scheduled UNRECORDED: Dashed/hollow outline
         CalendarDayStatus.ProjectedMissed -> {
-            Triple(
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-                MaterialTheme.colorScheme.onSurface,
-                todayBorder ?: BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+            CellStyleResult(
+                backgroundColor = MaterialTheme.colorScheme.surface,
+                textColor = MaterialTheme.colorScheme.outline,
+                border = todayBorder ?: BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)),
+                symbol = null
             )
         }
 
+        // REST / UNSCHEDULED: Plain neutral surface (subtle '+' marker if bonus activity logged)
         CalendarDayStatus.ProjectedRest -> {
-            Triple(
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
-                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.80f),
-                todayBorder ?: BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+            CellStyleResult(
+                backgroundColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
+                textColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                border = todayBorder ?: BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)),
+                symbol = null
             )
         }
 
+        // PAUSED: Paused surface
         CalendarDayStatus.Paused -> {
-            Triple(
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.30f),
-                MaterialTheme.colorScheme.onSurfaceVariant,
-                todayBorder ?: BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+            CellStyleResult(
+                backgroundColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.30f),
+                textColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                border = todayBorder ?: BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)),
+                symbol = null
             )
         }
 
         CalendarDayStatus.PreCreation -> {
-            Triple(
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.15f),
-                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
-                BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
+            CellStyleResult(
+                backgroundColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.15f),
+                textColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)),
+                symbol = null
             )
         }
 
         CalendarDayStatus.Future -> {
-            Triple(
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.20f),
-                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.70f),
-                todayBorder ?: BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+            CellStyleResult(
+                backgroundColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.20f),
+                textColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.70f),
+                border = todayBorder ?: BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+                symbol = null
             )
         }
     }
 }
 
+private data class CellStyleResult(
+    val backgroundColor: Color,
+    val textColor: Color,
+    val border: BorderStroke?,
+    val symbol: String?
+)
+
 /**
- * Compact legend tailored to Boolean or Quantitative habits.
+ * Status legend covering all 5 primary states (Decision 5.1.1).
  */
 @Composable
 private fun HeatmapLegend(
@@ -755,21 +769,18 @@ private fun HeatmapLegend(
     accentColor: Color = MaterialTheme.colorScheme.primary
 ) {
     Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
+        modifier = modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        if (isQuantitative) {
-            LegendItem(label = "Rest", color = Color.Transparent, isRestDot = true)
-            LegendItem(label = "Missed", color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f), hasBorder = true)
-            LegendItem(label = "Partial", color = accentColor.copy(alpha = 0.40f))
-            LegendItem(label = "Target", color = accentColor)
-        } else {
-            LegendItem(label = "Done", color = accentColor)
-            LegendItem(label = "Incomplete", color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.8f))
-            LegendItem(label = "Missed", color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f), hasBorder = true)
-            LegendItem(label = "Rest", color = Color.Transparent, isRestDot = true)
-        }
+        LegendItem(label = "Done", color = accentColor)
+        LegendItem(label = "Partial", color = accentColor.copy(alpha = 0.35f), hasBorder = true, borderColor = accentColor)
+        LegendItem(label = "Skipped", color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), symbol = "—")
+        LegendItem(label = "Missed", color = MaterialTheme.colorScheme.surface, hasBorder = true, borderColor = MaterialTheme.colorScheme.error.copy(alpha = 0.7f), symbol = "✕")
+        LegendItem(label = "Unrecorded", color = MaterialTheme.colorScheme.surface, hasBorder = true, borderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+        LegendItem(label = "Rest", color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f))
     }
 }
 
@@ -777,8 +788,9 @@ private fun HeatmapLegend(
 private fun LegendItem(
     label: String,
     color: Color,
-    isRestDot: Boolean = false,
-    hasBorder: Boolean = false
+    hasBorder: Boolean = false,
+    borderColor: Color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
+    symbol: String? = null
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -792,18 +804,18 @@ private fun LegendItem(
                 .then(
                     if (hasBorder) Modifier.border(
                         1.dp,
-                        MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
+                        borderColor,
                         RoundedCornerShape(3.dp)
                     ) else Modifier
                 ),
             contentAlignment = Alignment.Center
         ) {
-            if (isRestDot) {
-                Box(
-                    modifier = Modifier
-                        .size(3.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+            if (symbol != null) {
+                Text(
+                    text = symbol,
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp),
+                    fontWeight = FontWeight.Bold,
+                    color = borderColor
                 )
             }
         }
@@ -823,14 +835,22 @@ private fun LegendItem(
 fun HeatmapDayDetailDialog(
     day: HabitHistoryDay,
     habitName: String,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onEditRecord: (() -> Unit)? = null
 ) {
     val formatter = DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy", Locale.getDefault())
     val formattedDate = day.date.format(formatter)
 
+    val canEdit = onEditRecord != null &&
+        !day.date.isAfter(LocalDate.now()) &&
+        day.status !is CalendarDayStatus.PreCreation &&
+        day.status !is CalendarDayStatus.Paused
+
     val (statusLabel, statusColor, onStatusColor) = when (day.status) {
         is CalendarDayStatus.Completed -> Triple("Completed", MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.onPrimaryContainer)
         is CalendarDayStatus.RecordedIncomplete -> Triple("Incomplete", MaterialTheme.colorScheme.errorContainer, MaterialTheme.colorScheme.onErrorContainer)
+        is CalendarDayStatus.ExplicitMissed -> Triple("Missed", MaterialTheme.colorScheme.errorContainer, MaterialTheme.colorScheme.onErrorContainer)
+        is CalendarDayStatus.Skipped -> Triple("Skipped", MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.outline)
         CalendarDayStatus.ProjectedMissed -> Triple("Projected Missed", MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.onSurfaceVariant)
         CalendarDayStatus.ProjectedRest -> Triple("Rest Day", MaterialTheme.colorScheme.surface, MaterialTheme.colorScheme.outline)
         CalendarDayStatus.Paused -> Triple("Paused", MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.outline)
@@ -908,6 +928,28 @@ fun HeatmapDayDetailDialog(
                         )
                     }
 
+                    is CalendarDayStatus.ExplicitMissed -> {
+                        Text(
+                            text = "Explicitly recorded as missed for this day.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                        if (status.notes != null) {
+                            Text(
+                                text = "Note: ${status.notes}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    is CalendarDayStatus.Skipped -> {
+                        Text(
+                            text = "Skipped with permission. Active streak is preserved.",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+
                     CalendarDayStatus.ProjectedMissed -> {
                         Text(
                             text = "Projected missed based on the habit's current schedule. No factual record was logged for this date.",
@@ -951,8 +993,18 @@ fun HeatmapDayDetailDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Close")
+            Row {
+                if (canEdit) {
+                    TextButton(onClick = {
+                        onDismiss()
+                        onEditRecord?.invoke()
+                    }) {
+                        Text("Edit Record")
+                    }
+                }
+                TextButton(onClick = onDismiss) {
+                    Text("Close")
+                }
             }
         }
     )
@@ -989,6 +1041,8 @@ fun buildCellAccessibilityText(day: HabitHistoryDay, isQuantitative: Boolean): S
             "$dateStr: Incomplete. ${formatValue(status.actualValue)} of ${formatValue(status.targetValue)}$unitStr."
         }
 
+        is CalendarDayStatus.ExplicitMissed -> "$dateStr: Explicitly marked as missed."
+        is CalendarDayStatus.Skipped -> "$dateStr: Skipped."
         CalendarDayStatus.ProjectedMissed -> "$dateStr: Projected missed. No record logged for scheduled day."
         CalendarDayStatus.ProjectedRest -> "$dateStr: Rest day. Not scheduled."
         CalendarDayStatus.Paused -> "$dateStr: Paused."

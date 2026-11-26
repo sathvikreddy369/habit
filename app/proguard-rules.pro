@@ -8,8 +8,24 @@
     public static int d(...);
 }
 
-# 2. Kotlinx Serialization DTOs for backup/restore
-# Preserve serializable companions and primary constructors
+# 2. Kotlinx Serialization
+-keepattributes *Annotation*,InnerClasses
+-dontnote kotlinx.serialization.SerializationKt
+
+-keepclassmembers class * {
+    @kotlinx.serialization.Serializable <fields>;
+}
+-keepclasseswithmembers class * {
+    @kotlinx.serialization.Serializable <init>(...);
+}
+-keepclassmembers class * extends kotlinx.serialization.KSerializer {
+    *** Companion;
+    *** INSTANCE;
+}
+-keepclassmembers class * {
+    *** Companion;
+    *** $serializer;
+}
 -keepclassmembers class com.habit1.app.data.backup.model.** {
     *** Companion;
     *** $serializer;

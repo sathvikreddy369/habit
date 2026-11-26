@@ -435,4 +435,156 @@ class ComputeHabitAnalyticsUseCaseTest {
         assertEquals(2, summary.missedDays)
         assertEquals(50.0f, summary.completionRate, 0.01f)
     }
+
+    @Test
+    fun testWeekdayAdherence_mondayToSundayWithSkipAdjustment() {
+        // Scheduled Monday through Friday only
+        val habit = createHabit(
+            schedule = HabitSchedule.SpecificDays(
+                setOf(
+                    DayOfWeek.MONDAY,
+                    DayOfWeek.TUESDAY,
+                    DayOfWeek.WEDNESDAY,
+                    DayOfWeek.THURSDAY,
+                    DayOfWeek.FRIDAY
+                )
+            )
+        )
+        // 2-week range: 2026-09-07 (Mon) to 2026-09-20 (Sun)
+        val range = AnalyticsRange(LocalDate.of(2026, 9, 7), LocalDate.of(2026, 9, 20))
+        val today = LocalDate.of(2026, 9, 21) // Monday after
+
+        // Monday Sep 7: DONE, Monday Sep 14: SKIPPED
+        // Tuesday Sep 8: DONE, Tuesday Sep 15: MISSED (no record)
+        // Wednesday Sep 9 & 16: both DONE
+        val records = listOf(
+            createRecord(date = LocalDate.of(2026, 9, 7), isCompleted = true),
+            createRecord(
+                date = LocalDate.of(2026, 9, 14),
+                actualValue = 0.0,
+                isCompleted = false
+            ).copy(status = com.habit1.app.domain.model.HabitRecordStatus.SKIPPED),
+            createRecord(date = LocalDate.of(2026, 9, 8), isCompleted = true),
+            createRecord(date = LocalDate.of(2026, 9, 9), isCompleted = true),
+            createRecord(date = LocalDate.of(2026, 9, 16), isCompleted = true)
+        )
+
+        val summary = useCase.execute(
+            habit = habit,
+            records = records,
+            range = range,
+            todayDate = today,
+            zoneId = zoneId
+        )
+
+        val adherence = summary.weekdayAdherence
+        assertEquals(7, adherence.size)
+
+        // Monday: 2 scheduled, 1 skipped -> eligible = 1, completed = 1 -> 100%
+        val mon = adherence.first { it.dayOfWeek == DayOfWeek.MONDAY }
+        assertEquals(1, mon.completedCount)
+        assertEquals(1, mon.eligibleScheduledCount)
+        assertEquals(100.0f, mon.adherenceRate!!, 0.01f)
+
+        // Tuesday: 2 scheduled, 0 skipped -> eligible = 2, completed = 1 -> 50%
+        val tue = adherence.first { it.dayOfWeek == DayOfWeek.TUESDAY }
+        assertEquals(1, tue.completedCount)
+        assertEquals(2, tue.eligibleScheduledCount)
+        assertEquals(50.0f, tue.adherenceRate!!, 0.01f)
+
+        // Wednesday: 2 scheduled, 0 skipped -> eligible = 2, completed = 2 -> 100%
+        val wed = adherence.first { it.dayOfWeek == DayOfWeek.WEDNESDAY }
+        assertEquals(2, wed.completedCount)
+        assertEquals(2, wed.eligibleScheduledCount)
+        assertEquals(100.0f, wed.adherenceRate!!, 0.01f)
+
+        // Saturday & Sunday: unscheduled -> eligible = 0 -> adherenceRate == null ('—')
+        val sat = adherence.first { it.dayOfWeek == DayOfWeek.SATURDAY }
+        assertEquals(0, sat.eligibleScheduledCount)
+        assertNull(sat.adherenceRate)
+
+        val sun = adherence.first { it.dayOfWeek == DayOfWeek.SUNDAY }
+        assertEquals(0, sun.eligibleScheduledCount)
+        assertNull(sun.adherenceRate)
+    }
+
+    @Test
+    fun testScheduledDailyAverage_excludesBonusVolume_andCountsPacing() {
+        // Quantitative habit: 10 km daily target, scheduled only Mon-Wed-Fri
+        val habit = createHabit(
+            schedule = HabitSchedule.SpecificDays(setOf(DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY, DayOfWeek.FRIDAY)),
+            measurement = MeasurementType.Quantity(10.0, "km")
+        )
+        // 1 week: 2026-09-07 (Mon) to 2026-09-13 (Sun). Scheduled: Mon 7, Wed 9, Fri 11 (3 eligible days)
+        val range = AnalyticsRange(LocalDate.of(2026, 9, 7), LocalDate.of(2026, 9, 13))
+        val today = LocalDate.of(2026, 9, 14)
+
+        // Mon Sep 7: 10 km (scheduled)
+        // Wed Sep 9: 5 km (scheduled, partial)
+        // Fri Sep 11: 0 km (scheduled, unrecorded/missed)
+        // Sat Sep 12: 15 km (UNSCHEDULED BONUS DAY!)
+        val records = listOf(
+            createRecord(date = LocalDate.of(2026, 9, 7), actualValue = 10.0, targetValue = 10.0, isCompleted = true, unit = "km", measurementType = MeasurementType.Quantity.TYPE_NAME),
+            createRecord(date = LocalDate.of(2026, 9, 9), actualValue = 5.0, targetValue = 10.0, isCompleted = false, unit = "km", measurementType = MeasurementType.Quantity.TYPE_NAME)
+                .copy(status = com.habit1.app.domain.model.HabitRecordStatus.PARTIAL),
+            createRecord(date = LocalDate.of(2026, 9, 12), actualValue = 15.0, targetValue = 10.0, isCompleted = true, unit = "km", measurementType = MeasurementType.Quantity.TYPE_NAME)
+        )
+
+        val summary = useCase.execute(
+            habit = habit,
+            records = records,
+            range = range,
+            todayDate = today,
+            zoneId = zoneId
+        )
+
+        val stats = summary.quantitativeStats
+        assertNotNull(stats)
+
+        // 1. Total Volume: includes all actual volume: 10 + 5 + 15 = 30.0 km
+        assertEquals(30.0, stats!!.totalActualValue, 0.01)
+
+        // 2. Active Day Average: Total Volume (30.0) / Days with actual_value > 0 (3 days) = 10.0 km/day
+        assertEquals(3, stats.activeDaysCount)
+        assertEquals(10.0, stats.activeDayAverage!!, 0.01)
+
+        // 3. Scheduled Daily Average: Volume on Scheduled Days (10 + 5 = 15.0 km) / Eligible Scheduled Days (3) = 5.0 km/day
+        // Strictly excludes bonus-day volume (15.0 km from Saturday)!
+        assertEquals(15.0, stats.scheduledVolume, 0.01)
+        assertEquals(5.0, stats.scheduledDailyAverage!!, 0.01)
+
+        // 4. Bonus contributions disclosed
+        assertEquals(1, stats.bonusDaysCount)
+        assertEquals(15.0, stats.bonusVolume, 0.01)
+    }
+
+    @Test
+    fun testArchivedHabit_boundsScheduledOccurrencesAtArchivalDate() {
+        val habit = createHabit(
+            createdAt = Instant.parse("2026-09-01T00:00:00Z"),
+            isArchived = true
+        ).copy(archivedAt = Instant.parse("2026-09-10T12:00:00Z")) // Archived on Sep 10
+
+        val range = AnalyticsRange(LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 20)) // 20 days
+        val today = LocalDate.of(2026, 9, 21)
+
+        // Completed 5 days between Sep 1 and Sep 10
+        val records = (1..5).map { day ->
+            createRecord(date = LocalDate.of(2026, 9, day), isCompleted = true)
+        }
+
+        val summary = useCase.execute(
+            habit = habit,
+            records = records,
+            range = range,
+            todayDate = today,
+            zoneId = zoneId
+        )
+
+        // Scheduled dates are strictly bounded at archival date Sep 10 (10 days scheduled, not 20)
+        assertEquals(10, summary.scheduledDays)
+        assertEquals(10, summary.eligibleScheduledDays)
+        assertEquals(5, summary.completedDays)
+        assertEquals(50.0f, summary.completionRate, 0.01f)
+    }
 }

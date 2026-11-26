@@ -32,6 +32,9 @@ class BackupRepositoryImpl(
         isLenient = true
     }
 
+    @Volatile
+    private var cachedEnvelope: BackupEnvelopeDto? = null
+
     override suspend fun exportBackup(uri: Uri): Result<BackupExportSummary> = withContext(ioDispatcher) {
         try {
             val outputStream = context.contentResolver.openOutputStream(uri)
@@ -46,7 +49,10 @@ class BackupRepositoryImpl(
 
     override suspend fun inspectBackup(uri: Uri): Result<BackupPreviewInfo> = withContext(ioDispatcher) {
         try {
-            val envelope = readAndParseEnvelope(uri).getOrElse { return@withContext Result.failure(it) }
+            val envelope = readAndParseEnvelope(uri).getOrElse {
+                cachedEnvelope = null
+                return@withContext Result.failure(it)
+            }
 
             val existingHabitIds = database.habitDao().getAllHabitsList().map { it.id }.toSet()
             val existingGoalIds = database.dailyGoalDao().getAllGoalsList().map { it.id }.toSet()
@@ -55,18 +61,33 @@ class BackupRepositoryImpl(
             }.toSet()
 
             when (val result = BackupValidator.validate(envelope, existingHabitIds, existingGoalIds, existingRecordKeys)) {
-                is BackupValidationResult.Valid -> Result.success(result.preview)
-                is BackupValidationResult.Invalid -> Result.failure(IllegalStateException(result.error.message))
+                is BackupValidationResult.Valid -> {
+                    cachedEnvelope = envelope
+                    Result.success(result.preview)
+                }
+                is BackupValidationResult.Invalid -> {
+                    cachedEnvelope = null
+                    Result.failure(IllegalStateException(result.error.message))
+                }
             }
         } catch (t: Throwable) {
+            cachedEnvelope = null
             Result.failure(t)
         }
     }
 
     override suspend fun restoreBackup(uri: Uri, mode: RestoreMode): Result<BackupRestoreSummary> = withContext(ioDispatcher) {
         try {
-            val envelope = readAndParseEnvelope(uri).getOrElse { return@withContext Result.failure(it) }
+            val envelope = cachedEnvelope ?: readAndParseEnvelope(uri).getOrElse { return@withContext Result.failure(it) }
+            restoreBackup(envelope, mode)
+        } catch (t: Throwable) {
+            cachedEnvelope = null
+            Result.failure(t)
+        }
+    }
 
+    override suspend fun restoreBackup(envelope: BackupEnvelopeDto, mode: RestoreMode): Result<BackupRestoreSummary> = withContext(ioDispatcher) {
+        try {
             val existingHabitIds = database.habitDao().getAllHabitsList().map { it.id }.toSet()
             val existingGoalIds = database.dailyGoalDao().getAllGoalsList().map { it.id }.toSet()
             val existingRecordKeys = database.habitRecordDao().getAllRecordsList().map {
@@ -76,30 +97,36 @@ class BackupRepositoryImpl(
             when (val validation = BackupValidator.validate(envelope, existingHabitIds, existingGoalIds, existingRecordKeys)) {
                 is BackupValidationResult.Valid -> {
                     val summary = importer.restore(envelope, mode)
+                    cachedEnvelope = null
                     Result.success(summary)
                 }
                 is BackupValidationResult.Invalid -> {
+                    cachedEnvelope = null
                     Result.failure(IllegalStateException(validation.error.message))
                 }
             }
         } catch (t: Throwable) {
+            cachedEnvelope = null
             Result.failure(t)
         }
     }
 
     private fun readAndParseEnvelope(uri: Uri): Result<BackupEnvelopeDto> {
-        val inputStream = context.contentResolver.openInputStream(uri)
-            ?: return Result.failure(IllegalStateException("Unable to open input stream for URI: $uri"))
-
         return try {
-            val bytes = readStreamWithLimit(inputStream, BackupValidator.MAX_FILE_SIZE_BYTES)
+            val inputStream = context.contentResolver.openInputStream(uri)
+                ?: return Result.failure(IllegalStateException("Unable to open input stream for selected backup file."))
+            val bytes = inputStream.use { stream ->
+                readStreamWithLimit(stream, BackupValidator.MAX_FILE_SIZE_BYTES)
+            }
             val jsonString = String(bytes, Charsets.UTF_8)
-            val envelope = jsonParser.decodeFromString<BackupEnvelopeDto>(jsonString)
+            val envelope = try {
+                jsonParser.decodeFromString<BackupEnvelopeDto>(jsonString)
+            } catch (jsonEx: Exception) {
+                return Result.failure(IllegalArgumentException("Selected file is not a valid Habit1 backup archive (must be a valid JSON backup)."))
+            }
             Result.success(envelope)
         } catch (t: Throwable) {
             Result.failure(t)
-        } finally {
-            inputStream.close()
         }
     }
 

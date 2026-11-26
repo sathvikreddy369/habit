@@ -30,6 +30,7 @@ import java.util.UUID
 class HabitFormViewModel(
     private val habitRepository: HabitRepository,
     private val reminderCoordinator: com.habit1.app.domain.reminder.HabitReminderCoordinator? = null,
+    private val categoryRepository: com.habit1.app.data.repository.CategoryRepository? = null,
     private val initialHabitId: String? = null,
     private val initialTemplateId: String? = null,
     coroutineScope: CoroutineScope? = null
@@ -46,6 +47,16 @@ class HabitFormViewModel(
     val uiState: StateFlow<HabitFormUiState> = _uiState.asStateFlow()
 
     init {
+        categoryRepository?.observeAllCategories()?.let { flow ->
+            scope.launch {
+                flow.collect { entities ->
+                    _uiState.update { state ->
+                        state.copy(categories = entities.map { it.toDomain() })
+                    }
+                }
+            }
+        }
+
         if (initialHabitId != null) {
             loadHabit(initialHabitId)
         } else if (initialTemplateId != null) {
@@ -134,6 +145,12 @@ class HabitFormViewModel(
                     else -> LocalDate.now()
                 }
 
+                val startDate = try {
+                    LocalDate.parse(entity.startDate)
+                } catch (e: Exception) {
+                    com.habit1.app.core.util.DateTimeUtils.toLocalDate(java.time.Instant.ofEpochMilli(entity.createdAt), java.time.ZoneId.systemDefault())
+                }
+
                 _uiState.update {
                     it.copy(
                         habitId = habitId,
@@ -146,6 +163,8 @@ class HabitFormViewModel(
                         selectedDays = selectedDays,
                         intervalDaysInput = intervalDays,
                         anchorDate = anchorDate,
+                        startDate = startDate,
+                        categoryId = entity.categoryId,
                         reminderTimeInput = entity.reminderTime ?: "",
                         colorHex = entity.colorHex ?: com.habit1.app.ui.theme.HabitColors.DEFAULT_COLOR_HEX,
                         originalCreatedAt = entity.createdAt,
@@ -229,8 +248,29 @@ class HabitFormViewModel(
             is HabitFormUiEvent.UpdateReminderTime -> {
                 _uiState.update { it.copy(reminderTimeInput = event.reminderTime) }
             }
+            is HabitFormUiEvent.UpdateStartDate -> {
+                _uiState.update { it.copy(startDate = event.date) }
+            }
             is HabitFormUiEvent.UpdateColor -> {
                 _uiState.update { it.copy(colorHex = event.colorHex) }
+            }
+            is HabitFormUiEvent.SelectCategory -> {
+                _uiState.update { it.copy(categoryId = event.categoryId) }
+            }
+            is HabitFormUiEvent.CreateCategory -> {
+                scope.launch {
+                    val repo = categoryRepository ?: return@launch
+                    val newCategory = com.habit1.app.data.local.db.entity.CategoryEntity(
+                        id = UUID.randomUUID().toString(),
+                        name = event.name,
+                        colorHex = event.colorHex,
+                        icon = event.icon,
+                        displayOrder = _uiState.value.categories.size,
+                        createdAt = System.currentTimeMillis()
+                    )
+                    repo.createCategory(newCategory)
+                    _uiState.update { it.copy(categoryId = newCategory.id) }
+                }
             }
             is HabitFormUiEvent.SaveHabit -> saveHabit()
             is HabitFormUiEvent.ResetSaveState -> {
@@ -353,6 +393,7 @@ class HabitFormViewModel(
                 }
 
                 val reminderTime = state.reminderTimeInput.trim().ifEmpty { null }
+                val startDateStr = com.habit1.app.core.util.DateTimeUtils.formatDate(state.startDate)
 
                 if (state.habitId == null) {
                     // Creation
@@ -371,6 +412,8 @@ class HabitFormViewModel(
                         isPaused = false,
                         isArchived = false,
                         colorHex = state.colorHex,
+                        startDate = startDateStr,
+                        categoryId = state.categoryId,
                         createdAt = now,
                         updatedAt = now
                     )
@@ -392,6 +435,8 @@ class HabitFormViewModel(
                         isPaused = state.originalIsPaused,
                         isArchived = state.originalIsArchived,
                         colorHex = state.colorHex,
+                        startDate = startDateStr,
+                        categoryId = state.categoryId,
                         createdAt = state.originalCreatedAt ?: now,
                         updatedAt = now
                     )
@@ -409,13 +454,14 @@ class HabitFormViewModel(
     class Factory(
         private val habitRepository: HabitRepository,
         private val reminderCoordinator: com.habit1.app.domain.reminder.HabitReminderCoordinator? = null,
+        private val categoryRepository: com.habit1.app.data.repository.CategoryRepository? = null,
         private val habitId: String? = null,
         private val templateId: String? = null
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(HabitFormViewModel::class.java)) {
-                return HabitFormViewModel(habitRepository, reminderCoordinator, habitId, templateId) as T
+                return HabitFormViewModel(habitRepository, reminderCoordinator, categoryRepository, habitId, templateId) as T
             }
             throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
         }

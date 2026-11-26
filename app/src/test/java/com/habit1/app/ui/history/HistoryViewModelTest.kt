@@ -231,6 +231,8 @@ class HistoryViewModelTest {
         viewModel.uiState.test {
             awaitItem() // loading
             var state = awaitItem()
+            viewModel.onEvent(HistoryUiEvent.SelectDate(LocalDate.of(2026, 9, 1)))
+            state = awaitItem()
             // If data update caused subsequent emission, consume it
             while (state.monthSummary?.totalHabitCompletions != 1) {
                 state = awaitItem()
@@ -408,6 +410,8 @@ class HistoryViewModelTest {
         viewModel.uiState.test {
             awaitItem() // loading
             var state = awaitItem()
+            viewModel.onEvent(HistoryUiEvent.SelectDate(targetDate))
+            state = awaitItem()
             while (state.calendarDays.none { it.date == targetDate && it.hasReview }) {
                 state = awaitItem()
             }

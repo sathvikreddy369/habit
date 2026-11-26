@@ -4,16 +4,19 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.habit1.app.data.local.db.AppDatabase
 import com.habit1.app.data.local.db.entity.HabitEntity
+import com.habit1.app.data.local.db.entity.HabitRecordEntity
 import com.habit1.app.data.repository.HabitRecordRepository
 import com.habit1.app.data.repository.HabitRecordRepositoryImpl
 import com.habit1.app.data.repository.HabitRepository
 import com.habit1.app.data.repository.HabitRepositoryImpl
+import com.habit1.app.domain.model.HabitRecordStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -300,5 +303,143 @@ class RecordHabitProgressUseCaseTest {
         // Fails on missing habit
         val missingRes = useCase.markCompleted("h_nonexistent", testDate)
         assertTrue(missingRes.isFailure)
+    }
+
+    @Test
+    fun testMarkSkippedAndMarkMissed() = runBlocking {
+        val habit = HabitEntity(
+            id = "h_status_test",
+            name = "Morning Stretch",
+            measurementType = "BOOLEAN",
+            targetValue = 1.0,
+            unit = null,
+            scheduleType = "DAILY",
+            scheduleConfig = "{}",
+            displayOrder = 0,
+            createdAt = System.currentTimeMillis(),
+            updatedAt = System.currentTimeMillis()
+        )
+        habitRepo.createHabit(habit)
+
+        // Mark skipped
+        val skipRes = useCase.markSkipped("h_status_test", testDate, notes = "Traveling")
+        assertTrue(skipRes.isSuccess)
+        val skipRecord = skipRes.getOrThrow()
+        assertEquals("SKIPPED", skipRecord.status)
+        assertEquals("Traveling", skipRecord.notes)
+
+        val persistedSkip = recordRepo.getRecord("h_status_test", testDateStr)
+        assertNotNull(persistedSkip)
+        assertEquals("SKIPPED", persistedSkip!!.status)
+
+        // Mark explicit missed
+        val missRes = useCase.markMissed("h_status_test", testDate, notes = "Too tired")
+        assertTrue(missRes.isSuccess)
+        val missRecord = missRes.getOrThrow()
+        assertEquals("MISSED", missRecord.status)
+        assertEquals("Too tired", missRecord.notes)
+
+        val persistedMiss = recordRepo.getRecord("h_status_test", testDateStr)
+        assertNotNull(persistedMiss)
+        assertEquals("MISSED", persistedMiss!!.status)
+
+        // Clear record -> returns to virtual UNRECORDED
+        val clearRes = useCase.clearRecord("h_status_test", testDate)
+        assertTrue(clearRes.isSuccess)
+        assertNull(recordRepo.getRecord("h_status_test", testDateStr))
+    }
+
+    @Test
+    fun testSnapshotIntegrityPreservedOnEdit() = runBlocking {
+        val habit = HabitEntity(
+            id = "h_snapshot",
+            name = "Water",
+            measurementType = "QUANTITY",
+            targetValue = 2.0,
+            unit = "L",
+            scheduleType = "DAILY",
+            scheduleConfig = "{}",
+            displayOrder = 0,
+            createdAt = System.currentTimeMillis(),
+            updatedAt = System.currentTimeMillis()
+        )
+        habitRepo.createHabit(habit)
+
+        // Day 1: Logged with historical target 2.0 L
+        recordRepo.recordProgress(
+            HabitRecordEntity(
+                id = "rec_snap",
+                habitId = "h_snapshot",
+                date = testDateStr,
+                actualValue = 1.5,
+                targetValue = 2.0,
+                measurementType = "QUANTITY",
+                unit = "L",
+                isCompleted = false,
+                notes = null,
+                recordedAt = System.currentTimeMillis()
+            )
+        )
+        val rec1 = recordRepo.getRecord("h_snapshot", testDateStr)
+        assertNotNull(rec1)
+        assertEquals(1.5, rec1!!.actualValue, 0.001)
+        assertEquals(2.0, rec1.targetValue, 0.001)
+        assertEquals("PARTIAL", rec1.status)
+
+        // User changes habit target to 3.0 L
+        habitRepo.updateHabit(habit.copy(targetValue = 3.0))
+
+        // User edits actual value on day 1 (e.g. from 1.5 to 2.5) without overriding historical target
+        useCase.setActualValue("h_snapshot", testDate, 2.5)
+
+        val updatedRec1 = recordRepo.getRecord("h_snapshot", testDateStr)
+        assertNotNull(updatedRec1)
+        assertEquals(2.5, updatedRec1!!.actualValue, 0.001)
+        // Historical target remains 2.0, not overwritten by habit's current target of 3.0!
+        assertEquals(2.0, updatedRec1.targetValue, 0.001)
+        // Since actual 2.5 >= historical target 2.0, status is derived as DONE!
+        assertEquals("DONE", updatedRec1.status)
+    }
+
+    @Test
+    fun testBooleanHabitNeverEntersPartialState() = runBlocking {
+        val habit = HabitEntity(
+            id = "h_bool_guard",
+            name = "Read Book",
+            measurementType = "BOOLEAN",
+            targetValue = 1.0,
+            unit = null,
+            scheduleType = "DAILY",
+            scheduleConfig = "{}",
+            displayOrder = 0,
+            createdAt = System.currentTimeMillis(),
+            updatedAt = System.currentTimeMillis()
+        )
+        habitRepo.createHabit(habit)
+
+        // 1. Initial toggle -> DONE
+        val t1 = useCase.toggleHabit("h_bool_guard", testDate).getOrThrow()
+        assertEquals(HabitRecordStatus.DONE.name, t1.status)
+        assertTrue(t1.isCompleted)
+
+        // 2. Untoggle -> UNRECORDED (never PARTIAL)
+        val t2 = useCase.toggleHabit("h_bool_guard", testDate).getOrThrow()
+        assertEquals(HabitRecordStatus.UNRECORDED.name, t2.status)
+        assertFalse(t2.isCompleted)
+
+        // 3. Mark Incomplete -> UNRECORDED (never PARTIAL)
+        val rInc = useCase.markIncomplete("h_bool_guard", testDate).getOrThrow()
+        assertEquals(HabitRecordStatus.UNRECORDED.name, rInc.status)
+        assertFalse(rInc.isCompleted)
+
+        // 4. setActualValue with 0.0 -> UNRECORDED (never PARTIAL)
+        val rZero = useCase.setActualValue("h_bool_guard", testDate, 0.0).getOrThrow()
+        assertEquals(HabitRecordStatus.UNRECORDED.name, rZero.status)
+        assertFalse(rZero.isCompleted)
+
+        // 5. adjustHabit decrement -> UNRECORDED (never PARTIAL)
+        val rAdj = useCase.adjustHabit("h_bool_guard", testDate, increment = false).getOrThrow()
+        assertEquals(HabitRecordStatus.UNRECORDED.name, rAdj.status)
+        assertFalse(rAdj.isCompleted)
     }
 }

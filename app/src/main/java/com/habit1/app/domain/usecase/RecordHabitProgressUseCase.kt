@@ -5,6 +5,7 @@ import com.habit1.app.data.local.db.entity.HabitRecordEntity
 import com.habit1.app.data.repository.HabitRecordRepository
 import com.habit1.app.data.repository.HabitRepository
 import com.habit1.app.domain.mapper.EntityMappers.toDomain
+import com.habit1.app.domain.model.HabitRecordStatus
 import com.habit1.app.domain.model.MeasurementType
 import java.time.LocalDate
 import java.time.ZoneId
@@ -22,17 +23,19 @@ import java.util.UUID
  * 3. Explicit Target Date: Respects the civil target date passed in rather than assuming today.
  * 4. Idempotency: Reuses existing record ID for (habitId, date) to prevent duplicate records.
  * 5. Value Preservation: Quantitative DONE never downgrades an existing actual value that exceeds target.
+ * 6. Status Derivation: Correctly tags records with DONE, PARTIAL, SKIPPED, or MISSED.
  */
 class RecordHabitProgressUseCase(
     private val habitRepository: HabitRepository,
     private val habitRecordRepository: HabitRecordRepository,
     private val evaluateMeasurement: EvaluateMeasurementUseCase = EvaluateMeasurementUseCase(),
-    private val evaluateSchedule: EvaluateScheduleUseCase = EvaluateScheduleUseCase()
+    private val evaluateSchedule: EvaluateScheduleUseCase = EvaluateScheduleUseCase(),
+    private val reminderCoordinator: com.habit1.app.domain.reminder.HabitReminderCoordinator? = null
 ) {
 
     /**
      * Marks a habit as completed for [targetDate].
-     * For Boolean habits: actualValue = 1.0, isCompleted = true.
+     * For Boolean habits: actualValue = 1.0, status = DONE.
      * For Quantitative habits: if existing actual > target, preserves actual; otherwise sets actual = target.
      */
     suspend fun markCompleted(
@@ -48,13 +51,14 @@ class RecordHabitProgressUseCase(
             } else {
                 targetVal
             }
-            Pair(actual, true)
+            Triple(actual, true, HabitRecordStatus.DONE.name)
         }
     }
 
     /**
      * Marks a habit as incomplete for [targetDate].
      * Sets actualValue = 0.0, isCompleted = false.
+     * Boolean habits revert to UNRECORDED; quantitative habits to PARTIAL.
      */
     suspend fun markIncomplete(
         habitId: String,
@@ -62,9 +66,64 @@ class RecordHabitProgressUseCase(
         zoneId: ZoneId = ZoneId.systemDefault(),
         enforceSchedule: Boolean = false
     ): Result<HabitRecordEntity> {
-        return updateRecord(habitId, targetDate, zoneId, enforceSchedule) { _, _, _ ->
-            Pair(0.0, false)
+        return updateRecord(habitId, targetDate, zoneId, enforceSchedule) { habit, _, _ ->
+            val status = if (habit.measurement is MeasurementType.BooleanChoice) {
+                HabitRecordStatus.UNRECORDED.name
+            } else {
+                HabitRecordStatus.PARTIAL.name
+            }
+            Triple(0.0, false, status)
         }
+    }
+
+    /**
+     * Explicitly marks a habit as SKIPPED for [targetDate].
+     * Preserves any existing non-zero actual volume.
+     */
+    suspend fun markSkipped(
+        habitId: String,
+        targetDate: LocalDate,
+        notes: String? = null,
+        zoneId: ZoneId = ZoneId.systemDefault(),
+        enforceSchedule: Boolean = false
+    ): Result<HabitRecordEntity> {
+        return updateRecord(habitId, targetDate, zoneId, enforceSchedule, customNotes = notes) { _, existing, _ ->
+            val retainedActual = existing?.actualValue ?: 0.0
+            Triple(retainedActual, false, HabitRecordStatus.SKIPPED.name)
+        }
+    }
+
+    /**
+     * Explicitly marks a habit as MISSED for [targetDate].
+     * Breaks streak and revokes morning grace.
+     */
+    suspend fun markMissed(
+        habitId: String,
+        targetDate: LocalDate,
+        notes: String? = null,
+        zoneId: ZoneId = ZoneId.systemDefault(),
+        enforceSchedule: Boolean = false
+    ): Result<HabitRecordEntity> {
+        return updateRecord(habitId, targetDate, zoneId, enforceSchedule, customNotes = notes) { _, _, _ ->
+            Triple(0.0, false, HabitRecordStatus.MISSED.name)
+        }
+    }
+
+    /**
+     * Clears (deletes) a record for [targetDate], cleanly reverting it to virtual UNRECORDED.
+     */
+    suspend fun clearRecord(
+        habitId: String,
+        targetDate: LocalDate,
+        zoneId: ZoneId = ZoneId.systemDefault()
+    ): Result<Unit> {
+        val today = DateTimeUtils.today(zoneId)
+        if (targetDate.isAfter(today)) {
+            return Result.failure(IllegalStateException("Cannot clear record for future date: $targetDate"))
+        }
+        val dateString = DateTimeUtils.formatDate(targetDate)
+        habitRecordRepository.deleteRecord(habitId, dateString)
+        return Result.success(Unit)
     }
 
     /**
@@ -75,12 +134,23 @@ class RecordHabitProgressUseCase(
         targetDate: LocalDate,
         value: Double,
         zoneId: ZoneId = ZoneId.systemDefault(),
-        enforceSchedule: Boolean = false
+        enforceSchedule: Boolean = false,
+        customTargetValue: Double? = null,
+        customNotes: String? = null
     ): Result<HabitRecordEntity> {
-        return updateRecord(habitId, targetDate, zoneId, enforceSchedule) { habit, _, _ ->
+        return updateRecord(habitId, targetDate, zoneId, enforceSchedule, customTargetValue = customTargetValue, customNotes = customNotes) { habit, existing, effectiveTarget ->
             val clampedVal = value.coerceAtLeast(0.0)
-            val isCompleted = evaluateMeasurement.isCompleted(habit.measurement, clampedVal)
-            Pair(clampedVal, isCompleted)
+            val isCompleted = clampedVal >= effectiveTarget
+            val status = when {
+                habit.measurement is MeasurementType.BooleanChoice -> {
+                    if (isCompleted) HabitRecordStatus.DONE.name else HabitRecordStatus.UNRECORDED.name
+                }
+                isCompleted -> HabitRecordStatus.DONE.name
+                existing?.status == HabitRecordStatus.SKIPPED.name -> HabitRecordStatus.SKIPPED.name
+                clampedVal > 0.0 -> HabitRecordStatus.PARTIAL.name
+                else -> HabitRecordStatus.PARTIAL.name
+            }
+            Triple(clampedVal, isCompleted, status)
         }
     }
 
@@ -95,9 +165,14 @@ class RecordHabitProgressUseCase(
         return updateRecord(habitId, targetDate, zoneId, enforceSchedule = false) { habit, existing, targetVal ->
             val isCurrentlyCompleted = existing?.isCompleted ?: false
             if (isCurrentlyCompleted) {
-                Pair(0.0, false)
+                val revertedStatus = if (habit.measurement is MeasurementType.BooleanChoice) {
+                    HabitRecordStatus.UNRECORDED.name
+                } else {
+                    HabitRecordStatus.PARTIAL.name
+                }
+                Triple(0.0, false, revertedStatus)
             } else {
-                Pair(targetVal, true)
+                Triple(targetVal, true, HabitRecordStatus.DONE.name)
             }
         }
     }
@@ -111,7 +186,7 @@ class RecordHabitProgressUseCase(
         increment: Boolean,
         zoneId: ZoneId = ZoneId.systemDefault()
     ): Result<HabitRecordEntity> {
-        return updateRecord(habitId, targetDate, zoneId, enforceSchedule = false) { habit, existing, _ ->
+        return updateRecord(habitId, targetDate, zoneId, enforceSchedule = false) { habit, existing, effectiveTarget ->
             val currentVal = existing?.actualValue ?: 0.0
             val step = evaluateMeasurement.defaultStep(habit.measurement)
             val newVal = if (increment) {
@@ -120,7 +195,16 @@ class RecordHabitProgressUseCase(
                 (currentVal - step).coerceAtLeast(0.0)
             }
             val isCompleted = evaluateMeasurement.isCompleted(habit.measurement, newVal)
-            Pair(newVal, isCompleted)
+            val status = when {
+                habit.measurement is MeasurementType.BooleanChoice -> {
+                    if (isCompleted) HabitRecordStatus.DONE.name else HabitRecordStatus.UNRECORDED.name
+                }
+                isCompleted -> HabitRecordStatus.DONE.name
+                existing?.status == HabitRecordStatus.SKIPPED.name -> HabitRecordStatus.SKIPPED.name
+                newVal > 0.0 -> HabitRecordStatus.PARTIAL.name
+                else -> HabitRecordStatus.PARTIAL.name
+            }
+            Triple(newVal, isCompleted, status)
         }
     }
 
@@ -129,8 +213,15 @@ class RecordHabitProgressUseCase(
         targetDate: LocalDate,
         zoneId: ZoneId,
         enforceSchedule: Boolean,
-        calculateNewValues: (habit: com.habit1.app.domain.model.Habit, existing: HabitRecordEntity?, targetVal: Double) -> Pair<Double, Boolean>
+        customNotes: String? = null,
+        customTargetValue: Double? = null,
+        calculateNewValues: (habit: com.habit1.app.domain.model.Habit, existing: HabitRecordEntity?, targetVal: Double) -> Triple<Double, Boolean, String>
     ): Result<HabitRecordEntity> {
+        val today = DateTimeUtils.today(zoneId)
+        if (targetDate.isAfter(today)) {
+            return Result.failure(IllegalStateException("Cannot record progress for future date: $targetDate"))
+        }
+
         val habitEntity = habitRepository.getHabitById(habitId)
             ?: return Result.failure(IllegalArgumentException("Habit not found: $habitId"))
 
@@ -138,11 +229,15 @@ class RecordHabitProgressUseCase(
             return Result.failure(IllegalStateException("Cannot record progress on archived habit: $habitId"))
         }
 
-        if (habitEntity.isPaused) {
+        if (habitEntity.isPaused || habitEntity.isCurrentlyPaused) {
             return Result.failure(IllegalStateException("Cannot record progress on paused habit: $habitId"))
         }
 
-        val habit = habitEntity.toDomain()
+        val habit = habitEntity.toDomain(zoneId)
+
+        if (habitEntity.startDate.isNotBlank() && targetDate.isBefore(habit.startDate)) {
+            return Result.failure(IllegalStateException("Cannot record progress before habit start date (${habit.startDate}): $targetDate"))
+        }
 
         if (enforceSchedule && !evaluateSchedule.isScheduledOn(habit, targetDate, zoneId)) {
             return Result.failure(IllegalStateException("Habit is not scheduled on $targetDate: $habitId"))
@@ -158,21 +253,35 @@ class RecordHabitProgressUseCase(
         val dateString = DateTimeUtils.formatDate(targetDate)
         val existingRecord = habitRecordRepository.getRecord(habitId, dateString)
 
-        val (newActualValue, newIsCompleted) = calculateNewValues(habit, existingRecord, targetVal)
+        // Snapshot preservation: If record already existed, preserve its historical targetValue, measurementType, and unit
+        // If backfilling a new record, use customTargetValue if provided, otherwise default to current targetVal
+        val targetSnapshot = existingRecord?.targetValue ?: customTargetValue ?: targetVal
+        val measurementTypeSnapshot = existingRecord?.measurementType ?: habit.measurement.typeName
+        val unitSnapshot = existingRecord?.unit ?: habitEntity.unit
+        val notesToSave = customNotes ?: existingRecord?.notes
+
+        val (newActualValue, newIsCompleted, newStatus) = calculateNewValues(habit, existingRecord, targetSnapshot)
 
         val recordToSave = HabitRecordEntity(
             id = existingRecord?.id ?: UUID.randomUUID().toString(),
             habitId = habitId,
             date = dateString,
             actualValue = newActualValue,
-            targetValue = targetVal,
-            measurementType = habit.measurement.typeName,
-            unit = habitEntity.unit,
+            targetValue = targetSnapshot,
+            measurementType = measurementTypeSnapshot,
+            unit = unitSnapshot,
             isCompleted = newIsCompleted,
-            recordedAt = System.currentTimeMillis()
+            notes = notesToSave,
+            recordedAt = System.currentTimeMillis(),
+            status = newStatus
         )
 
         habitRecordRepository.recordProgress(recordToSave)
+
+        if (targetDate == today && (recordToSave.isCompleted || recordToSave.status == HabitRecordStatus.DONE.name)) {
+            reminderCoordinator?.onHabitCompletedToday(habitId, zoneId)
+        }
+
         return Result.success(recordToSave)
     }
 }

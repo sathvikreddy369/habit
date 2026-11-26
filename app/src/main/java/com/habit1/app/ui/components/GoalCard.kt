@@ -89,9 +89,10 @@ fun GoalCard(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
         ),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             // Main Goal Header Row: [Accent Bar] [Title + Subtask stats] [Menu] [Check Circle]

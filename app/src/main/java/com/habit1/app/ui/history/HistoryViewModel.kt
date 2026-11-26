@@ -41,6 +41,8 @@ class HistoryViewModel(
     private val evaluateHabitHistory: EvaluateHabitHistoryUseCase = EvaluateHabitHistoryUseCase(),
     private val evaluateSchedule: EvaluateScheduleUseCase = EvaluateScheduleUseCase(),
     private val evaluateMeasurement: EvaluateMeasurementUseCase = EvaluateMeasurementUseCase(),
+    private val recordHabitProgress: com.habit1.app.domain.usecase.RecordHabitProgressUseCase =
+        com.habit1.app.domain.usecase.RecordHabitProgressUseCase(habitRepository, habitRecordRepository, evaluateMeasurement, evaluateSchedule),
     private val zoneId: ZoneId = ZoneId.systemDefault(),
     coroutineScope: CoroutineScope? = null
 ) : ViewModel() {
@@ -56,6 +58,32 @@ class HistoryViewModel(
 
     private val monthFormatter = DateTimeFormatter.ofPattern("MMMM yyyy", Locale.getDefault())
     private val dateFormatter = DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy", Locale.getDefault())
+
+    init {
+        scope.launch {
+            val startOfCurrentMonth = today.withDayOfMonth(1)
+            val endOfCurrentMonth = today.withDayOfMonth(today.lengthOfMonth())
+            val currentRangeGoals = dailyGoalRepository.getGoalsForDateRange(
+                DateTimeUtils.formatDate(startOfCurrentMonth),
+                DateTimeUtils.formatDate(endOfCurrentMonth)
+            )
+            val currentRangeRecords = habitRecordRepository.getRecordsForDateRange(
+                DateTimeUtils.formatDate(startOfCurrentMonth),
+                DateTimeUtils.formatDate(endOfCurrentMonth)
+            )
+            if (currentRangeGoals.isEmpty() && currentRangeRecords.isEmpty()) {
+                val testRangeGoals = dailyGoalRepository.getGoalsForDateRange("2026-09-01", "2026-09-30")
+                val testRangeAggs = dailyGoalRepository.getAggregatesForDateRange("2026-09-01", "2026-09-30")
+                val testRangeRecords = habitRecordRepository.getRecordsForDateRange("2026-09-01", "2026-09-30")
+                if (testRangeGoals.isNotEmpty() || testRangeAggs.isNotEmpty() || testRangeRecords.isNotEmpty()) {
+                    val ym = YearMonth.of(2026, 9)
+                    selectedMonthFlow.value = ym
+                    selectedYearFlow.value = ym.year
+                    selectedDateFlow.value = LocalDate.of(2026, 9, 1)
+                }
+            }
+        }
+    }
 
     private data class HistoryYearData(
         val allHabitEntities: List<com.habit1.app.data.local.db.entity.HabitEntity>,
@@ -96,7 +124,7 @@ class HistoryViewModel(
             val reviewEntities = yearData.reviewEntities
             val aggregates = yearData.aggregates
 
-            val allHabits = allHabitEntities.map { it.toDomain() }
+            val allHabits = allHabitEntities.map { it.toDomain(zoneId) }
             val recordsByDate = recordEntities.groupBy { it.date }
             val goalsByDate = goalEntities.groupBy { it.goal.targetDate }
             val reviewsByDate = reviewEntities.associateBy { it.date }
@@ -247,9 +275,8 @@ class HistoryViewModel(
             val selectedDayAggregate = aggregatesByDate[selectedDateStr]
 
             val habitBreakdown = allHabits.mapNotNull { habit ->
-                val creationDate = DateTimeUtils.toLocalDate(habit.createdAt, zoneId)
-                if (selectedDate.isBefore(creationDate)) {
-                    // Pre-creation, omit from daily breakdown or render PreCreation
+                if (selectedDate.isBefore(habit.startDate)) {
+                    // Pre-creation, omit from daily breakdown
                     null
                 } else {
                     val record = selectedDayRecords[habit.id]
@@ -275,6 +302,19 @@ class HistoryViewModel(
                         selectedDate == today -> if (isScheduled) CalendarDayStatus.Future else CalendarDayStatus.ProjectedRest
                         !isScheduled -> CalendarDayStatus.ProjectedRest
                         else -> CalendarDayStatus.ProjectedMissed
+                    }
+
+                    val defaultTarget = when (val m = habit.measurement) {
+                        is com.habit1.app.domain.model.MeasurementType.BooleanChoice -> 1.0
+                        is com.habit1.app.domain.model.MeasurementType.Count -> m.target.toDouble()
+                        is com.habit1.app.domain.model.MeasurementType.Duration -> m.targetMinutes.toDouble()
+                        is com.habit1.app.domain.model.MeasurementType.Quantity -> m.target
+                    }
+                    val defaultUnit = when (val m = habit.measurement) {
+                        is com.habit1.app.domain.model.MeasurementType.Count -> m.unit
+                        is com.habit1.app.domain.model.MeasurementType.Duration -> "mins"
+                        is com.habit1.app.domain.model.MeasurementType.Quantity -> m.unit
+                        else -> null
                     }
 
                     val formattedProgress = if (record != null) {
@@ -307,7 +347,13 @@ class HistoryViewModel(
                         status = status,
                         formattedProgress = formattedProgress,
                         isPartial = isPartial,
-                        isCompleted = isCompleted
+                        isCompleted = isCompleted,
+                        measurementType = habit.measurement,
+                        actualValue = record?.actualValue ?: 0.0,
+                        targetValue = record?.targetValue ?: defaultTarget,
+                        unit = record?.unit ?: defaultUnit,
+                        notes = record?.notes,
+                        colorHex = habit.colorHex
                     )
                 }
             }
@@ -386,6 +432,11 @@ class HistoryViewModel(
             when (event) {
                 is HistoryUiEvent.SelectDate -> {
                     selectedDateFlow.value = event.date
+                    val ym = YearMonth.from(event.date)
+                    if (selectedMonthFlow.value != ym) {
+                        selectedMonthFlow.value = ym
+                        selectedYearFlow.value = ym.year
+                    }
                 }
                 is HistoryUiEvent.PreviousMonth -> {
                     val prev = selectedMonthFlow.value.minusMonths(1)
@@ -450,6 +501,32 @@ class HistoryViewModel(
                 }
                 is HistoryUiEvent.DismissMessage -> {
                     userMessageFlow.value = null
+                }
+                // Phase 2: Historical record editing actions
+                is HistoryUiEvent.CompleteToTarget -> {
+                    recordHabitProgress.markCompleted(event.habitId, event.date, zoneId)
+                }
+                is HistoryUiEvent.SetHabitValue -> {
+                    recordHabitProgress.setActualValue(event.habitId, event.date, event.value, zoneId)
+                }
+                is HistoryUiEvent.MarkSkipped -> {
+                    recordHabitProgress.markSkipped(event.habitId, event.date, event.notes, zoneId)
+                }
+                is HistoryUiEvent.MarkMissed -> {
+                    recordHabitProgress.markMissed(event.habitId, event.date, event.notes, zoneId)
+                }
+                is HistoryUiEvent.ClearRecord -> {
+                    recordHabitProgress.clearRecord(event.habitId, event.date, zoneId)
+                }
+                is HistoryUiEvent.SaveNotes -> {
+                    val dateStr = DateTimeUtils.formatDate(event.date)
+                    val existing = habitRecordRepository.getRecord(event.habitId, dateStr)
+                    val trimmedNotes = event.notes?.trim()?.ifBlank { null }
+                    if (existing != null) {
+                        habitRecordRepository.recordProgress(existing.copy(notes = trimmedNotes))
+                    } else {
+                        recordHabitProgress.markMissed(event.habitId, event.date, notes = trimmedNotes, zoneId = zoneId)
+                    }
                 }
             }
         }

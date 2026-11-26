@@ -136,5 +136,76 @@ class GlobalAnalyticsViewModelTest {
 
         assertEquals(GlobalAnalyticsPreset.ThisYear, viewModel.uiState.value.selectedPreset)
         assertEquals(365, viewModel.uiState.value.summary?.range?.dayCount)
+
+        viewModel.onEvent(GlobalAnalyticsUiEvent.SelectPreset(GlobalAnalyticsPreset.Last90Days))
+        advanceUntilIdle()
+
+        assertEquals(GlobalAnalyticsPreset.Last90Days, viewModel.uiState.value.selectedPreset)
+        assertEquals(90, viewModel.uiState.value.summary?.range?.dayCount)
+    }
+
+    @Test
+    fun archivedHabit_includedInHistoryWithArchivedBadge() = runTest(testDispatcher) {
+        val activeHabit = HabitEntity(
+            id = "h_act",
+            name = "Read",
+            measurementType = "BOOLEAN",
+            scheduleType = "DAILY",
+            scheduleConfig = "{}",
+            displayOrder = 0,
+            isPaused = false,
+            isArchived = false,
+            startDate = "2026-09-01",
+            createdAt = 1756684800000L,
+            updatedAt = 1756684800000L
+        )
+        val archivedHabit = HabitEntity(
+            id = "h_arch",
+            name = "Old Habit",
+            measurementType = "BOOLEAN",
+            scheduleType = "DAILY",
+            scheduleConfig = "{}",
+            displayOrder = 1,
+            isPaused = false,
+            isArchived = true,
+            archivedAt = 1757462400000L, // Sep 10
+            startDate = "2026-09-01",
+            createdAt = 1756684800000L,
+            updatedAt = 1757462400000L
+        )
+        database.habitDao().insert(activeHabit)
+        database.habitDao().insert(archivedHabit)
+
+        val record = HabitRecordEntity(
+            id = "r_arch_1",
+            habitId = "h_arch",
+            date = "2026-09-05",
+            actualValue = 1.0,
+            targetValue = 1.0,
+            measurementType = "BOOLEAN",
+            isCompleted = true,
+            recordedAt = 1757030400000L
+        )
+        database.habitRecordDao().upsert(record)
+
+        viewModel.onEvent(GlobalAnalyticsUiEvent.Refresh)
+        advanceUntilIdle()
+
+        viewModel.uiState.test {
+            val state = awaitItem()
+            val loadedState = if (state.isLoading) awaitItem() else state
+
+            // Active habit count strictly excludes archived
+            assertEquals(1, loadedState.summary?.activeHabitsCount)
+
+            // Both habits appear in performances
+            val perfs = loadedState.summary?.habitPerformances ?: emptyList()
+            assertEquals(2, perfs.size)
+
+            val archPerf = perfs.first { it.habitId == "h_arch" }
+            assertEquals("Old Habit", archPerf.habitName)
+            assertEquals(true, archPerf.isArchived)
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 }

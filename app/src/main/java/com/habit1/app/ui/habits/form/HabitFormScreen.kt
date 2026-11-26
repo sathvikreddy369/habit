@@ -18,22 +18,29 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.unit.sp
+import com.habit1.app.ui.components.CategoryPickerDialog
+import com.habit1.app.ui.components.CATEGORY_SUGGESTIONS
 import com.habit1.app.ui.components.ColorPickerDialog
 import com.habit1.app.ui.theme.HabitColors
+import com.habit1.app.ui.theme.HabitIcons
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -48,6 +55,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -74,6 +82,7 @@ import com.habit1.app.domain.validation.MeasurementKind
 import com.habit1.app.domain.validation.ScheduleKind
 import com.habit1.app.ui.components.ReminderTimePickerDialog
 import java.time.DayOfWeek
+import java.time.LocalDate
 import java.time.format.TextStyle
 import java.util.Locale
 
@@ -88,6 +97,10 @@ fun HabitFormScreen(
     val nameFocusRequester = remember { FocusRequester() }
     var showTimePickerDialog by remember { mutableStateOf(false) }
     var showColorPickerDialog by remember { mutableStateOf(false) }
+    var showCategoryDialog by remember { mutableStateOf(false) }
+    var prefillCategoryName by remember { mutableStateOf("") }
+    var prefillCategoryColor by remember { mutableStateOf<String?>(null) }
+    var prefillCategoryIcon by remember { mutableStateOf<String?>(null) }
     var showArchiveDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
 
@@ -266,6 +279,103 @@ fun HabitFormScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
+            // Category Section
+            Text(
+                text = "Category (Optional)",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // "None" / Uncategorized chip
+                FilterChip(
+                    selected = uiState.categoryId == null,
+                    onClick = { viewModel.onEvent(HabitFormUiEvent.SelectCategory(null)) },
+                    label = { Text("None") }
+                )
+
+                // User-created categories
+                uiState.categories.forEach { category ->
+                    val isSelected = uiState.categoryId == category.id
+                    val vectorIcon = HabitIcons.getVectorIcon(category.icon)
+                    FilterChip(
+                        selected = isSelected,
+                        onClick = { viewModel.onEvent(HabitFormUiEvent.SelectCategory(category.id)) },
+                        leadingIcon = {
+                            if (vectorIcon != null) {
+                                Icon(
+                                    imageVector = vectorIcon,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else HabitColors.parseColor(category.colorHex)
+                                )
+                            } else if (HabitIcons.isEmoji(category.icon)) {
+                                Text(category.icon ?: "", fontSize = 14.sp)
+                            }
+                        },
+                        label = { Text(category.name) }
+                    )
+                }
+
+                // "+ New Category" button
+                AssistChip(
+                    onClick = {
+                        prefillCategoryName = ""
+                        prefillCategoryColor = null
+                        prefillCategoryIcon = null
+                        showCategoryDialog = true
+                    },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    },
+                    label = { Text("New Category") }
+                )
+            }
+
+            // Quick suggestion chips when few categories exist
+            if (uiState.categories.size < 4) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Suggestions:",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(end = 2.dp)
+                    )
+                    CATEGORY_SUGGESTIONS.take(5).forEach { suggestion ->
+                        val alreadyExists = uiState.categories.any { it.name.equals(suggestion.name, ignoreCase = true) }
+                        if (!alreadyExists) {
+                            SuggestionChip(
+                                onClick = {
+                                    prefillCategoryName = suggestion.name
+                                    prefillCategoryColor = suggestion.colorHex
+                                    prefillCategoryIcon = suggestion.iconKey
+                                    showCategoryDialog = true
+                                },
+                                label = { Text(suggestion.name, style = MaterialTheme.typography.labelSmall) }
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
             // Measurement Section
             Text(
                 text = "Measurement",
@@ -298,83 +408,195 @@ fun HabitFormScreen(
             // Dynamic measurement fields
             when (uiState.measurementKind) {
                 MeasurementKind.BOOLEAN -> {
-                    Text(
-                        text = "Simple checkbox to mark completed each scheduled day.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
+                            .padding(12.dp)
+                    ) {
+                        Text(
+                            text = "Simple Yes / No check each scheduled day.",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Examples: Floss teeth, Wake up before 7am, Take vitamins, Journal.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
                 MeasurementKind.COUNT -> {
                     val targetError = uiState.errors.contains(HabitValidationError.TargetMustBePositive)
-                    Row(modifier = Modifier.fillMaxWidth()) {
+                    Column {
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            OutlinedTextField(
+                                value = uiState.targetInput,
+                                onValueChange = { viewModel.onEvent(HabitFormUiEvent.UpdateTarget(it)) },
+                                label = { Text("Daily target count") },
+                                placeholder = { Text("e.g. 50") },
+                                keyboardOptions = KeyboardOptions(
+                                    keyboardType = KeyboardType.Number,
+                                    imeAction = ImeAction.Next
+                                ),
+                                singleLine = true,
+                                isError = targetError,
+                                supportingText = if (targetError) { { Text("Must be a positive number") } } else null,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            OutlinedTextField(
+                                value = uiState.unitInput,
+                                onValueChange = { viewModel.onEvent(HabitFormUiEvent.UpdateUnit(it)) },
+                                label = { Text("Unit") },
+                                placeholder = { Text("e.g. pushups") },
+                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                                singleLine = true,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        // Quick example chips for Count
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Examples:",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            listOf(
+                                Triple("10", "glasses", "10 glasses water"),
+                                Triple("30", "pushups", "30 pushups"),
+                                Triple("20", "pages", "20 pages read"),
+                                Triple("5", "calls", "5 sales calls")
+                            ).forEach { (presetTarget, presetUnit, label) ->
+                                SuggestionChip(
+                                    onClick = {
+                                        viewModel.onEvent(HabitFormUiEvent.UpdateTarget(presetTarget))
+                                        viewModel.onEvent(HabitFormUiEvent.UpdateUnit(presetUnit))
+                                    },
+                                    label = { Text(label, style = MaterialTheme.typography.labelSmall) }
+                                )
+                            }
+                        }
+                    }
+                }
+                MeasurementKind.DURATION -> {
+                    val targetError = uiState.errors.contains(HabitValidationError.TargetMustBePositive)
+                    Column {
                         OutlinedTextField(
                             value = uiState.targetInput,
                             onValueChange = { viewModel.onEvent(HabitFormUiEvent.UpdateTarget(it)) },
-                            label = { Text("Daily target count") },
+                            label = { Text("Target duration (minutes)") },
+                            placeholder = { Text("e.g. 30") },
                             keyboardOptions = KeyboardOptions(
                                 keyboardType = KeyboardType.Number,
                                 imeAction = ImeAction.Next
                             ),
                             singleLine = true,
                             isError = targetError,
-                            supportingText = if (targetError) { { Text("Must be a positive number") } } else null,
-                            modifier = Modifier.weight(1f)
+                            supportingText = if (targetError) { { Text("Must be greater than 0 minutes") } } else null,
+                            modifier = Modifier.fillMaxWidth()
                         )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        OutlinedTextField(
-                            value = uiState.unitInput,
-                            onValueChange = { viewModel.onEvent(HabitFormUiEvent.UpdateUnit(it)) },
-                            label = { Text("Unit (e.g. reps, pages)") },
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                            singleLine = true,
-                            modifier = Modifier.weight(1f)
-                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        // Quick example chips for Duration
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Examples:",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            listOf(
+                                "15" to "15 min Meditation",
+                                "30" to "30 min Reading",
+                                "45" to "45 min Workout",
+                                "60" to "1 hr Deep Work"
+                            ).forEach { (presetMins, label) ->
+                                SuggestionChip(
+                                    onClick = {
+                                        viewModel.onEvent(HabitFormUiEvent.UpdateTarget(presetMins))
+                                    },
+                                    label = { Text(label, style = MaterialTheme.typography.labelSmall) }
+                                )
+                            }
+                        }
                     }
-                }
-                MeasurementKind.DURATION -> {
-                    val targetError = uiState.errors.contains(HabitValidationError.TargetMustBePositive)
-                    OutlinedTextField(
-                        value = uiState.targetInput,
-                        onValueChange = { viewModel.onEvent(HabitFormUiEvent.UpdateTarget(it)) },
-                        label = { Text("Target duration (minutes)") },
-                        keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.Number,
-                            imeAction = ImeAction.Next
-                        ),
-                        singleLine = true,
-                        isError = targetError,
-                        supportingText = if (targetError) { { Text("Must be greater than 0 minutes") } } else null,
-                        modifier = Modifier.fillMaxWidth()
-                    )
                 }
                 MeasurementKind.QUANTITY -> {
                     val targetError = uiState.errors.contains(HabitValidationError.TargetMustBePositive)
                     val unitError = uiState.errors.contains(HabitValidationError.UnitRequired)
-                    Row(modifier = Modifier.fillMaxWidth()) {
-                        OutlinedTextField(
-                            value = uiState.targetInput,
-                            onValueChange = { viewModel.onEvent(HabitFormUiEvent.UpdateTarget(it)) },
-                            label = { Text("Target quantity") },
-                            keyboardOptions = KeyboardOptions(
-                                keyboardType = KeyboardType.Decimal,
-                                imeAction = ImeAction.Next
-                            ),
-                            singleLine = true,
-                            isError = targetError,
-                            supportingText = if (targetError) { { Text("Must be greater than 0") } } else null,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        OutlinedTextField(
-                            value = uiState.unitInput,
-                            onValueChange = { viewModel.onEvent(HabitFormUiEvent.UpdateUnit(it)) },
-                            label = { Text("Unit (e.g. L, km)") },
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                            singleLine = true,
-                            isError = unitError,
-                            supportingText = if (unitError) { { Text("Unit required") } } else null,
-                            modifier = Modifier.weight(1f)
-                        )
+                    Column {
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            OutlinedTextField(
+                                value = uiState.targetInput,
+                                onValueChange = { viewModel.onEvent(HabitFormUiEvent.UpdateTarget(it)) },
+                                label = { Text("Target quantity") },
+                                placeholder = { Text("e.g. 2.5") },
+                                keyboardOptions = KeyboardOptions(
+                                    keyboardType = KeyboardType.Decimal,
+                                    imeAction = ImeAction.Next
+                                ),
+                                singleLine = true,
+                                isError = targetError,
+                                supportingText = if (targetError) { { Text("Must be greater than 0") } } else null,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            OutlinedTextField(
+                                value = uiState.unitInput,
+                                onValueChange = { viewModel.onEvent(HabitFormUiEvent.UpdateUnit(it)) },
+                                label = { Text("Unit") },
+                                placeholder = { Text("e.g. L, km") },
+                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                                singleLine = true,
+                                isError = unitError,
+                                supportingText = if (unitError) { { Text("Unit required") } } else null,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        // Quick example chips for Quantity
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Examples:",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            listOf(
+                                Triple("2.5", "L", "2.5 L Water"),
+                                Triple("5", "km", "5 km Run"),
+                                Triple("10000", "steps", "10,000 Steps"),
+                                Triple("500", "kcal", "500 kcal Burn")
+                            ).forEach { (presetTarget, presetUnit, label) ->
+                                SuggestionChip(
+                                    onClick = {
+                                        viewModel.onEvent(HabitFormUiEvent.UpdateTarget(presetTarget))
+                                        viewModel.onEvent(HabitFormUiEvent.UpdateUnit(presetUnit))
+                                    },
+                                    label = { Text(label, style = MaterialTheme.typography.labelSmall) }
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -474,12 +696,24 @@ fun HabitFormScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Optional Reminder Time
-            Text(
-                text = "Reminder",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onBackground
-            )
+            // 1. Optional Reminder Time (Positioned above tracking start date)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Reminder",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Text(
+                    text = "Get notified",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
             Spacer(modifier = Modifier.height(8.dp))
 
             val context = LocalContext.current
@@ -517,18 +751,26 @@ fun HabitFormScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = "Add reminder",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
                         Text(
-                            text = "Add reminder",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.primary
+                            text = "Get notified",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.outline
                         )
                     }
                 }
@@ -557,11 +799,20 @@ fun HabitFormScreen(
                             )
                             Spacer(modifier = Modifier.width(12.dp))
                             Column {
-                                Text(
-                                    text = DateTimeUtils.format12HourTime(currentLocalTime),
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = "Get notified at",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = DateTimeUtils.format12HourTime(currentLocalTime),
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
                                 Text(
                                     text = "Daily reminder",
                                     style = MaterialTheme.typography.bodySmall,
@@ -620,6 +871,81 @@ fun HabitFormScreen(
                     },
                     onDismiss = { showTimePickerDialog = false }
                 )
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // 2. Behavioral Start Date (Decision 2.1 - Positioned below Reminder)
+            Text(
+                text = "Tracking Start Date",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Dates before this are non-applicable (pre-creation) and excluded from streaks and analytics. Future dates cannot be selected.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            val startDateContext = LocalContext.current
+            val startDateFormatter = remember { java.time.format.DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy", Locale.getDefault()) }
+            OutlinedCard(
+                onClick = {
+                    android.app.DatePickerDialog(
+                        startDateContext,
+                        { _, year, month, dayOfMonth ->
+                            val picked = LocalDate.of(year, month + 1, dayOfMonth)
+                            viewModel.onEvent(HabitFormUiEvent.UpdateStartDate(picked))
+                        },
+                        uiState.startDate.year,
+                        uiState.startDate.monthValue - 1,
+                        uiState.startDate.dayOfMonth
+                    ).apply {
+                        // Strict Future Date Ban (Decision 2.1)
+                        datePicker.maxDate = System.currentTimeMillis()
+                    }.show()
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.DateRange,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = uiState.startDate.format(startDateFormatter),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            val isToday = uiState.startDate == LocalDate.now()
+                            Text(
+                                text = if (isToday) "Starts today" else "Backfilled to ${uiState.startDate}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    Text(
+                        text = "Change",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
             }
 
             if (uiState.isEditMode) {
@@ -773,6 +1099,18 @@ fun HabitFormScreen(
             selectedColorHex = uiState.colorHex,
             onColorSelected = { viewModel.onEvent(HabitFormUiEvent.UpdateColor(it)) },
             onDismiss = { showColorPickerDialog = false }
+        )
+    }
+
+    if (showCategoryDialog) {
+        CategoryPickerDialog(
+            initialName = prefillCategoryName,
+            initialColorHex = prefillCategoryColor,
+            initialIcon = prefillCategoryIcon,
+            onConfirm = { name, colorHex, icon ->
+                viewModel.onEvent(HabitFormUiEvent.CreateCategory(name, colorHex, icon))
+            },
+            onDismiss = { showCategoryDialog = false }
         )
     }
 }

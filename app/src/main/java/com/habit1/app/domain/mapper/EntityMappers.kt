@@ -1,24 +1,32 @@
 package com.habit1.app.domain.mapper
 
+import com.habit1.app.data.local.db.entity.CategoryEntity
 import com.habit1.app.data.local.db.entity.DailyGoalEntity
 import com.habit1.app.data.local.db.entity.DailyGoalWithSubtasks
 import com.habit1.app.data.local.db.entity.DailyReviewEntity
 import com.habit1.app.data.local.db.entity.GoalSubtaskEntity
 import com.habit1.app.data.local.db.entity.HabitEntity
+import com.habit1.app.data.local.db.entity.HabitPauseEntity
 import com.habit1.app.data.local.db.entity.HabitRecordEntity
+import com.habit1.app.data.local.db.entity.HabitScheduleEntity
+import com.habit1.app.domain.model.Category
 import com.habit1.app.domain.model.DailyGoal
 import com.habit1.app.domain.model.DailyReview
 import com.habit1.app.domain.model.GoalSubtask
 import com.habit1.app.domain.model.Habit
+import com.habit1.app.domain.model.HabitPause
 import com.habit1.app.domain.model.HabitRecord
+import com.habit1.app.domain.model.HabitRecordStatus
+import com.habit1.app.domain.model.HabitScheduleVersion
 import com.habit1.app.domain.model.MeasurementType
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.ZoneId
 
 object EntityMappers {
 
-    fun HabitEntity.toDomain(): Habit {
+    fun HabitEntity.toDomain(zoneId: ZoneId = ZoneId.systemDefault()): Habit {
         val measurement = when (measurementType) {
             MeasurementType.Count.TYPE_NAME -> MeasurementType.Count(
                 target = targetValue.toInt().coerceAtLeast(1),
@@ -35,16 +43,26 @@ object EntityMappers {
         }
 
         val createdInstant = Instant.ofEpochMilli(createdAt)
+        val resolvedStartDate = if (startDate.isNotBlank()) {
+            try {
+                LocalDate.parse(startDate)
+            } catch (_: Exception) {
+                createdInstant.atZone(zoneId).toLocalDate()
+            }
+        } else {
+            createdInstant.atZone(zoneId).toLocalDate()
+        }
+
         val schedule = ScheduleConfigSerializer.deserialize(
             scheduleType = scheduleType,
             scheduleConfig = scheduleConfig,
-            fallbackAnchorDate = LocalDate.ofEpochDay(createdAt / (24 * 60 * 60 * 1000L))
+            fallbackAnchorDate = resolvedStartDate
         )
 
         val reminder = reminderTime?.let {
             try {
                 LocalTime.parse(it)
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 null
             }
         }
@@ -60,6 +78,10 @@ object EntityMappers {
             isPaused = isPaused,
             isArchived = isArchived,
             colorHex = colorHex,
+            startDate = resolvedStartDate,
+            categoryId = categoryId,
+            isCurrentlyPaused = isCurrentlyPaused,
+            archivedAt = archivedAt?.let { Instant.ofEpochMilli(it) },
             createdAt = createdInstant,
             updatedAt = Instant.ofEpochMilli(updatedAt)
         )
@@ -88,12 +110,17 @@ object EntityMappers {
             isPaused = isPaused,
             isArchived = isArchived,
             colorHex = colorHex,
+            startDate = startDate.toString(),
+            categoryId = categoryId,
+            isCurrentlyPaused = isCurrentlyPaused,
+            archivedAt = archivedAt?.toEpochMilli(),
             createdAt = createdAt.toEpochMilli(),
             updatedAt = updatedAt.toEpochMilli()
         )
     }
 
     fun HabitRecordEntity.toDomain(): HabitRecord {
+        val domainStatus = HabitRecordStatus.fromString(status)
         return HabitRecord(
             id = id,
             habitId = habitId,
@@ -102,7 +129,7 @@ object EntityMappers {
             targetValue = targetValue,
             measurementType = measurementType,
             unit = unit,
-            isCompleted = isCompleted,
+            status = domainStatus,
             notes = notes,
             recordedAt = Instant.ofEpochMilli(recordedAt)
         )
@@ -117,9 +144,79 @@ object EntityMappers {
             targetValue = targetValue,
             measurementType = measurementType,
             unit = unit,
-            isCompleted = isCompleted,
+            status = status.name,
+            isCompleted = (status == HabitRecordStatus.DONE),
             notes = notes,
             recordedAt = recordedAt.toEpochMilli()
+        )
+    }
+
+    fun CategoryEntity.toDomain(): Category {
+        return Category(
+            id = id,
+            name = name,
+            colorHex = colorHex,
+            icon = icon,
+            displayOrder = displayOrder,
+            createdAt = Instant.ofEpochMilli(createdAt)
+        )
+    }
+
+    fun Category.toEntity(): CategoryEntity {
+        return CategoryEntity(
+            id = id,
+            name = name,
+            colorHex = colorHex,
+            icon = icon,
+            displayOrder = displayOrder,
+            createdAt = createdAt.toEpochMilli()
+        )
+    }
+
+    fun HabitPauseEntity.toDomain(): HabitPause {
+        return HabitPause(
+            id = id,
+            habitId = habitId,
+            startDate = LocalDate.parse(startDate),
+            endDate = endDate?.let { LocalDate.parse(it) },
+            reason = reason
+        )
+    }
+
+    fun HabitPause.toEntity(): HabitPauseEntity {
+        return HabitPauseEntity(
+            id = id,
+            habitId = habitId,
+            startDate = startDate.toString(),
+            endDate = endDate?.toString(),
+            reason = reason
+        )
+    }
+
+    fun HabitScheduleEntity.toDomain(): HabitScheduleVersion {
+        val schedule = ScheduleConfigSerializer.deserialize(
+            scheduleType = scheduleType,
+            scheduleConfig = scheduleConfig,
+            fallbackAnchorDate = LocalDate.parse(effectiveFrom)
+        )
+        return HabitScheduleVersion(
+            id = id,
+            habitId = habitId,
+            schedule = schedule,
+            effectiveFrom = LocalDate.parse(effectiveFrom),
+            effectiveTo = effectiveTo?.let { LocalDate.parse(it) }
+        )
+    }
+
+    fun HabitScheduleVersion.toEntity(): HabitScheduleEntity {
+        val (schedType, schedConfig) = ScheduleConfigSerializer.serialize(schedule)
+        return HabitScheduleEntity(
+            id = id,
+            habitId = habitId,
+            scheduleType = schedType,
+            scheduleConfig = schedConfig,
+            effectiveFrom = effectiveFrom.toString(),
+            effectiveTo = effectiveTo?.toString()
         )
     }
 

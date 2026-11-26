@@ -1,5 +1,8 @@
 package com.habit1.app.ui.history
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -38,11 +41,19 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalContext
+import com.habit1.app.data.export.ExportFormat
+import com.habit1.app.ui.components.DataExportDialog
+import kotlinx.coroutines.launch
+import java.time.LocalDate
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -65,6 +76,8 @@ import com.habit1.app.ui.components.HabitOverviewCard
 import com.habit1.app.ui.components.HabitStreaksCard
 import com.habit1.app.ui.components.HeatmapDayDetailDialog
 import com.habit1.app.ui.components.QuantitativePerformanceCard
+import com.habit1.app.ui.components.AnalyticsInsightsSection
+import com.habit1.app.ui.components.PeriodComparisonCard
 import com.habit1.app.ui.theme.HabitColors
 
 /**
@@ -84,12 +97,43 @@ fun HabitHistoryScreen(
     val analyticsSummary = uiState.analyticsSummary
 
     val habitColor = HabitColors.parseColor(habit?.colorHex)
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
     var showOverflowMenu by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showExportDialog by remember { mutableStateOf(false) }
+    var exportFormat by remember { mutableStateOf(ExportFormat.CSV) }
+    var exportStartDate by remember { mutableStateOf<LocalDate?>(null) }
+    var exportEndDate by remember { mutableStateOf<LocalDate?>(null) }
+    var editingDay by remember { mutableStateOf<com.habit1.app.domain.model.HabitHistoryDay?>(null) }
+    var editingValueDay by remember { mutableStateOf<com.habit1.app.domain.model.HabitHistoryDay?>(null) }
+    var editingNotesDay by remember { mutableStateOf<com.habit1.app.domain.model.HabitHistoryDay?>(null) }
+
+    val habitExportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument(exportFormat.mimeType)
+    ) { uri: Uri? ->
+        uri?.let {
+            viewModel.exportSingleHabit(
+                uri = it,
+                format = exportFormat,
+                startDate = exportStartDate,
+                endDate = exportEndDate,
+                context = context,
+                onSuccess = { msg ->
+                    coroutineScope.launch { snackbarHostState.showSnackbar(msg) }
+                },
+                onError = { err ->
+                    coroutineScope.launch { snackbarHostState.showSnackbar(err) }
+                }
+            )
+        }
+    }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
         contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
@@ -136,6 +180,7 @@ fun HabitHistoryScreen(
                                     text = { Text("Export") },
                                     onClick = {
                                         showOverflowMenu = false
+                                        showExportDialog = true
                                     }
                                 )
                                 DropdownMenuItem(
@@ -276,6 +321,20 @@ fun HabitHistoryScreen(
                     }
                 }
 
+                // Period Comparison Card
+                if (analyticsSummary?.periodComparison != null && analyticsSummary.periodComparison.isSufficientData) {
+                    item(key = "habit_period_comparison") {
+                        PeriodComparisonCard(comparison = analyticsSummary.periodComparison)
+                    }
+                }
+
+                // Habit Observations & Insights
+                if (analyticsSummary?.insights?.isNotEmpty() == true) {
+                    item(key = "habit_insights_section") {
+                        AnalyticsInsightsSection(insights = analyticsSummary.insights)
+                    }
+                }
+
                 // 2. Trend Section (Score Trend & Distribution)
                 if (analyticsSummary != null) {
                     item(key = "score_trend_section") {
@@ -309,7 +368,7 @@ fun HabitHistoryScreen(
                     item(key = "calendar_section") {
                         Column(modifier = Modifier.fillMaxWidth()) {
                             Text(
-                                text = "Calendar",
+                                text = "Calendar (Activity Heatmap)",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = habitColor
@@ -332,7 +391,18 @@ fun HabitHistoryScreen(
                     }
                 }
 
-                // 4. Patterns Section (Streaks, Frequency, Quantitative & Consistency Breakdown)
+                // Quantitative Performance (if applicable) - directly below Calendar Heatmap
+                if (habit.measurement !is MeasurementType.BooleanChoice && analyticsSummary != null) {
+                    item(key = "quantitative_performance") {
+                        QuantitativePerformanceCard(
+                            habit = habit,
+                            summary = analyticsSummary,
+                            selectedPreset = uiState.selectedPreset
+                        )
+                    }
+                }
+
+                // 4. Patterns Section (Streaks, Frequency, & Consistency Breakdown)
                 item(key = "patterns_header") {
                     Text(
                         text = "Patterns & Consistency",
@@ -354,23 +424,13 @@ fun HabitHistoryScreen(
                     }
                 }
 
-                // Weekday Frequency
+                // Weekday Frequency (Decision 5.1.3)
                 if (analyticsSummary != null) {
                     item(key = "frequency_section") {
                         HabitFrequencyCard(
                             historyDays = analyticsSummary.dailyBreakdown,
+                            weekdayAdherence = analyticsSummary.weekdayAdherence,
                             accentColor = habitColor
-                        )
-                    }
-                }
-
-                // Quantitative Performance (if applicable)
-                if (habit.measurement !is MeasurementType.BooleanChoice && analyticsSummary != null) {
-                    item(key = "quantitative_performance") {
-                        QuantitativePerformanceCard(
-                            habit = habit,
-                            summary = analyticsSummary,
-                            selectedPreset = uiState.selectedPreset
                         )
                     }
                 }
@@ -523,8 +583,151 @@ fun HabitHistoryScreen(
         HeatmapDayDetailDialog(
             day = day,
             habitName = habit?.name ?: "Habit",
-            onDismiss = { viewModel.onEvent(HabitHistoryUiEvent.DismissDayDetail) }
+            onDismiss = { viewModel.onEvent(HabitHistoryUiEvent.DismissDayDetail) },
+            onEditRecord = { editingDay = day }
         )
+    }
+
+    // Historical Record Action Sheet (Decision 2.1)
+    editingDay?.let { targetDay ->
+        if (habit != null) {
+            val status = when (targetDay.status) {
+                is com.habit1.app.domain.model.CalendarDayStatus.Completed -> com.habit1.app.domain.model.HabitRecordStatus.DONE
+                is com.habit1.app.domain.model.CalendarDayStatus.RecordedIncomplete -> com.habit1.app.domain.model.HabitRecordStatus.PARTIAL
+                is com.habit1.app.domain.model.CalendarDayStatus.ExplicitMissed -> com.habit1.app.domain.model.HabitRecordStatus.MISSED
+                is com.habit1.app.domain.model.CalendarDayStatus.Skipped -> com.habit1.app.domain.model.HabitRecordStatus.SKIPPED
+                else -> com.habit1.app.domain.model.HabitRecordStatus.UNRECORDED
+            }
+            val actualVal = when (val s = targetDay.status) {
+                is com.habit1.app.domain.model.CalendarDayStatus.Completed -> s.actualValue
+                is com.habit1.app.domain.model.CalendarDayStatus.RecordedIncomplete -> s.actualValue
+                else -> 0.0
+            }
+            val targetVal = when (val s = targetDay.status) {
+                is com.habit1.app.domain.model.CalendarDayStatus.Completed -> s.targetValue
+                is com.habit1.app.domain.model.CalendarDayStatus.RecordedIncomplete -> s.targetValue
+                else -> when (val m = habit.measurement) {
+                    is com.habit1.app.domain.model.MeasurementType.BooleanChoice -> 1.0
+                    is com.habit1.app.domain.model.MeasurementType.Count -> m.target.toDouble()
+                    is com.habit1.app.domain.model.MeasurementType.Duration -> m.targetMinutes.toDouble()
+                    is com.habit1.app.domain.model.MeasurementType.Quantity -> m.target
+                }
+            }
+            val unitStr = when (val s = targetDay.status) {
+                is com.habit1.app.domain.model.CalendarDayStatus.Completed -> s.unit
+                is com.habit1.app.domain.model.CalendarDayStatus.RecordedIncomplete -> s.unit
+                else -> when (val m = habit.measurement) {
+                    is com.habit1.app.domain.model.MeasurementType.Count -> m.unit
+                    is com.habit1.app.domain.model.MeasurementType.Duration -> "mins"
+                    is com.habit1.app.domain.model.MeasurementType.Quantity -> m.unit
+                    else -> null
+                }
+            }
+            val noteStr = when (val s = targetDay.status) {
+                is com.habit1.app.domain.model.CalendarDayStatus.ExplicitMissed -> s.notes
+                else -> null
+            }
+
+            val habitItem = com.habit1.app.ui.today.TodayHabitItem(
+                id = habit.id,
+                name = habit.name,
+                description = habit.description,
+                measurementType = habit.measurement,
+                targetValue = targetVal,
+                actualValue = actualVal,
+                unit = unitStr,
+                status = status,
+                isCompleted = status == com.habit1.app.domain.model.HabitRecordStatus.DONE,
+                progressRatio = if (targetVal > 0.0) (actualVal / targetVal).toFloat().coerceIn(0f, 1f) else 0f,
+                formattedProgress = if (habit.measurement is com.habit1.app.domain.model.MeasurementType.BooleanChoice) status.name else "$actualVal / $targetVal",
+                streakResult = com.habit1.app.domain.model.StreakResult(0, 0, 0, 0, 0f, false),
+                colorHex = habit.colorHex,
+                notes = noteStr
+            )
+
+            com.habit1.app.ui.components.HabitActionSheet(
+                habitItem = habitItem,
+                dateLabel = targetDay.date.toString(),
+                onDismiss = { editingDay = null },
+                onCompleteToTarget = {
+                    viewModel.onEvent(HabitHistoryUiEvent.CompleteToTarget(targetDay.date))
+                    editingDay = null
+                },
+                onOpenNumericEntry = {
+                    editingValueDay = targetDay
+                    editingDay = null
+                },
+                onMarkSkipped = {
+                    viewModel.onEvent(HabitHistoryUiEvent.MarkSkipped(targetDay.date))
+                    editingDay = null
+                },
+                onMarkMissed = {
+                    viewModel.onEvent(HabitHistoryUiEvent.MarkMissed(targetDay.date))
+                    editingDay = null
+                },
+                onClearRecord = {
+                    viewModel.onEvent(HabitHistoryUiEvent.ClearRecord(targetDay.date))
+                    editingDay = null
+                },
+                onEditNotes = {
+                    editingNotesDay = targetDay
+                    editingDay = null
+                }
+            )
+        }
+    }
+
+    // Direct Numeric Entry Dialog (Quantitative only - Boolean habits never enter numeric entry)
+    editingValueDay?.let { targetDay ->
+        if (habit != null && habit.measurement !is com.habit1.app.domain.model.MeasurementType.BooleanChoice) {
+            val actualVal = when (val s = targetDay.status) {
+                is com.habit1.app.domain.model.CalendarDayStatus.Completed -> s.actualValue
+                is com.habit1.app.domain.model.CalendarDayStatus.RecordedIncomplete -> s.actualValue
+                else -> 0.0
+            }
+            val targetVal = when (val s = targetDay.status) {
+                is com.habit1.app.domain.model.CalendarDayStatus.Completed -> s.targetValue
+                is com.habit1.app.domain.model.CalendarDayStatus.RecordedIncomplete -> s.targetValue
+                else -> 1.0
+            }
+            val unitVal = when (val m = habit.measurement) {
+                is com.habit1.app.domain.model.MeasurementType.Count -> m.unit
+                is com.habit1.app.domain.model.MeasurementType.Duration -> "mins"
+                is com.habit1.app.domain.model.MeasurementType.Quantity -> m.unit
+                else -> null
+            }
+            com.habit1.app.ui.components.NumericEntryDialog(
+                habitName = habit.name,
+                measurementType = habit.measurement,
+                currentValue = actualVal,
+                targetValue = targetVal,
+                unit = unitVal,
+                onDismiss = { editingValueDay = null },
+                onConfirm = { value ->
+                    viewModel.onEvent(HabitHistoryUiEvent.SetHabitValue(targetDay.date, value))
+                    editingValueDay = null
+                }
+            )
+        }
+    }
+
+    // Notes Dialog
+    editingNotesDay?.let { targetDay ->
+        if (habit != null) {
+            val noteStr = when (val s = targetDay.status) {
+                is com.habit1.app.domain.model.CalendarDayStatus.ExplicitMissed -> s.notes
+                else -> null
+            }
+            com.habit1.app.ui.components.HabitNotesDialog(
+                habitName = habit.name,
+                initialNotes = noteStr,
+                onDismiss = { editingNotesDay = null },
+                onSave = { notes ->
+                    viewModel.onEvent(HabitHistoryUiEvent.SaveNotes(targetDay.date, notes))
+                    editingNotesDay = null
+                }
+            )
+        }
     }
 
     // Delete Confirmation Dialog
@@ -571,6 +774,29 @@ fun HabitHistoryScreen(
                     Text("Cancel")
                 }
             }
+        )
+    }
+
+    if (showExportDialog && habit != null) {
+        DataExportDialog(
+            allHabits = listOf(habit),
+            selectedHabitIds = setOf(habit.id),
+            exportFormat = exportFormat,
+            onToggleHabit = {},
+            onSelectAllHabits = {},
+            onFormatChange = { exportFormat = it },
+            onDateRangeChange = { start, end ->
+                exportStartDate = start
+                exportEndDate = end
+            },
+            onConfirmExport = {
+                val safeName = habit.name.lowercase().replace("[^a-z0-9]+".toRegex(), "_").trim('_')
+                val defaultFilename = "${safeName}_export_${LocalDate.now()}.${exportFormat.extension}"
+                habitExportLauncher.launch(defaultFilename)
+                showExportDialog = false
+            },
+            onDismiss = { showExportDialog = false },
+            isSingleHabitMode = true
         )
     }
 }

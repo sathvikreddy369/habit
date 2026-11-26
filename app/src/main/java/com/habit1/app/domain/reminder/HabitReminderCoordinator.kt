@@ -1,11 +1,18 @@
 package com.habit1.app.domain.reminder
 
+import com.habit1.app.core.util.DateTimeUtils
+import com.habit1.app.data.local.preferences.UserPreferencesDataStore
+import com.habit1.app.data.repository.HabitRecordRepository
 import com.habit1.app.data.repository.HabitRepository
 import com.habit1.app.domain.mapper.EntityMappers.toDomain
 import com.habit1.app.domain.model.Habit
+import com.habit1.app.domain.model.HabitRecordStatus
 import com.habit1.app.platform.notification.NotificationHelper
+import com.habit1.app.platform.reminder.EveningDigestScheduler
 import com.habit1.app.platform.reminder.HabitReminderScheduler
+import kotlinx.coroutines.flow.firstOrNull
 import java.time.Instant
+import java.time.LocalTime
 import java.time.ZoneId
 
 /**
@@ -13,14 +20,16 @@ import java.time.ZoneId
  *
  * Guarantees:
  * 1. Reminders are scheduled/canceled ONLY after database persistence operations succeed.
- * 2. ViewModels do not directly manipulate alarms.
- * 3. Reconciles all eligible habits when notification permission becomes available, on device reboot,
- *    or when the system clock/timezone changes.
+ * 2. Eagerly suppresses and cancels alarms when a habit is completed for today.
+ * 3. Reconciles all eligible habits and evening digest on boot, time changes, or resume.
  */
 class HabitReminderCoordinator(
     private val habitRepository: HabitRepository,
     private val scheduler: HabitReminderScheduler,
-    private val notificationHelper: NotificationHelper
+    private val notificationHelper: NotificationHelper,
+    private val habitRecordRepository: HabitRecordRepository? = null,
+    private val eveningDigestScheduler: EveningDigestScheduler? = null,
+    private val userPreferences: UserPreferencesDataStore? = null
 ) {
 
     /**
@@ -40,6 +49,24 @@ class HabitReminderCoordinator(
             scheduler.scheduleNextReminder(habit, fromInstant = Instant.now(), zoneId = zoneId)
         } else {
             scheduler.cancelReminder(habit.id)
+            notificationHelper.cancelNotification(habit.id)
+        }
+    }
+
+    /**
+     * Eagerly cancels today's pending reminder and notification when a habit is marked DONE today.
+     * Immediately reschedules for the next scheduled occurrence starting from tomorrow.
+     */
+    suspend fun onHabitCompletedToday(habitId: String, zoneId: ZoneId = ZoneId.systemDefault()) {
+        scheduler.cancelReminder(habitId)
+        notificationHelper.cancelNotification(habitId)
+
+        val habitEntity = habitRepository.getHabitById(habitId) ?: return
+        val habit = habitEntity.toDomain(zoneId)
+        if (habit.reminderTime != null && !habit.isPaused && !habit.isArchived && notificationHelper.areNotificationsEnabled()) {
+            val today = DateTimeUtils.today(zoneId)
+            val tomorrowStart = today.plusDays(1).atStartOfDay(zoneId).toInstant()
+            scheduler.scheduleNextReminder(habit, fromInstant = tomorrowStart, zoneId = zoneId)
         }
     }
 
@@ -48,6 +75,7 @@ class HabitReminderCoordinator(
      */
     fun onHabitPaused(habitId: String) {
         scheduler.cancelReminder(habitId)
+        notificationHelper.cancelNotification(habitId)
     }
 
     /**
@@ -55,7 +83,7 @@ class HabitReminderCoordinator(
      */
     suspend fun onHabitResumed(habitId: String, zoneId: ZoneId = ZoneId.systemDefault()) {
         val habitEntity = habitRepository.getHabitById(habitId) ?: return
-        val habit = habitEntity.toDomain()
+        val habit = habitEntity.toDomain(zoneId)
         if (habit.reminderTime != null && !habit.isArchived && notificationHelper.areNotificationsEnabled()) {
             scheduler.scheduleNextReminder(habit, fromInstant = Instant.now(), zoneId = zoneId)
         }
@@ -66,6 +94,7 @@ class HabitReminderCoordinator(
      */
     fun onHabitArchived(habitId: String) {
         scheduler.cancelReminder(habitId)
+        notificationHelper.cancelNotification(habitId)
     }
 
     /**
@@ -73,7 +102,7 @@ class HabitReminderCoordinator(
      */
     suspend fun onHabitUnarchived(habitId: String, zoneId: ZoneId = ZoneId.systemDefault()) {
         val habitEntity = habitRepository.getHabitById(habitId) ?: return
-        val habit = habitEntity.toDomain()
+        val habit = habitEntity.toDomain(zoneId)
         if (habit.reminderTime != null && !habit.isPaused && notificationHelper.areNotificationsEnabled()) {
             scheduler.scheduleNextReminder(habit, fromInstant = Instant.now(), zoneId = zoneId)
         }
@@ -88,7 +117,7 @@ class HabitReminderCoordinator(
     }
 
     /**
-     * Reconciles all active reminders across the database.
+     * Reconciles all active reminders across the database and the evening digest.
      * Invoked on:
      * - Notification permission granted / app resume
      * - System boot (BOOT_COMPLETED)
@@ -98,13 +127,37 @@ class HabitReminderCoordinator(
      */
     suspend fun reconcileAllReminders(zoneId: ZoneId = ZoneId.systemDefault()) {
         val notificationsAllowed = notificationHelper.areNotificationsEnabled()
-        val activeHabits = habitRepository.getActiveHabitsList().map { it.toDomain() }
+        val activeHabits = habitRepository.getActiveHabitsList().map { it.toDomain(zoneId) }
+        val today = DateTimeUtils.today(zoneId)
+        val todayStr = DateTimeUtils.formatDate(today)
 
         for (habit in activeHabits) {
             if (notificationsAllowed && habit.reminderTime != null && !habit.isPaused) {
-                scheduler.scheduleNextReminder(habit, fromInstant = Instant.now(), zoneId = zoneId)
+                val record = habitRecordRepository?.getRecord(habit.id, todayStr)
+                val isDoneToday = record != null && (record.isCompleted || record.status == HabitRecordStatus.DONE.name)
+                val fromInstant = if (isDoneToday) {
+                    today.plusDays(1).atStartOfDay(zoneId).toInstant()
+                } else {
+                    Instant.now()
+                }
+                scheduler.scheduleNextReminder(habit, fromInstant = fromInstant, zoneId = zoneId)
             } else {
                 scheduler.cancelReminder(habit.id)
+            }
+        }
+
+        // Reconcile Evening Digest
+        if (eveningDigestScheduler != null && userPreferences != null) {
+            val prefs = userPreferences.userPreferencesFlow.firstOrNull()
+            if (prefs != null && prefs.dailyReviewEnabled && notificationsAllowed) {
+                val digestTime = try {
+                    LocalTime.parse(prefs.dailyReviewTime)
+                } catch (_: Exception) {
+                    LocalTime.of(21, 0)
+                }
+                eveningDigestScheduler.scheduleDigest(digestTime, zoneId)
+            } else {
+                eveningDigestScheduler.cancelDigest()
             }
         }
     }

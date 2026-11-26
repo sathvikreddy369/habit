@@ -19,14 +19,51 @@ private val DarkColorScheme = darkColorScheme(
     onSecondary = OnSecondaryDark,
     secondaryContainer = SecondaryContainerDark,
     onSecondaryContainer = OnSecondaryContainerDark,
+    tertiary = TertiaryDark,
+    onTertiary = OnTertiaryDark,
+    tertiaryContainer = TertiaryContainerDark,
+    onTertiaryContainer = OnTertiaryContainerDark,
     background = BackgroundDark,
     onBackground = OnBackgroundDark,
     surface = SurfaceDark,
     onSurface = OnSurfaceDark,
     surfaceVariant = SurfaceVariantDark,
     onSurfaceVariant = OnSurfaceVariantDark,
+    surfaceContainerLowest = SurfaceContainerLowestDark,
+    surfaceContainerLow = SurfaceContainerLowDark,
+    surfaceContainer = SurfaceContainerDark,
+    surfaceContainerHigh = SurfaceContainerHighDark,
+    surfaceContainerHighest = SurfaceContainerHighestDark,
     outline = OutlineDark,
     outlineVariant = OutlineVariantDark
+)
+
+private val AmoledColorScheme = darkColorScheme(
+    primary = PrimaryDark,
+    onPrimary = OnPrimaryDark,
+    primaryContainer = PrimaryContainerDark,
+    onPrimaryContainer = OnPrimaryContainerDark,
+    secondary = SecondaryDark,
+    onSecondary = OnSecondaryDark,
+    secondaryContainer = SecondaryContainerDark,
+    onSecondaryContainer = OnSecondaryContainerDark,
+    tertiary = TertiaryDark,
+    onTertiary = OnTertiaryDark,
+    tertiaryContainer = TertiaryContainerDark,
+    onTertiaryContainer = OnTertiaryContainerDark,
+    background = BackgroundAmoled,
+    onBackground = OnBackgroundDark,
+    surface = SurfaceAmoled,
+    onSurface = OnSurfaceDark,
+    surfaceVariant = SurfaceVariantAmoled,
+    onSurfaceVariant = OnSurfaceVariantDark,
+    surfaceContainerLowest = SurfaceContainerLowestAmoled,
+    surfaceContainerLow = SurfaceContainerLowAmoled,
+    surfaceContainer = SurfaceContainerAmoled,
+    surfaceContainerHigh = SurfaceContainerHighAmoled,
+    surfaceContainerHighest = SurfaceContainerHighestAmoled,
+    outline = OutlineDark,
+    outlineVariant = OutlineVariantAmoled
 )
 
 private val LightColorScheme = lightColorScheme(
@@ -38,12 +75,21 @@ private val LightColorScheme = lightColorScheme(
     onSecondary = OnSecondaryLight,
     secondaryContainer = SecondaryContainerLight,
     onSecondaryContainer = OnSecondaryContainerLight,
+    tertiary = TertiaryLight,
+    onTertiary = OnTertiaryLight,
+    tertiaryContainer = TertiaryContainerLight,
+    onTertiaryContainer = OnTertiaryContainerLight,
     background = BackgroundLight,
     onBackground = OnBackgroundLight,
     surface = SurfaceLight,
     onSurface = OnSurfaceLight,
     surfaceVariant = SurfaceVariantLight,
     onSurfaceVariant = OnSurfaceVariantLight,
+    surfaceContainerLowest = SurfaceContainerLowestLight,
+    surfaceContainerLow = SurfaceContainerLowLight,
+    surfaceContainer = SurfaceContainerLight,
+    surfaceContainerHigh = SurfaceContainerHighLight,
+    surfaceContainerHighest = SurfaceContainerHighestLight,
     outline = OutlineLight,
     outlineVariant = OutlineVariantLight
 )
@@ -51,6 +97,7 @@ private val LightColorScheme = lightColorScheme(
 @Composable
 fun HabitTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
+    isAmoled: Boolean = false,
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
@@ -59,6 +106,7 @@ fun HabitTheme(
             val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
+        darkTheme && isAmoled -> AmoledColorScheme
         darkTheme -> DarkColorScheme
         else -> LightColorScheme
     }
